@@ -1,1 +1,1 @@
-pub mod chnfe_from_xml;
+pub mod from_xml;

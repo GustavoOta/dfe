@@ -1,4 +1,4 @@
-pub fn chnfe_from_xml(xml: String) -> String {
+pub fn get_chnfe(xml: String) -> String {
     let chnfe = xml;
     return chnfe.to_string();
 }
