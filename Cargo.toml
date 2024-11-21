@@ -1,13 +1,14 @@
 [package]
 name = "dfe"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description = "DFE - Documentos Fiscais Eletrônicos Brasileiros"
 license = "MIT"
 readme = "README.md"
 keywords = ["rust", "nfe", "dfe"]
 categories = ["api-bindings", "parsing"]
-
+homepage = "https://github.com/GustavoOta/dfe"
+repository = "https://github.com/GustavoOta/dfe"
 
 [dependencies]
 serde = { version = "1.0.215", features = ["derive"] }
