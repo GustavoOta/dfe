@@ -7,12 +7,18 @@ license = "MIT"
 readme = "README.md"
 keywords = ["rust", "nfe", "dfe"]
 categories = ["api-bindings", "parsing"]
+
 homepage = "https://github.com/GustavoOta/dfe"
 repository = "https://github.com/GustavoOta/dfe"
 
 [dependencies]
-openssl = { version = "0.10", features = ["vendored"] }
-reqwest = "0.12.9"
+anyhow = "1.0.93"
+base64 = "0.22.1"
+libxml = "0.3.3"
+openssl = { version = "0.10.68", features = ["vendored"] }
+quick-xml = { version = "0.37.1", features = ["tokio"]}
+rand = "0.8.5"
+reqwest = { version = "0.12.9", features = ["native-tls", "json", "gzip"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 tokio = { version = "1.41.1", features = ["full"] }

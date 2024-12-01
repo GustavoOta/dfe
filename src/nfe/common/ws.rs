@@ -1,98 +1,118 @@
-use std::error::Error;
+use anyhow::*;
 
-pub fn get_ws_url(
-    service: String,
-    ambiente: i8,
-    uf: String,
-    svn: bool,
-) -> Result<String, Box<dyn Error>> {
+pub fn nfe_status_servico(ambiente: i8, uf: &str, svn: bool) -> Result<&str> {
+    let url = url("NfeStatusServico", ambiente, uf, svn);
+    Ok(url.unwrap())
+}
+/// Retorna a URL do Web Service conforme o serviço, ambiente, UF e SVN
+/// # Exemplo
+/// ```
+/// use dfe::ws::Get;
+/// let url = Get::nfe_status_servico("NfeStatusServico", 2, "SP", false);
+/// println!("URL: {:?}", url);
+/// ```
+fn url<'a>(service: &'a str, ambiente: i8, uf: &'a str, svn: bool) -> Result<&'a str> {
     // Se service = NfeInutilizacao, NfeConsultaProtocolo, NfeStatusServico, NfeConsultaCadastro, RecepcaoEvento, NFeAutorizacao, NFeRetAutorizacao
     // Se ambiente 0 = produção com validade jurídica ou 1 = homologação
     // Se UF = SP, RJ, MG, etc
     // Se SVN = true, então é SVC-AN
 
-    let url = match (service.as_str(), ambiente, uf.as_str(), svn) {
-        ("NfeInutilizacao", 0, "SP", false) => {
-            "https://nfe.fazenda.sp.gov.br/ws/nfeinutilizacao4.asmx".to_string()
-        }
-        ("NfeConsultaProtocolo", 0, "SP", false) => {
-            "https://nfe.fazenda.sp.gov.br/ws/nfeconsultaprotocolo4.asmx".to_string()
-        }
-        ("NfeStatusServico", 0, "SP", false) => {
-            "https://nfe.fazenda.sp.gov.br/ws/nfestatusservico4.asmx".to_string()
-        }
-        ("NfeConsultaCadastro", 0, "SP", false) => {
-            "https://nfe.fazenda.sp.gov.br/ws/cadconsultacadastro4.asmx".to_string()
-        }
-        ("RecepcaoEvento", 0, "SP", false) => {
-            "https://nfe.fazenda.sp.gov.br/ws/nferecepcaoevento4.asmx".to_string()
-        }
-        ("NFeAutorizacao", 0, "SP", false) => {
-            "https://nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx".to_string()
-        }
-        ("NFeRetAutorizacao", 0, "SP", false) => {
-            "https://nfe.fazenda.sp.gov.br/ws/nferetautorizacao4.asmx".to_string()
-        }
+    let url = match (service, ambiente, uf, svn) {
         ("NfeInutilizacao", 1, "SP", false) => {
-            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeinutilizacao4.asmx".to_string()
+            "https://nfe.fazenda.sp.gov.br/ws/nfeinutilizacao4.asmx"
         }
         ("NfeConsultaProtocolo", 1, "SP", false) => {
-            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeconsultaprotocolo4.asmx".to_string()
+            "https://nfe.fazenda.sp.gov.br/ws/nfeconsultaprotocolo4.asmx"
         }
         ("NfeStatusServico", 1, "SP", false) => {
-            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfestatusservico4.asmx".to_string()
+            "https://nfe.fazenda.sp.gov.br/ws/nfestatusservico4.asmx"
         }
         ("NfeConsultaCadastro", 1, "SP", false) => {
-            "https://homologacao.nfe.fazenda.sp.gov.br/ws/cadconsultacadastro4.asmx".to_string()
+            "https://nfe.fazenda.sp.gov.br/ws/cadconsultacadastro4.asmx"
         }
         ("RecepcaoEvento", 1, "SP", false) => {
-            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nferecepcaoevento4.asmx".to_string()
+            "https://nfe.fazenda.sp.gov.br/ws/nferecepcaoevento4.asmx"
         }
         ("NFeAutorizacao", 1, "SP", false) => {
-            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx".to_string()
+            "https://nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx"
         }
         ("NFeRetAutorizacao", 1, "SP", false) => {
-            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nferetautorizacao4.asmx".to_string()
+            "https://nfe.fazenda.sp.gov.br/ws/nferetautorizacao4.asmx"
         }
-        ("NfeConsultaProtocolo", 0, "SP", true) => {
-            "https://www.svc.fazenda.gov.br/NFeConsultaProtocolo4/NFeConsultaProtocolo4.asmx"
-                .to_string()
+        ("NfeInutilizacao", 2, "SP", false) => {
+            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeinutilizacao4.asmx"
         }
-        ("NfeStatusServico", 0, "SP", true) => {
-            "https://www.svc.fazenda.gov.br/NFeStatusServico4/NFeStatusServico4.asmx".to_string()
+        ("NfeConsultaProtocolo", 2, "SP", false) => {
+            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeconsultaprotocolo4.asmx"
         }
-        ("RecepcaoEvento", 0, "SP", true) => {
-            "https://www.svc.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx".to_string()
+        ("NfeStatusServico", 2, "SP", false) => {
+            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfestatusservico4.asmx"
         }
-        ("NFeAutorizacao", 0, "SP", true) => {
-            "https://www.svc.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx".to_string()
+        ("NfeConsultaCadastro", 2, "SP", false) => {
+            "https://homologacao.nfe.fazenda.sp.gov.br/ws/cadconsultacadastro4.asmx"
         }
-        ("NFeRetAutorizacao", 0, "SP", true) => {
-            "https://www.svc.fazenda.gov.br/NFeRetAutorizacao4/NFeRetAutorizacao4.asmx".to_string()
+        ("RecepcaoEvento", 2, "SP", false) => {
+            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nferecepcaoevento4.asmx"
+        }
+        ("NFeAutorizacao", 2, "SP", false) => {
+            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeautorizacao4.asmx"
+        }
+        ("NFeRetAutorizacao", 2, "SP", false) => {
+            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nferetautorizacao4.asmx"
         }
         ("NfeConsultaProtocolo", 1, "SP", true) => {
-            "https://hom.svc.fazenda.gov.br/NFeConsultaProtocolo4/NFeConsultaProtocolo4.asmx"
-                .to_string()
+            "https://www.svc.fazenda.gov.br/NFeConsultaProtocolo4/NFeConsultaProtocolo4.asmx"
         }
         ("NfeStatusServico", 1, "SP", true) => {
-            "https://hom.svc.fazenda.gov.br/NFeStatusServico4/NFeStatusServico4.asmx".to_string()
+            "https://www.svc.fazenda.gov.br/NFeStatusServico4/NFeStatusServico4.asmx"
         }
         ("RecepcaoEvento", 1, "SP", true) => {
-            "https://hom.svc.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx".to_string()
+            "https://www.svc.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx"
         }
         ("NFeAutorizacao", 1, "SP", true) => {
-            "https://hom.svc.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx".to_string()
+            "https://www.svc.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx"
         }
         ("NFeRetAutorizacao", 1, "SP", true) => {
-            "https://hom.svc.fazenda.gov.br/NFeRetAutorizacao4/NFeRetAutorizacao4.asmx".to_string()
+            "https://www.svc.fazenda.gov.br/NFeRetAutorizacao4/NFeRetAutorizacao4.asmx"
+        }
+        ("NfeConsultaProtocolo", 2, "SP", true) => {
+            "https://hom.svc.fazenda.gov.br/NFeConsultaProtocolo4/NFeConsultaProtocolo4.asmx"
+        }
+        ("NfeStatusServico", 2, "SP", true) => {
+            "https://hom.svc.fazenda.gov.br/NFeStatusServico4/NFeStatusServico4.asmx"
+        }
+        ("RecepcaoEvento", 2, "SP", true) => {
+            "https://hom.svc.fazenda.gov.br/NFeRecepcaoEvento4/NFeRecepcaoEvento4.asmx"
+        }
+        ("NFeAutorizacao", 2, "SP", true) => {
+            "https://hom.svc.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx"
+        }
+        ("NFeRetAutorizacao", 2, "SP", true) => {
+            "https://hom.svc.fazenda.gov.br/NFeRetAutorizacao4/NFeRetAutorizacao4.asmx"
         }
         // Adicione mais URLs conforme a necessidade
         _ => {
-            return Err(format!("Error: Service name not found: {}", service).into());
+            return Err(anyhow!("Service endpoint not found"));
         }
     };
 
     Ok(url)
+}
+
+// Teste
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_ws_url() {
+        let url = url("NfeStatusServico", 2, "SP", false);
+        println!("URL: {:?}", url);
+        assert_eq!(
+            url.unwrap(),
+            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfestatusservico4.asmx"
+        );
+    }
 }
 
 /*
