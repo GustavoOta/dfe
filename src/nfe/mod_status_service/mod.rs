@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
-use quick_xml::events::Event;
-use quick_xml::name::QName;
-use quick_xml::Reader;
+use quick_xml::events::Event; // TODO: change to quick_xml to serde_xml_rs
+use quick_xml::name::QName; // TODO: change to quick_xml to serde_xml_rs
+use quick_xml::Reader; // TODO: change to quick_xml to serde_xml_rs
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 
@@ -38,7 +38,7 @@ pub async fn get(params: Use) -> Result<Status> {
         _ => 2,
     };
     // TODO: implement svc parameter fallback
-    let url = nfe_status_servico(environment_num, &raw_config.federative_unit, false)?;
+    let url = nfe_status_servico(environment_num, &raw_config.federative_unit, 55, false)?;
 
     let response = connection::WebService::send(
         client,

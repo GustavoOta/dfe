@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 pub enum Use {
     ManualConfig(Fields),
@@ -13,10 +14,19 @@ pub struct Fields {
 }
 
 // Environment options to use in the service
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Environment {
-    Production = 1,
-    Homologation = 2,
+    Production,
+    Homologation,
+}
+
+impl fmt::Display for Environment {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Environment::Production => write!(f, "1"),
+            Environment::Homologation => write!(f, "2"),
+        }
+    }
 }
 
 // Password options to use the encrypted password, key, and iv in a file

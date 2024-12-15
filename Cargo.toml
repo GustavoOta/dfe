@@ -14,11 +14,16 @@ repository = "https://github.com/GustavoOta/dfe"
 [dependencies]
 anyhow = "1.0.93"
 base64 = "0.22.1"
+chrono = "0.4.38"
+chrono-tz = "0.10.0"
 libxml = "0.3.3"
 openssl = { version = "0.10.68", features = ["vendored"] }
-quick-xml = { version = "0.37.1", features = ["tokio"]}
+quick-xml = "0.37.1"
 rand = "0.8.5"
-reqwest = { version = "0.12.9", features = ["native-tls", "json", "gzip"] }
+regex = "1.11.1"
+reqwest = { version = "0.12.9", features = ["native-tls", "json", "gzip", "blocking"] }
 serde = { version = "1.0.215", features = ["derive"] }
+serde-xml-rs = "0.6.0"
 serde_json = "1.0.133"
+sha1 = "0.10.6"
 tokio = { version = "1.41.1", features = ["full"] }

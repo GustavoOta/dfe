@@ -1,9 +1,22 @@
 pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<bool, Vec<String>> {
-    let xml = libxml::parser::Parser::default()
-        .parse_file(xml)
-        .expect("Erro ao tentar fazer o parse do XML");
+    // clean \ backslash
+    let xml = xml.replace("\\", "");
+    // clean /n and /r white space
+    let xml = xml.replace("\n", "");
+    let xml = xml.replace("\r", "");
+    // clean /t tab space
+    let xml = xml.replace("\t", "");
+    // clean / white space
+    let xml = libxml::parser::Parser::default().parse_string(xml);
+
+    if xml.is_err() {
+        return Err(vec![xml.err().unwrap().to_string()]);
+    }
+
+    let xml = xml.unwrap();
 
     let mut xsdparser = libxml::schemas::SchemaParserContext::from_file(xsd);
+
     let xsd = libxml::schemas::SchemaValidationContext::from_parser(&mut xsdparser);
 
     if let Err(errors) = xsd {

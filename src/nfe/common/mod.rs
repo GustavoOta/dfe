@@ -1,4 +1,10 @@
 pub mod cert;
+pub mod chave_acesso;
+pub mod cleaner;
+pub mod config;
 pub mod config_file;
+pub mod dates;
+pub mod extract;
+pub mod sign;
 pub mod validation;
 pub mod ws;
