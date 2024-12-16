@@ -365,10 +365,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
 
     // validação do xml ----------------------------------------------------
     use crate::nfe::common::validation::is_xml_valid;
-    let is_valid = is_xml_valid(
-        &xml,
-        "D:/Projetos/dfe/shema/PL_009p_NT2024_003_v1.02/nfe_v4.00.xsd",
-    );
+    let is_valid = is_xml_valid(&xml, "./dfe/shema/PL_009p_NT2024_003_v1.02/nfe_v4.00.xsd");
     if is_valid.is_err() {
         // save xml_validation_error.xml
         let mut file =

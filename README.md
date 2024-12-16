@@ -9,8 +9,9 @@ Porque RUST?
 Porque estou aprendendo a linguagem KKK.
 
 ## Instalação:
--> É necessário instalar o OPENSSL em seu ambiente de desenvolvimento, em ambiente Windows(o meu) instale Pear tbm.
--> cargo add dfe
+-> É necessário instalar o OPENSSL no seu ambiente de desenvolvimento. No ambiente Windows (como o meu), instale também o Pear.   
+-> Copie a pasta dfe que contém os arquivos de SCHEMA para o diretório do seu executável.   
+-> cargo add dfe  
 
 ## Exemplo de Uso: Emitir NFe
 
