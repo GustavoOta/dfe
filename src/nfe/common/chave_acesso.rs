@@ -1,5 +1,6 @@
 use crate::nfe::common::dates::{get_current_month, get_current_year};
 use crate::nfe::types::chave_acesso_props::{ChaveAcessoProps, ExtractComposition};
+use anyhow::{Error, Result};
 use rand::Rng;
 
 pub struct ChaveAcesso {
@@ -60,28 +61,28 @@ impl ChaveAcesso {
         codigo_numerico.to_string()
     }
 
-    pub fn extract_composition(chave: &str) -> ExtractComposition {
+    pub fn extract_composition(chave: &str) -> Result<ExtractComposition, Error> {
         let uf = &chave[0..2];
         let ano = &chave[2..4];
         let mes = &chave[4..6];
-        let cnpj = &chave[6..20];
+        let doc = &chave[6..20];
         let modelo = &chave[20..22];
         let serie = &chave[22..25];
         let numero = &chave[25..34];
         let tp_emis = &chave[34..35];
         let codigo_numerico = &chave[35..43];
 
-        ExtractComposition {
-            uf: uf.to_string(),
+        Ok(ExtractComposition {
+            uf_code: uf.to_string(),
             ano: ano.to_string(),
             mes: mes.to_string(),
-            doc: cnpj.to_string(),
+            doc: doc.to_string(),
             modelo: modelo.to_string(),
             serie: serie.to_string(),
             numero: numero.to_string(),
             tp_emis: tp_emis.to_string(),
             codigo_numerico: codigo_numerico.to_string(),
-        }
+        })
     }
 }
 

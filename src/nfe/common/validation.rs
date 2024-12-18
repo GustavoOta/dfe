@@ -1,14 +1,9 @@
 use anyhow::{Error, Result};
+use std::fs::File;
+use std::io::Write;
 
-pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<bool, Error> {
-    // clean \ backslash
-    let xml = xml.replace("\\", "");
-    // clean /n and /r white space
-    let xml = xml.replace("\n", "");
-    let xml = xml.replace("\r", "");
-    // clean /t tab space
-    let xml = xml.replace("\t", "");
-    // clean / white space
+pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<String, Error> {
+    let raw_incoming_xml = xml;
     let xml = libxml::parser::Parser::default().parse_string(xml)?;
 
     let mut xsdparser = libxml::schemas::SchemaParserContext::from_file(xsd);
@@ -20,6 +15,7 @@ pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<bool, Error> {
         for err in &errors {
             messages.push(err.message.as_ref().unwrap().to_string());
         }
+        save_xml(&raw_incoming_xml)?;
         return Err(Error::msg(messages.join("\n")));
     }
 
@@ -30,10 +26,18 @@ pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<bool, Error> {
         for err in &errors {
             messages.push(err.message.as_ref().unwrap().to_string());
         }
+        save_xml(&raw_incoming_xml)?;
         return Err(Error::msg(messages.join("\n")));
     }
 
-    Ok(true)
+    Ok(raw_incoming_xml.to_string())
+}
+
+fn save_xml(xml: &str) -> Result<(), Error> {
+    // save xml_validation_error.xml
+    let mut file = File::create("./xml_validation_error.xml")?;
+    file.write_all(xml.as_bytes())?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -50,7 +54,6 @@ mod tests {
             assert!(false);
             return;
         }
-        let result = result.unwrap();
-        assert_eq!(result, true);
+        let _result = result.unwrap();
     }
 }

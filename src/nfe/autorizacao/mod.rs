@@ -8,31 +8,35 @@ mod total;
 mod transp;
 
 use crate::nfe;
-use crate::nfe::common::cert::{self, Cert};
-use crate::nfe::common::dates::get_current_date_time;
-use crate::nfe::common::ws::nfe_autorizacao;
-use crate::nfe::connection::WebService;
-use crate::nfe::types::autorizacao4::*;
-use crate::nfe::types::chave_acesso_props::ChaveAcessoProps;
 use anyhow::{Error, Result};
-use base64::{engine::general_purpose::STANDARD, Engine};
 use dest::dest_process;
 use det::det_process;
 use emit::{EmitProcess, EnderEmitProcess};
 use ide::*;
 use inf_adic::inf_adic_process;
+use nfe::common::cert::Cert;
 use nfe::common::chave_acesso::ChaveAcesso;
-use openssl::pkcs12::Pkcs12;
-use openssl::sign::Signer;
+use nfe::common::cleaner;
+use nfe::common::cleaner::Strings;
+use nfe::common::dates::get_current_date_time;
+use nfe::common::validation::is_xml_valid;
+use nfe::common::ws::nfe_autorizacao;
+use nfe::connection::WebService;
+use nfe::types::autorizacao4::*;
+use nfe::types::chave_acesso_props::ChaveAcessoProps;
 use pag::pag_process;
 use regex::Regex;
 use serde_xml_rs::to_string;
-//use sha1::digest;
 use std::fs::File;
-use std::io::Read;
 use std::io::Write;
 use total::total_process;
 use transp::transp_process;
+
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
+pub struct Response {
+    pub protocolo: TagInfProt,
+    pub xml: String,
+}
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct InfProt {
@@ -57,12 +61,6 @@ pub struct InfProt {
 pub struct TagInfProt {
     #[serde(rename = "infProt")]
     pub inf_prot: InfProt,
-}
-
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
-pub struct Response {
-    pub protocolo: TagInfProt,
-    pub xml: String,
 }
 
 pub async fn emit(nfe: NFe) -> Result<Response, Error> {
@@ -176,6 +174,8 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
     };
 
     let dest = dest_process(nfe.dest)?;
+    let dest_string = to_string(&dest)?;
+    let dest_string = corrigir_tags_dest(dest_string);
 
     let dets = det_process(nfe.det)?;
     let mut det_string = String::new();
@@ -197,53 +197,9 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
     }
 
     let total = total_process(nfe.total)?;
-
     let transp = transp_process(nfe.transp)?;
-
     let pag = pag_process(nfe.pag)?;
-
     let inf_adic = inf_adic_process(nfe.inf_adic)?;
-
-    let dest_string = to_string(&dest);
-    let dest_string = match dest_string {
-        Ok(dest_string) => dest_string,
-        Err(e) => {
-            println!("Erro ao gerar o XML do Destinatário: {:?}", e);
-            return Err(Error::msg("Erro ao gerar o XML do Destinatário"));
-        }
-    };
-
-    // remover de dest string <CPF><CPF> e substituir por <CPF>
-    let re = Regex::new(r"<CPF><CPF>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "<CPF>").to_string();
-
-    // remover de dest string <CNPJ><CNPJ> e substituir por <CNPJ>
-    let re = Regex::new(r"<CNPJ><CNPJ>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "<CNPJ>").to_string();
-
-    // remover de dest string <idEstrangeiro><idEstrangeiro> e substituir por <idEstrangeiro>
-    let re = Regex::new(r"<idEstrangeiro><idEstrangeiro>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "<idEstrangeiro>").to_string();
-
-    // remover de dest string </CPF></CPF> e substituir por ""
-    let re = Regex::new(r"</enderDest></CPF>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "</enderDest>").to_string();
-
-    // remover de dest string </CNPJ></CNPJ> e substituir por ""
-    let re = Regex::new(r"</enderDest></CNPJ>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "</enderDest>").to_string();
-
-    // remover de dest string </CNPJ></dest> e substituir por "</dest>"
-    let re = Regex::new(r"</CNPJ></dest>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "</dest>").to_string();
-
-    // remover de dest string </CPF></dest> e substituir por "</dest>"
-    let re = Regex::new(r"</CPF></dest>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "</dest>").to_string();
-
-    // remover de dest string </idEstrangeiro></idEstrangeiro> e substituir por ""
-    let re = Regex::new(r"</enderDest></idEstrangeiro>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "</enderDest>").to_string();
 
     let xml = format!(
         "<infNFe xmlns=\"http://www.portalfiscal.inf.br/nfe\" Id=\"NFe{}\" versao=\"4.00\">{}{}{}{}{}{}{}{}{}",
@@ -277,20 +233,18 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         "</infNFe>"
     );
 
-    use nfe::common::cleaner::Strings;
     let xml = Strings::clear_xml_string(&xml);
 
     // generate digest value OK ---------------------------------------------
-    let digest_value = crate::nfe::common::cert::DigestValue::sha1(&xml);
+    let digest_value = crate::nfe::common::cert::DigestValue::sha1(&xml)?;
 
     // generate x509 certificate clean begin and end OK ----------------------
-    let x509_cert = cert::raw_pub_key(&nfe.cert_path, &nfe.cert_pass)
-        .await
-        .unwrap();
+    let x509_cert =
+        crate::nfe::common::cert::RawPubKey::get_from_file(&nfe.cert_path, &nfe.cert_pass).await?;
 
     // adicionar os campos de assinatura ------------------------------------
     //<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\">
-    let mut digest_nodes = "".to_string()
+    let mut signed_info = "".to_string()
         + "<SignedInfo xmlns=\"http://www.w3.org/2000/09/xmldsig#\">"
         + "<CanonicalizationMethod Algorithm=\"http://www.w3.org/TR/2001/REC-xml-c14n-20010315\"></CanonicalizationMethod>"
         + "<SignatureMethod Algorithm=\"http://www.w3.org/2000/09/xmldsig#rsa-sha1\"></SignatureMethod>"
@@ -309,26 +263,16 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         + "</SignedInfo>";
 
     // clean digest nodes use regex para remover \
-    digest_nodes = digest_nodes.replace("\n", "");
-    digest_nodes = digest_nodes.replace("\r", "");
-    digest_nodes = digest_nodes.replace("\t", "");
-    digest_nodes = digest_nodes.replace(" /", "/");
-    digest_nodes = digest_nodes.replace("\\", "");
-    // Remove espaços em branco entre '>' e '<'
-    let re = Regex::new(r">\s+<").unwrap();
-    digest_nodes = re.replace_all(&digest_nodes, "><").to_string();
+    signed_info = cleaner::Strings::clear_xml_string(&signed_info);
 
     // generate signature base64 -------------------------------------------
-    //openssl_sign($digest_value, $encryptedData, $this->resource, $algorithm)
-    let signature_base64 = openssl_sign(&digest_nodes, &nfe.cert_path, &nfe.cert_pass)
-        .await
-        .unwrap();
-    let signature_base64 = STANDARD.encode(&signature_base64);
+    let signature_base64 =
+        crate::nfe::common::cert::Sign::xml_string(&signed_info, &nfe.cert_path, &nfe.cert_pass)
+            .await?;
 
     // adicionar a assinatura ao XML ---------------------------------------
-    // att signature
     let signature_nodes =
-        digest_nodes + "<SignatureValue>" + &signature_base64 + "</SignatureValue>";
+        signed_info + "<SignatureValue>" + &signature_base64 + "</SignatureValue>";
 
     // add x509 certificate ------------------------------------------------
     let signed_xml = "<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\">".to_string()
@@ -348,39 +292,20 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         + &signed_xml
         + "</NFe>";
 
-    // clean /n and /r white space /t ---------------------------------------
-    let xml = xml.replace("\n", "");
-    let xml = xml.replace("\r", "");
-    let xml = xml.replace("\t", "");
-    let xml = xml.replace(" /", "/");
-    // Remove espaços em branco entre '>' e '<'
-    let re = Regex::new(r">\s+<").unwrap();
-    let xml = re.replace_all(&xml, "><").to_string();
-
-    // remove <?xml version=\"1.0\" encoding=\"utf-8\"?> ---------------------
-    let xml = xml.replace("<?xml version=\"1.0\" encoding=\"utf-8\"?>", "");
-
     // validação do xml ----------------------------------------------------
-    use crate::nfe::common::validation::is_xml_valid;
-    let is_valid = is_xml_valid(&xml, "./dfe/shema/PL_009p_NT2024_003_v1.02/nfe_v4.00.xsd");
-    if is_valid.is_err() {
-        // save xml_validation_error.xml
-        let mut file =
-            File::create("./xml_validation_error.xml").expect("Não foi possível criar o arquivo");
-        file.write_all(xml.as_bytes())
-            .expect("Não foi possível escrever o arquivo");
-
-        return Err(Error::msg(format!(
-            "Erro ao validar o XML: {:?} -> XML Gerado: {:?}",
-            is_valid.err(),
-            xml
-        )));
-    }
-
-    let signed_xml = xml.clone();
+    let signed_xml = is_xml_valid(&xml, "./dfe/shema/PL_009p_NT2024_003_v1.02/nfe_v4.00.xsd")?;
 
     // envelope -------------------------------------------------------------
-    let lote_ini = r#"<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>100</idLote><indSinc>1</indSinc>"#;
+    // TODO: Identificador de controle do Lote de envio do Evento.
+    // Número sequencial autoincremental único para identificação
+    // do Lote. A responsabilidade de gerar e controlar é exclusiva
+    // do autor do evento. O Web Service não faz qualquer uso
+    // deste identificador u<1-15>
+    let id_lote = 100;
+    let lote_ini = format!(
+        r#"<enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>{}</idLote><indSinc>1</indSinc>"#,
+        id_lote
+    );
     let lote_fim = "</enviNFe>";
 
     let xml = format!(
@@ -388,15 +313,11 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         lote_ini, &xml, lote_fim
     );
 
-    // Enviar a NF-e para a SEFAZ de homologacao de SP -----------------------
-    //let url = "https://homologacao.nfe.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx";
-    //let url = nfe_autorizacao(&nfe.ide.tp_amb, &nfe.ide.uf, &nfe.ide.mod_);
-
+    // Selecionar o url do webservice -----------------------
     let url = nfe_autorizacao(nfe.ide.tp_amb, "SP", nfe.ide.mod_, false)?;
 
-    let cert = Cert::from_pfx(&nfe.cert_path, &nfe.cert_pass)
-        .expect("Não foi possível carregar o certificado");
-    let client = WebService::client(cert.identity).unwrap();
+    let cert = Cert::from_pfx(&nfe.cert_path, &nfe.cert_pass)?;
+    let client = WebService::client(cert.identity)?;
 
     // Verificar a declaração de codificação no XML
     let xml_with_declaration = if xml.starts_with("<?xml") {
@@ -475,7 +396,6 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
 }
 
 fn xml_result(response: &str, signed_xml: String) -> Result<Response, Error> {
-    // Extract the response body with the infProt tag and its content
     let re = Regex::new(r#"<protNFe versao="4.00">(.*?)</protNFe>"#)?;
     let prot_nfe = re.captures(&response).unwrap().get(0).unwrap().as_str();
 
@@ -486,31 +406,41 @@ fn xml_result(response: &str, signed_xml: String) -> Result<Response, Error> {
         xml: signed_xml,
     })
 }
+// TODO - ??? GAMBIARRA ??? Usar o quick_xml para gerar o XML.
+// O serde_xml_rs para deserializar a resposta é bom
+// mas para gerar é melhor o quick_xml
+fn corrigir_tags_dest(string: String) -> String {
+    // remover de dest string <CPF><CPF> e substituir por <CPF>
+    let re = Regex::new(r"<CPF><CPF>").unwrap();
+    let dest_string = re.replace_all(&string, "<CPF>").to_string();
 
-async fn openssl_sign(data: &str, pfx_path: &str, password: &str) -> Result<Vec<u8>, Error> {
-    let mut buf = Vec::new();
-    let mut pfx = File::open(pfx_path).expect("Não foi possível abrir o arquivo do certificado");
-    pfx.read_to_end(&mut buf)
-        .expect("Não foi possível ler o arquivo do certificado");
+    // remover de dest string <CNPJ><CNPJ> e substituir por <CNPJ>
+    let re = Regex::new(r"<CNPJ><CNPJ>").unwrap();
+    let dest_string = re.replace_all(&dest_string, "<CNPJ>").to_string();
 
-    let pkcs12 = Pkcs12::from_der(&buf).expect("Não foi possível carregar o certificado");
+    // remover de dest string <idEstrangeiro><idEstrangeiro> e substituir por <idEstrangeiro>
+    let re = Regex::new(r"<idEstrangeiro><idEstrangeiro>").unwrap();
+    let dest_string = re.replace_all(&dest_string, "<idEstrangeiro>").to_string();
 
-    // assinar data
-    let pkey = pkcs12
-        .parse2(password)
-        .expect("Não foi possível carregar o certificado");
+    // remover de dest string </CPF></CPF> e substituir por ""
+    let re = Regex::new(r"</enderDest></CPF>").unwrap();
+    let dest_string = re.replace_all(&dest_string, "</enderDest>").to_string();
 
-    let pkey = pkey.pkey.expect("Chave privada não encontrada");
+    // remover de dest string </CNPJ></CNPJ> e substituir por ""
+    let re = Regex::new(r"</enderDest></CNPJ>").unwrap();
+    let dest_string = re.replace_all(&dest_string, "</enderDest>").to_string();
 
-    let mut signer = Signer::new(openssl::hash::MessageDigest::sha1(), &pkey)
-        .expect("Não foi possível criar o assinador");
-    signer
-        .update(data.as_bytes())
-        .expect("Não foi possível assinar o XML");
+    // remover de dest string </CNPJ></dest> e substituir por "</dest>"
+    let re = Regex::new(r"</CNPJ></dest>").unwrap();
+    let dest_string = re.replace_all(&dest_string, "</dest>").to_string();
 
-    let signature = signer
-        .sign_to_vec()
-        .expect("Não foi possível assinar o XML");
+    // remover de dest string </CPF></dest> e substituir por "</dest>"
+    let re = Regex::new(r"</CPF></dest>").unwrap();
+    let dest_string = re.replace_all(&dest_string, "</dest>").to_string();
 
-    Ok(signature)
+    // remover de dest string </idEstrangeiro></idEstrangeiro> e substituir por ""
+    let re = Regex::new(r"</enderDest></idEstrangeiro>").unwrap();
+    let dest_string = re.replace_all(&dest_string, "</enderDest>").to_string();
+
+    dest_string
 }

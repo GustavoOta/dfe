@@ -22,7 +22,7 @@ pub struct ChaveAcessoProps {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ExtractComposition {
-    pub uf: String,
+    pub uf_code: String,
     pub ano: String,
     pub mes: String,
     pub doc: String,

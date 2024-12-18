@@ -59,6 +59,14 @@ impl DigestValue {
         let digest_value = STANDARD.encode(&result);
         Ok(digest_value)
     }
+
+    pub fn sha2(xml: &str) -> Result<String, Error> {
+        let mut hasher = openssl::sha::Sha256::new();
+        hasher.update(xml.as_bytes());
+        let result = hasher.finish();
+        let digest_value = STANDARD.encode(&result);
+        Ok(digest_value)
+    }
 }
 
 pub struct RawPubKey;
