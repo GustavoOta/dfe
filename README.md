@@ -155,24 +155,33 @@ if let Err(e) = teste {
     println!("Erro: {:?}", e);
 } else {
     if let Ok(response) = teste {
-        println!("Resposta: Ok(Response {{");
-        println!("    inf_prot: InfProt {{");
-        println!("        tp_amb: {},", response.protocolo.inf_prot.tp_amb);
-        println!("        ver_aplic: \"{}\",", response.protocolo.inf_prot.ver_aplic);
-        println!("        ch_nfe: \"{}\",", response.protocolo.inf_prot.ch_nfe);
-        println!("        dh_recbto: \"{}\",", response.protocolo.inf_prot.dh_recbto);
-        println!("        n_prot: {:?},", response.protocolo.inf_prot.n_prot);
-        println!("        dig_val: {:?},", response.protocolo.inf_prot.dig_val);
-        println!("        c_stat: {},", response.protocolo.inf_prot.c_stat);
-        println!("        x_motivo: \"{}\"", response.protocolo.inf_prot.x_motivo);
-        println!("    }}");
-        println!("}}");
-
-        // print xml
+        println!("Resposta: {}", response);
         println!("XML: {:?}", response.xml);
     }
 }
 ```
+# Exemplo de uso: Cancelar NF-e 
+```rust
+use dfe::nfe::cancelar::nfe_cancelar;
+    use dfe::nfe::types::cancelar::*;
+
+    let teste = nfe_cancelar(NFeCancelar {
+        cert_path: "D:/Projetos/cert.pfx".to_string(),
+        cert_pass: "1234".to_string(),
+        tp_amb: 2,
+        chave: "35241211111111111111550010000000381505051324".to_string(),
+        protocolo: "1352400000006702".to_string(),
+        justificativa: "TESTE DE CANCELAMENTO".to_string(),
+    })
+    .await;
+
+    if let Err(e) = teste {
+        println!("Erro: {:?}", e);
+    } else {
+        println!("Response: {:?}", teste.unwrap().response);
+    }
+```
+
 # Exemplo de uso: Status do Serviço 
 Webservice SP Produção
 ```rust
@@ -181,7 +190,7 @@ use dfe::nfe::types::config::*;
 // TODO mudar o tipo para receber Estado, Ambiente, NFe ou NFCe Homologação ou Produção
 let teste = service_status(Use::ManualConfig(Fields {
     cert_path: "D:/Projetos/cert.pfx".to_string(),
-    cert_pass: Password::Phrase("4101".to_string()),
+    cert_pass: Password::Phrase("1234".to_string()),
     federative_unit: "SP".to_string(),
     environment: Environment::Homologation,
 }))
