@@ -19,3 +19,16 @@ pub struct ChaveAcessoProps {
     /// If not informed, a random number will be generated
     pub codigo_numerico: String,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ExtractComposition {
+    pub uf: String,
+    pub ano: String,
+    pub mes: String,
+    pub doc: String,
+    pub modelo: String,
+    pub serie: String,
+    pub numero: String,
+    pub tp_emis: String,
+    pub codigo_numerico: String,
+}

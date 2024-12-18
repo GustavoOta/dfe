@@ -1,4 +1,6 @@
-pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<bool, Vec<String>> {
+use anyhow::{Error, Result};
+
+pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<bool, Error> {
     // clean \ backslash
     let xml = xml.replace("\\", "");
     // clean /n and /r white space
@@ -7,13 +9,7 @@ pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<bool, Vec<String>> {
     // clean /t tab space
     let xml = xml.replace("\t", "");
     // clean / white space
-    let xml = libxml::parser::Parser::default().parse_string(xml);
-
-    if xml.is_err() {
-        return Err(vec![xml.err().unwrap().to_string()]);
-    }
-
-    let xml = xml.unwrap();
+    let xml = libxml::parser::Parser::default().parse_string(xml)?;
 
     let mut xsdparser = libxml::schemas::SchemaParserContext::from_file(xsd);
 
@@ -24,7 +20,7 @@ pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<bool, Vec<String>> {
         for err in &errors {
             messages.push(err.message.as_ref().unwrap().to_string());
         }
-        return Err(messages);
+        return Err(Error::msg(messages.join("\n")));
     }
 
     let mut xsd = xsd.unwrap();
@@ -34,7 +30,7 @@ pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<bool, Vec<String>> {
         for err in &errors {
             messages.push(err.message.as_ref().unwrap().to_string());
         }
-        return Err(messages);
+        return Err(Error::msg(messages.join("\n")));
     }
 
     Ok(true)

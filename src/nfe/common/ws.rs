@@ -15,6 +15,16 @@ pub fn nfe_autorizacao<'a>(ambiente: u8, uf: &'a str, modelo: u32, svn: bool) ->
     Ok(url.unwrap())
 }
 
+pub fn nfe_recepcao_evento<'a>(
+    ambiente: u8,
+    uf: &'a str,
+    modelo: u32,
+    svn: bool,
+) -> Result<&'a str> {
+    let url = url("RecepcaoEvento", ambiente, uf, modelo, svn);
+    Ok(url.unwrap())
+}
+
 /// Retorna a URL do Web Service conforme o serviço, ambiente, UF e SVN
 /// # Exemplo
 /// ```

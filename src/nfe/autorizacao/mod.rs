@@ -27,6 +27,7 @@ use openssl::sign::Signer;
 use pag::pag_process;
 use regex::Regex;
 use serde_xml_rs::to_string;
+//use sha1::digest;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
@@ -280,11 +281,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
     let xml = Strings::clear_xml_string(&xml);
 
     // generate digest value OK ---------------------------------------------
-    use sha1::{Digest, Sha1};
-    let mut hasher = Sha1::new();
-    hasher.update(xml.as_bytes());
-    let result = hasher.finalize();
-    let digest_value = STANDARD.encode(&result);
+    let digest_value = crate::nfe::common::cert::DigestValue::sha1(&xml);
 
     // generate x509 certificate clean begin and end OK ----------------------
     let x509_cert = cert::raw_pub_key(&nfe.cert_path, &nfe.cert_pass)
