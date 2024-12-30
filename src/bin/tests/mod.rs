@@ -63,8 +63,8 @@ async fn test_emit_nfe_nfce() {
             ..Default::default()
         },
         emit: Emit {
-            cnpj: Some("11111111111111".to_string()),
-            ie: Some(448111111111),
+            cnpj: Some("01111111000111".to_string()),
+            ie: Some(448111111110),
             crt: 3,
             x_nome: "EMPRESA DE TESTE".to_string(),
             x_fant: Some("TESTANDO EMPREENDIMENTOS".to_string()),
