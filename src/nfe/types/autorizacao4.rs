@@ -232,7 +232,7 @@ impl Default for Emit {
             c_mun: 0000000,
             x_mun: "".to_string(),
             uf: "".to_string(),
-            cep: 00000000,
+            cep: "00000000".to_string(),
             c_pais: Some(1058),
             x_pais: Some("Brasil".to_string()),
             fone: None,
@@ -268,7 +268,7 @@ pub struct Dest {
     /// Sigla da UF Ex: SC
     pub uf: Option<String>,
     /// CEP do destinatário Ex: 88509900
-    pub cep: Option<u32>,
+    pub cep: Option<String>,
     /// Código do país Ex: 1058 para Brasil
     pub c_pais: Option<String>,
     /// Nome do país Ex: Brasil
@@ -392,7 +392,7 @@ pub struct Det {
     /// desejada (0-10 decimais). Para efeitos de cálculo, o valor
     /// unitário será obtido pela divisão do valor do produto pela
     /// quantidade tributável (NT 2013/003)
-    pub v_un_trib: String,
+    pub v_un_trib: f32,
     /// Valor Total do Frete 13v2 Informar o valor total do frete da mercadoria ou serviço.
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
@@ -443,7 +443,7 @@ impl Default for Det {
             c_ean_trib: "SEM GTIN".to_string(),
             u_trib: "ng".to_string(),
             q_trib: 0.0,
-            v_un_trib: "".to_string(),
+            v_un_trib: 0.0,
             v_frete: None,
             v_seg: None,
             v_desc: None,
