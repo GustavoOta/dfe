@@ -189,9 +189,9 @@ pub struct Emit {
     pub x_mun: String,
     /// Sigla da UF Ex: SC String<2 Chars>
     pub uf: String,
-    /// CEP do emitente Ex: 88509900 u<8 Digits>
+    /// CEP do emitente Ex: 88509900 String<8 Digits>
     /// Informar os zeros não significativos. (NT 2011/004)
-    pub cep: u32,
+    pub cep: String,
     /// Código do país Ex: 1058 para Brasil u<4 Digits>
     pub c_pais: Option<u16>,
     /// Nome do país Ex: Brasil String<1-60 Chars>
