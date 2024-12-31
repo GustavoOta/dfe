@@ -60,7 +60,7 @@ pub struct EnderEmitProcess {
 
     /// CEP do emitente Ex: 88509900
     #[serde(rename = "CEP")]
-    pub cep: u32,
+    pub cep: String,
 
     /// Código do país Ex: 1058 para Brasil
     #[serde(rename = "cPais")]

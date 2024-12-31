@@ -74,7 +74,7 @@ async fn test_emit_nfe_nfce() {
             c_mun: 3529906,
             x_mun: "SÃO PAULO".to_string(),
             uf: "SP".to_string(),
-            cep: 11850000,
+            cep: "11850000".to_string(),
             ..Default::default()
         },
         dest: Dest {
@@ -88,7 +88,7 @@ async fn test_emit_nfe_nfce() {
             c_mun: Some(3550308),
             x_mun: Some("SÃO PAULO".to_string()),
             uf: Some("SP".to_string()),
-            cep: Some(11850000),
+            cep: Some("11850000".to_string()),
             //c_pais: Some("1058".to_string()),
             //x_pais: Some("BRASIL".to_string()),
             //fone: Some("11999999999".to_string()),
@@ -109,7 +109,7 @@ async fn test_emit_nfe_nfce() {
                 v_prod: 10.0,
                 u_trib: "CX".to_string(),
                 q_trib: 1.0,
-                v_un_trib: "10.00".to_string(),
+                v_un_trib: 10.00,
                 ind_tot: 1,
                 // TODO: Dispobilizar todos os tipos de ICMS
                 // Disponivel: -> ICMS40 ou ICMSSN102
@@ -132,7 +132,7 @@ async fn test_emit_nfe_nfce() {
                 v_prod: 20.0,
                 u_trib: "CX".to_string(),
                 q_trib: 2.0,
-                v_un_trib: "10.00".to_string(),
+                v_un_trib: 10.0,
                 ind_tot: 1,
                 icms: "ICMS40".to_string(), // ICMS40 ou ICMSSN102
                 pis: "PISNT".to_string(),
