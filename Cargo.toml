@@ -1,6 +1,6 @@
 [package]
 name = "dfe"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2021"
 description = "DFE - Documentos Fiscais Eletrônicos Brasileiros"
 license = "MIT"
