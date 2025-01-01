@@ -29,3 +29,6 @@ serde_json = "1.0.133"
 sha1 = "0.10.6"
 sha2 = "0.10.8"
 tokio = { version = "1.41.1", features = ["full"] }
+
+[package.metadata.vcpkg]
+build_type = "release"
