@@ -1,6 +1,6 @@
 [package]
 name = "dfe"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 description = "DFE - Documentos Fiscais Eletrônicos Brasileiros"
 license = "MIT"
@@ -10,6 +10,12 @@ categories = ["api-bindings", "parsing"]
 
 homepage = "https://github.com/GustavoOta/dfe"
 repository = "https://github.com/GustavoOta/dfe"
+
+[package.metadata.vcpkg]
+triplet = "x64-windows-static"
+
+[profile.release]
+debug = false
 
 [dependencies]
 anyhow = "1.0.93"

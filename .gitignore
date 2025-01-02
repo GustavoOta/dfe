@@ -1,5 +1,6 @@
 /target
 /vcpkg
 Cargo.lock
+nfe_request.xml
 cert_pass.txt
 nfe_config.json
