@@ -21,7 +21,7 @@ pub struct EmitProcess {
     pub ender_emit: EnderEmitProcess,
     /// Inscrição estadual do emitente Ex: 123456789
     #[serde(rename = "IE", skip_serializing_if = "Option::is_none")]
-    pub ie: Option<u64>,
+    pub ie: Option<String>,
 
     /// Código de Regime Tributário do emitente
     /// Ex: 1 para Simples Nacional

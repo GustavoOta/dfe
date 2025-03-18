@@ -53,7 +53,7 @@ async fn test_emit_nfe_nfce() {
             c_uf: 35,
             serie: 1,
             n_nf: 38,
-            c_mun_fg: 3550308,
+            c_mun_fg: "3550308".to_string(),
             tp_emis: 1,
             tp_amb: 2,
             ind_final: 1,
@@ -64,7 +64,7 @@ async fn test_emit_nfe_nfce() {
         },
         emit: Emit {
             cnpj: Some("01111111000111".to_string()),
-            ie: Some(448111111110),
+            ie: Some("448111111110".to_string()),
             crt: 3,
             x_nome: "EMPRESA DE TESTE".to_string(),
             x_fant: Some("TESTANDO EMPREENDIMENTOS".to_string()),

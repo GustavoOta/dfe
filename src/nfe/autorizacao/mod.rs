@@ -117,7 +117,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         dh_sai_ent: Some(dh_sai_ent),
         tp_nf: nfe.ide.tp_nf,
         id_dest: nfe.ide.id_dest,
-        c_mun_fg: nfe.ide.c_mun_fg,
+        c_mun_fg: nfe.ide.c_mun_fg.clone(),
         tp_imp: nfe.ide.tp_imp,
         tp_emis: nfe.ide.tp_emis,
         c_dv: Some(dv),

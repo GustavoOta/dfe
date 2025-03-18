@@ -73,7 +73,7 @@ pub struct Ide {
 
     /// Código do Município de Ocorrência do Fato Gerador. Informar o município de ocorrência do fato gerador do ICMS.
     /// Ex: 3550308 = São Paulo
-    pub c_mun_fg: u64,
+    pub c_mun_fg: String,
 
     /// Formato de Impressão do DANFE
     /// 0=Sem geração de DANFE;
@@ -150,7 +150,7 @@ impl Default for Ide {
             dh_sai_ent: None,
             tp_nf: 1,
             id_dest: 1,
-            c_mun_fg: 3550308,
+            c_mun_fg: "3550308".to_string(),
             tp_imp: 1,
             tp_emis: 1,
             c_dv: None,
@@ -200,7 +200,7 @@ pub struct Emit {
     /// Preencher com o Código DDD + número do telefone. Nas operações com exterior é permitido informar o código do país + código da localidade + número do telefone (v2.0)
     pub fone: Option<u64>,
     /// Inscrição estadual do emitente Ex: 123456789 u<2-14 Digits>
-    pub ie: Option<u64>,
+    pub ie: Option<String>,
     /// IE do Substituto Tributário da UF de destino da mercadoria, quando houver a retenção do ICMS ST para a UF de destino.
     pub iest: Option<u64>,
     /// Inscrição Municipal do Prestador de Serviço Ex: 123456789 u<1-15 Digits>

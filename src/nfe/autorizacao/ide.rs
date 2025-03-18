@@ -67,7 +67,7 @@ pub struct IdeProcess {
     /// Código do Município de Ocorrência do Fato Gerador. Informar o município de ocorrência do fato gerador do ICMS.
     /// Ex: 3550308 = São Paulo
     #[serde(rename = "cMunFG")]
-    pub c_mun_fg: u64,
+    pub c_mun_fg: String,
 
     /// Formato de Impressão do DANFE
     /// 0=Sem geração de DANFE;
