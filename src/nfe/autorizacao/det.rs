@@ -170,6 +170,18 @@ pub struct ICMS70 {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ICMS90 {
     // Campos específicos para ICMS90
+    pub orig: u8,
+    #[serde(rename = "CST")]
+    pub cst: String,
+}
+
+impl Default for ICMS90 {
+    fn default() -> Self {
+        ICMS90 {
+            orig: 0,
+            cst: "90".to_string(),
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -420,6 +432,17 @@ pub fn det_process(prod: Vec<Det>) -> Result<Vec<DetProcess>, Error> {
                 cst: 41,
                 ..Default::default()
             }),
+            "ICMS90" => {
+                let orig = match d.orig {
+                    Some(orig) => orig,
+                    None => return Err(Error::msg("Origem da mercadoria não informada")),
+                };
+                let cst = match d.cst.clone() {
+                    Some(cst) => cst,
+                    None => return Err(Error::msg("CST não informado")),
+                };
+                ICMSProcess::ICMS90(ICMS90 { orig, cst })
+            }
             _ => return Err(Error::msg("Unsupported ICMS type")),
         };
 
