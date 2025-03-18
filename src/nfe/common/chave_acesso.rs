@@ -28,19 +28,23 @@ impl ChaveAcesso {
         );
 
         let digito_verificador = ChaveAcesso::gerar_dv(&chave);
-        chave.push_str(&digito_verificador.to_string());
-        ChaveAcesso {
-            chave,
-            dv: digito_verificador,
+        match digito_verificador {
+            Ok(dv) => {
+                chave.push_str(&dv.to_string());
+                ChaveAcesso { chave, dv }
+            }
+            Err(e) => panic!("Error generating DV: {}", e),
         }
     }
 
-    pub fn gerar_dv(chave_sem_dv: &str) -> u8 {
+    pub fn gerar_dv(chave_sem_dv: &str) -> Result<u8, Error> {
         let pesos = [2, 3, 4, 5, 6, 7, 8, 9];
         let mut soma = 0;
 
         for (i, c) in chave_sem_dv.chars().rev().enumerate() {
-            let digito = c.to_digit(10).unwrap();
+            let digito = c
+                .to_digit(10)
+                .ok_or_else(|| Error::msg(format!("Invalid character '{}' in chave_sem_dv", c)))?;
             soma += digito * pesos[i % 8];
         }
 
@@ -51,7 +55,7 @@ impl ChaveAcesso {
             11 - resto
         };
 
-        dv as u8
+        Ok(dv as u8)
     }
 
     /// Gera um código numérico de 8 dígitos
