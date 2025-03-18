@@ -262,7 +262,7 @@ pub struct Dest {
     /// Bairro do destinatário Ex: Centro
     pub x_bairro: Option<String>,
     /// Código do município Ex: 4205407 para Lages
-    pub c_mun: Option<u32>,
+    pub c_mun: Option<String>,
     /// Nome do município Ex: Lages
     pub x_mun: Option<String>,
     /// Sigla da UF Ex: SC

@@ -85,7 +85,7 @@ async fn test_emit_nfe_nfce() {
             x_lgr: Some("RUA TESTE".to_string()),
             nro: Some("123".to_string()),
             x_bairro: Some("CENTRO".to_string()),
-            c_mun: Some(3550308),
+            c_mun: Some("3550308".to_string()),
             x_mun: Some("SÃO PAULO".to_string()),
             uf: Some("SP".to_string()),
             cep: Some("11850000".to_string()),
