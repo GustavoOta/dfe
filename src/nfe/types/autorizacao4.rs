@@ -184,7 +184,7 @@ pub struct Emit {
     pub x_bairro: String,
     /// Código do município Ex: 4205407 para Lages u<7 Digits>
     /// Utilizar a Tabela do IBGE (Anexo IX- Tabela de UF, Município e País).
-    pub c_mun: u32,
+    pub c_mun: String,
     /// Nome do município Ex: Lages String<2-60 Chars>
     pub x_mun: String,
     /// Sigla da UF Ex: SC String<2 Chars>
@@ -229,7 +229,7 @@ impl Default for Emit {
             nro: "S/N".to_string(),
             x_cpl: None,
             x_bairro: "".to_string(),
-            c_mun: 0000000,
+            c_mun: "0000000".to_string(),
             x_mun: "".to_string(),
             uf: "".to_string(),
             cep: "00000000".to_string(),

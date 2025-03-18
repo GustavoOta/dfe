@@ -48,7 +48,7 @@ pub struct EnderEmitProcess {
 
     /// Código do município Ex: 4205407 para Lages
     #[serde(rename = "cMun")]
-    pub c_mun: u32,
+    pub c_mun: String,
 
     /// Nome do município Ex: Lages
     #[serde(rename = "xMun")]
