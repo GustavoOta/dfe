@@ -79,11 +79,11 @@ pub struct ICMS00 {
     #[serde(rename = "modBC")]
     pub mod_bc: u8,
     #[serde(rename = "vBC")]
-    pub v_bc: f32,
+    pub v_bc: f64,
     #[serde(rename = "pICMS")]
-    pub p_icms: f32,
+    pub p_icms: f64,
     #[serde(rename = "vICMS")]
-    pub v_icms: f32,
+    pub v_icms: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -120,7 +120,7 @@ pub struct ICMS40 {
     /// b) destinadas à SUFRAMA, informando-se o valor que seria devido se não houvesse isenção.
     /// c) de venda a órgão da administração pública direta e suas Nota Fiscal eletrônica fundações e autarquias com isenção do ICMS. (NT 2011/004)
     #[serde(rename = "vICMSDeson", skip_serializing_if = "Option::is_none")]
-    pub vicmsdeson: Option<f32>,
+    pub vicmsdeson: Option<f64>,
     /// Campo será preenchido quando o campo anterior estiver preenchido.
     /// Informar o motivo da desoneração:
     /// 1 = Táxi;
@@ -196,9 +196,9 @@ pub struct ICMSSN102 {
     #[serde(rename = "CSOSN")]
     pub csosn: u16,
     #[serde(rename = "pCredSN")]
-    pub p_cred_sn: f32,
+    pub p_cred_sn: f64,
     #[serde(rename = "vCredICMSSN")]
-    pub v_cred_icmssn: f32,
+    pub v_cred_icmssn: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

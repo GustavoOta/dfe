@@ -366,15 +366,15 @@ pub struct Det {
     pub u_com: String,
     /// Quantidade Comercial  11v0-4 Informar a quantidade de comercialização do produto (v2.0).
     /// Decimal com até 4 dígitos, sendo 7 inteiros e 4 decimais. u<1-11.0-4 Chars>
-    pub q_com: f32,
+    pub q_com: f64,
     /// Valor Unitário de Comercialização 11v0-10 Informar o valor unitário
     /// de comercialização do produto, campo meramente informativo, o contribuinte pode utilizar a precisão desejada (0-10 decimais).
     /// Para efeitos de cálculo, o valor unitário será obtido pela divisão do valor do produto pela quantidade comercial (NT 2013/003)
     /// u<1-11.0-10 Chars>
-    pub v_un_com: f32,
+    pub v_un_com: f64,
     /// Valor Total Bruto dos Produtos ou Serviços
     /// 13v2 Informar o valor total bruto dos produtos ou serviços, campo
-    pub v_prod: f32,
+    pub v_prod: f64,
     /// Preencher com o código GTIN-8, GTIN-12, GTIN-13 ou GTIN-14 (antigos códigos EAN, UPC e DUN-14) da unidade tributável
     /// do produto, não informar o conteúdo da TAG em caso de o
     /// produto não possuir este código.
@@ -386,29 +386,29 @@ pub struct Det {
     /// Informar a quantidade de tributação do produto (v2.0).
     /// Decimal com até 4 dígitos, sendo 7 inteiros e 4 decimais.
     /// u<1-11.0-4 Chars>
-    pub q_trib: f32,
+    pub q_trib: f64,
     /// Informar o valor unitário de tributação do produto, campo
     /// meramente informativo, o contribuinte pode utilizar a precisão
     /// desejada (0-10 decimais). Para efeitos de cálculo, o valor
     /// unitário será obtido pela divisão do valor do produto pela
     /// quantidade tributável (NT 2013/003)
-    pub v_un_trib: f32,
+    pub v_un_trib: f64,
     /// Valor Total do Frete 13v2 Informar o valor total do frete da mercadoria ou serviço.
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_frete: Option<f32>,
+    pub v_frete: Option<f64>,
     /// Valor Total do Seguro 13v2 Informar o valor total do seguro da mercadoria ou serviço.
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_seg: Option<f32>,
+    pub v_seg: Option<f64>,
     /// Valor do Desconto 13v2 Informar o valor total do desconto do item / produto.
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_desc: Option<f32>,
+    pub v_desc: Option<f64>,
     /// Outras despesas acessórias 13v2 Informar o valor total de outras despesas acessórias.
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_outro: Option<f32>,
+    pub v_outro: Option<f64>,
     /// Indica se valor do Item (vProd) entra no valor total da NF-e (vProd)
     /// 0=Valor do item (vProd) não compõe o valor total da NF-e (vProd)
     /// 1=Valor do item (vProd) compõe o valor total da NF-e (vProd)
@@ -418,12 +418,12 @@ pub struct Det {
     pub orig: Option<u8>,
     pub cst: Option<String>,
     pub mod_bc: Option<u8>,
-    pub v_bc: Option<f32>,
-    pub p_icms: Option<f32>,
-    pub v_icms: Option<f32>,
+    pub v_bc: Option<f64>,
+    pub p_icms: Option<f64>,
+    pub v_icms: Option<f64>,
     pub csosn: Option<u16>,
-    pub p_cred_sn: Option<f32>,
-    pub v_cred_icmssn: Option<f32>,
+    pub p_cred_sn: Option<f64>,
+    pub v_cred_icmssn: Option<f64>,
     // ******* PIS ******* //
     pub pis: String,
     // ******* COFINS ******* //
@@ -431,7 +431,7 @@ pub struct Det {
     /// vTotTrib 13v2 Valor aproximado total de tributos federais, estaduais e municipais.
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_tot_trib: f32,
+    pub v_tot_trib: f64,
 }
 
 impl Default for Det {
@@ -480,89 +480,89 @@ pub struct Total {
     /// Base de Cálculo do ICMS 13v2 Informar o valor da BC do ICMS
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_bc: f32,
+    pub v_bc: f64,
     /// Valor Total do ICMS 13v2 Informar o valor total do ICMS
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_icms: f32,
+    pub v_icms: f64,
     /// Valor Total do ICMS Desonerado 13v2 Informar o valor total do ICMS desonerado
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_icms_deson: f32,
+    pub v_icms_deson: f64,
 
     /// v_fcpuf_dest    
     /// Valor do ICMS UF Destino 13v2 Informar o valor do ICMS de UF destino
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_fcpuf_dest: f32,
+    pub v_fcpuf_dest: f64,
     /// Valor do ICMS UF Destino 13v2 Informar o valor do ICMS de UF destino
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_icms_uf_dest: f32,
+    pub v_icms_uf_dest: f64,
     /// Valor do ICMS UF Remetente 13v2 Informar o valor do ICMS de UF remetente
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_icms_uf_remet: f32,
+    pub v_icms_uf_remet: f64,
     /// vFCP
-    pub v_fcp: f32,
+    pub v_fcp: f64,
     /// Base de Cálculo do ICMS ST 13v2 Informar o valor da BC do ICMS ST
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_bc_st: f32,
+    pub v_bc_st: f64,
     /// Valor Total do ICMS ST 13v2 Informar o valor total do ICMS ST
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_st: f32,
+    pub v_st: f64,
     /// vFCPST
-    pub v_fcpst: f32,
+    pub v_fcpst: f64,
     // vFCPSTRet
-    pub v_fcpst_ret: f32,
+    pub v_fcpst_ret: f64,
     /// Valor Total dos Produtos e Serviços 13v2 Informar o valor total dos produtos e serviços
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_prod: f32,
+    pub v_prod: f64,
     /// Valor Total do Frete 13v2 Informar o valor total do frete
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_frete: f32,
+    pub v_frete: f64,
     /// Valor Total do Seguro 13v2 Informar o valor total do seguro
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_seg: f32,
+    pub v_seg: f64,
     /// Valor Total do Desconto 13v2 Informar o valor total do desconto
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_desc: f32,
+    pub v_desc: f64,
     /// Valor Total do II 13v2 Informar o valor total do II
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_ii: f32,
+    pub v_ii: f64,
     /// Valor Total do IPI 13v2 Informar o valor total do IPI
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_ipi: f32,
+    pub v_ipi: f64,
     // vIPIDevol
-    pub v_ipi_devol: f32,
+    pub v_ipi_devol: f64,
     /// Valor do PIS 13v2 Informar o valor do PIS
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_pis: f32,
+    pub v_pis: f64,
     /// Valor da COFINS 13v2 Informar o valor da COFINS
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_cofins: f32,
+    pub v_cofins: f64,
     /// Outras Despesas acessórias 13v2 Informar o valor de outras despesas acessórias
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_outro: f32,
+    pub v_outro: f64,
     /// Valor Total da NF-e 13v2 Informar o valor total da NF-e
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_nf: f32,
+    pub v_nf: f64,
     /// Valor aproximado total de tributos federais, estaduais e municipais.
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
-    pub v_tot_trib: f32,
+    pub v_tot_trib: f64,
 }
 
 impl Default for Total {
@@ -649,7 +649,7 @@ pub struct Pag {
     /// 99=Outros.
     pub t_pag: String,
     /// Valor do pagamento
-    pub v_pag: f32,
+    pub v_pag: f64,
 }
 
 impl Default for Pag {
