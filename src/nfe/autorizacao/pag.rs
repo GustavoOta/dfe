@@ -15,7 +15,7 @@ pub struct DetPag {
     pub t_pag: String,
     #[serde(rename = "vPag")]
     pub v_pag: String,
-    #[serde(rename = "xPag")]
+    #[serde(rename = "xPag", skip_serializing_if = "Option::is_none")]
     pub x_pag: Option<String>,
 }
 
