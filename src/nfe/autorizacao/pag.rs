@@ -15,6 +15,8 @@ pub struct DetPag {
     pub t_pag: String,
     #[serde(rename = "vPag")]
     pub v_pag: String,
+    #[serde(rename = "xPag")]
+    pub x_pag: Option<String>,
 }
 
 pub fn pag_process(pag: Pag) -> Result<PagProcess, Error> {
@@ -22,6 +24,7 @@ pub fn pag_process(pag: Pag) -> Result<PagProcess, Error> {
         det_pag: DetPag {
             t_pag: format!("{}", pag.t_pag),
             v_pag: format!("{:.2}", pag.v_pag),
+            x_pag: pag.x_pag,
         },
     };
     Ok(pag_process)

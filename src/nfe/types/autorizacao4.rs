@@ -650,6 +650,7 @@ pub struct Pag {
     pub t_pag: String,
     /// Valor do pagamento
     pub v_pag: f64,
+    pub x_pag: Option<String>,
 }
 
 impl Default for Pag {
@@ -657,6 +658,7 @@ impl Default for Pag {
         Pag {
             t_pag: "99".to_string(),
             v_pag: 0.0,
+            x_pag: None,
         }
     }
 }
