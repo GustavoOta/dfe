@@ -636,29 +636,38 @@ impl Default for Transp {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Pag {
+    /// Indicador de forma de pagamento
+    /// 0=Pagamento à vista;
+    /// 1=Pagamento a prazo;
+    pub ind_pag: u8,
     /// Forma de pagamento
-    /// 01=Dinheiro;
-    /// 02=Cheque;
-    /// 03=Cartão de Crédito;
-    /// 04=Cartão de Débito;
-    /// 05=Crédito Loja;
-    /// 10=Vale Alimentação;
-    /// 11=Vale Refeição;
-    /// 12=Vale Presente;
-    /// 13=Vale Combustível;
-    /// 99=Outros.
+    /// 01=Dinheiro
+    /// 02=Cheque
+    /// 03=Cartão de Crédito
+    /// 04=Cartão de Débito
+    /// 05=Crédito Loja
+    /// 10=Vale Alimentação
+    /// 11=Vale Refeição
+    /// 12=Vale Presente
+    /// 13=Vale Combustível
+    /// 15=Boleto Bancário
+    /// 16=Depósito Bancário
+    /// 17=Pagamento Instantâneo (PIX)
+    /// 18=Transferência bancária, Carteira Digital
+    /// 19=Programa de fidelidade, Cashback, Crédito Virtual
+    /// 90=Sem pagamento
+    /// 99=Outros
     pub t_pag: String,
     /// Valor do pagamento
     pub v_pag: f64,
-    pub x_pag: Option<String>,
 }
 
 impl Default for Pag {
     fn default() -> Self {
         Pag {
+            ind_pag: 0,
             t_pag: "99".to_string(),
             v_pag: 0.0,
-            x_pag: None,
         }
     }
 }
