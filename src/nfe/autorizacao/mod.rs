@@ -191,10 +191,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         });
         let inf_ad_prod = &det.inf_ad_prod;
         let inf_ad_prod = if let Some(inf_ad_prod) = inf_ad_prod {
-            to_string(&format!("<infAdProd>{}</infAdProd>", inf_ad_prod)).unwrap_or_else(|e| {
-                println!("Erro ao gerar o XML do Detalhe: {:?}", e);
-                return String::new();
-            })
+            format!("<infAdProd>{}</infAdProd>", inf_ad_prod)
         } else {
             "".to_string()
         };
