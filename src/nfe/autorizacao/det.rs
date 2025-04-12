@@ -35,6 +35,10 @@ pub struct ProdProcess {
     pub v_un_trib: String,
     #[serde(rename = "indTot")]
     pub ind_tot: String,
+    #[serde(rename = "xPed", skip_serializing_if = "Option::is_none")]
+    pub x_ped: Option<String>,
+    #[serde(rename = "nItemPed", skip_serializing_if = "Option::is_none")]
+    pub n_item_ped: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -330,6 +334,8 @@ pub struct DetProcess {
     pub prod: ProdProcess,
     #[serde(rename = "imposto")]
     pub imposto: ImpostoProcess,
+    #[serde(rename = "infAdProd", skip_serializing_if = "Option::is_none")]
+    pub inf_ad_prod: Option<String>,
 }
 pub fn det_process(prod: Vec<Det>) -> Result<Vec<DetProcess>, Error> {
     let mut det_process_values: Vec<DetProcess> = Vec::new();
@@ -463,6 +469,8 @@ pub fn det_process(prod: Vec<Det>) -> Result<Vec<DetProcess>, Error> {
                 q_trib: format!("{:.2}", d.q_trib),
                 v_un_trib: format!("{:.2}", d.v_un_trib),
                 ind_tot: d.ind_tot.to_string(),
+                x_ped: d.x_ped.clone(),
+                n_item_ped: d.n_item_ped.clone(),
             },
             imposto: ImpostoProcess {
                 v_tot_trib: format!("{:.2}", d.v_tot_trib),
@@ -484,6 +492,7 @@ pub fn det_process(prod: Vec<Det>) -> Result<Vec<DetProcess>, Error> {
                     },
                 },
             },
+            inf_ad_prod: d.inf_ad_prod.clone(),
         });
     }
     Ok(det_process_values)

@@ -413,6 +413,10 @@ pub struct Det {
     /// 0=Valor do item (vProd) não compõe o valor total da NF-e (vProd)
     /// 1=Valor do item (vProd) compõe o valor total da NF-e (vProd)
     pub ind_tot: u8,
+    /// xPed
+    pub x_ped: Option<String>,
+    /// nItemPed
+    pub n_item_ped: Option<String>,
     // ******* ICMS ******* //
     pub icms: String,
     pub orig: Option<u8>,
@@ -432,6 +436,8 @@ pub struct Det {
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
     pub v_tot_trib: f64,
+    /// infAdProd
+    pub inf_ad_prod: Option<String>,
 }
 
 impl Default for Det {
@@ -458,6 +464,8 @@ impl Default for Det {
             v_desc: None,
             v_outro: None,
             ind_tot: 1,
+            x_ped: None,
+            n_item_ped: None,
             icms: "ng".to_string(),
             orig: None,
             cst: None,
@@ -471,6 +479,7 @@ impl Default for Det {
             pis: "ng".to_string(),
             cofins: "ng".to_string(),
             v_tot_trib: 0.0,
+            inf_ad_prod: None,
         }
     }
 }
