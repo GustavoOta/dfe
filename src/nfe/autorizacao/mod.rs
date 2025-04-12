@@ -189,11 +189,20 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
             println!("Erro ao gerar o XML do Detalhe: {:?}", e);
             return String::new();
         });
+        let inf_ad_prod = if let Some(inf_ad_prod) = &det.inf_ad_prod {
+            to_string(&inf_ad_prod).unwrap_or_else(|e| {
+                println!("Erro ao gerar o XML do Detalhe: {:?}", e);
+                return String::new();
+            })
+        } else {
+            "".to_string()
+        };
         det_string.push_str(&format!(
-            r#"<det nItem="{}">{}{}</det>"#,
+            r#"<det nItem="{}">{}{}{}</det>"#,
             i + 1,
             prod,
-            imposto
+            imposto,
+            inf_ad_prod
         ));
     }
 
