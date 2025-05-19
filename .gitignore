@@ -4,3 +4,5 @@ Cargo.lock
 nfe_request.xml
 cert_pass.txt
 nfe_config.json
+tested_response_from_sefaz.xml
+xml_validation_error.xml
