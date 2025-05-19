@@ -430,8 +430,58 @@ pub struct Det {
     pub v_cred_icmssn: Option<f64>,
     // ******* PIS ******* //
     pub pis: String,
+    // PISAliq ---
+    pub pis_cst: Option<String>,
+    pub pis_v_bc: Option<f64>,
+    pub pis_p_pis: Option<f64>,
+    pub pis_v_pis: Option<f64>,
+    // PisQtde ---
+    // pub pis_cst: Option<String>,
+    pub pis_q_bc_prod: Option<f64>,
+    pub pis_v_aliq_prod: Option<f64>,
+    // pub pis_v_pis: Option<f64>,
+    // PISNT ---
+    // pub pis_cst: Option<String>,
+    // PISOutr ---
+    // pis_cst: Option<String>,
+    // -*-
+    // pub pis_v_bc: Option<f64>,
+    // pub pis_p_pis: Option<f64>,
+    // -*-
+    // PISST ---
+    // -*-
+    // pub pis_v_bc: Option<f64>,
+    // pub pis_p_pis: Option<f64>,
+    // -*-
+    // pub pis_q_bc_prod: Option<f64>,
+    // pub pis_v_aliq_prod: Option<f64>,
+    // pub pis_v_pis: Option<f64>,
+
     // ******* COFINS ******* //
     pub cofins: String,
+    // COFINSAliq ---
+    pub cofins_cst: Option<String>,
+    pub cofins_v_bc: Option<f64>,
+    pub cofins_p_cofins: Option<f64>,
+    pub cofins_v_cofins: Option<f64>,
+    // COFINSQtde ---
+    // pub cofins_cst: Option<String>,
+    pub cofins_q_bc_prod: Option<f64>,
+    pub cofins_v_aliq_prod: Option<f64>,
+    // pub cofins_v_cofins: Option<f64>,
+    // COFINSNT ---
+    // pub cofins_cst: Option<String>,
+    // COFINSOutr ---
+    // pub cofins_cst: Option<String>,
+    // -*-
+    // pub cofins_v_bc: Option<f64>,
+    // pub cofins_p_cofins: Option<f64>,
+    // -*-
+    // pub cofins_q_bc_prod: Option<f64>,
+    // pub cofins_v_aliq_prod: Option<f64>,
+    // pub cofins_v_cofins: Option<f64>,
+    // TODO: ISSQN
+    // TODO: impostoDevol
     /// vTotTrib 13v2 Valor aproximado total de tributos federais, estaduais e municipais.
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
     /// u<1-13.0-2 Chars>
@@ -477,7 +527,19 @@ impl Default for Det {
             p_cred_sn: None,
             v_cred_icmssn: None,
             pis: "ng".to_string(),
+            pis_cst: None,
+            pis_p_pis: None,
+            pis_q_bc_prod: None,
+            pis_v_aliq_prod: None,
+            pis_v_bc: None,
+            pis_v_pis: None,
             cofins: "ng".to_string(),
+            cofins_cst: None,
+            cofins_p_cofins: None,
+            cofins_q_bc_prod: None,
+            cofins_v_aliq_prod: None,
+            cofins_v_bc: None,
+            cofins_v_cofins: None,
             v_tot_trib: 0.0,
             inf_ad_prod: None,
         }

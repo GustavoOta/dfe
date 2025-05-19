@@ -65,19 +65,13 @@ pub struct TagInfProt {
 }
 
 pub async fn emit(nfe: NFe) -> Result<Response, Error> {
-    let codigo_numerico = if let Some(codigo_numerico) = nfe.ide.c_nf {
-        codigo_numerico
-    } else {
-        ChaveAcesso::gerar_codigo_numerico()
-    };
+    let codigo_numerico = ChaveAcesso::gerar_codigo_numerico(nfe.ide.c_nf);
 
     // atribua a doc a condicao que atribui o valor de nfe.emit.cnpj se some ou nfe.emit.cpf se some
-    let doc = if let Some(cnpj) = nfe.emit.cnpj.clone() {
-        cnpj
-    } else if let Some(cpf) = nfe.emit.cpf.clone() {
-        cpf
-    } else {
-        return Err(Error::msg("CNPJ ou CPF do emitente não informado"));
+    let doc = match (nfe.emit.cnpj.as_ref(), nfe.emit.cpf.as_ref()) {
+        (Some(cnpj), _) => cnpj.clone(),
+        (None, Some(cpf)) => cpf.clone(),
+        (None, None) => String::new(),
     };
 
     let ch_acc = ChaveAcesso::gerar_chave_acesso(ChaveAcessoProps {
@@ -182,11 +176,11 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
     let mut det_string = String::new();
     for (i, det) in dets.iter().enumerate() {
         let prod = to_string(&det.prod).unwrap_or_else(|e| {
-            println!("Erro ao gerar o XML do Detalhe: {:?}", e);
+            println!("Erro ao gerar o XML do DetProcess: {:?}", e);
             return String::new();
         });
         let imposto = to_string(&det.imposto).unwrap_or_else(|e| {
-            println!("Erro ao gerar o XML do Detalhe: {:?}", e);
+            println!("Erro ao gerar o XML do DetProcess: {:?}", e);
             return String::new();
         });
         let inf_ad_prod = &det.inf_ad_prod;

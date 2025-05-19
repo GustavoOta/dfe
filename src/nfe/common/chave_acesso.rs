@@ -59,7 +59,11 @@ impl ChaveAcesso {
     }
 
     /// Gera um código numérico de 8 dígitos
-    pub fn gerar_codigo_numerico() -> String {
+    pub fn gerar_codigo_numerico(c_nf: Option<String>) -> String {
+        if c_nf.is_some() {
+            return c_nf.unwrap_or("Erro: c_nf não é String".to_string());
+        }
+
         let mut rng = rand::thread_rng();
         let codigo_numerico: u32 = rng.gen_range(10000000..99999999);
         codigo_numerico.to_string()

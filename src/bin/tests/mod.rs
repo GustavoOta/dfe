@@ -48,12 +48,12 @@ async fn test_emit_nfe_nfce() {
 
     let teste = emit(NFe {
         cert_path: "D:/Projetos/cert.pfx".to_string(),
-        cert_pass: "1234".to_string(),
+        cert_pass: "xxxxxx".to_string(),
         ide: Ide {
             c_uf: 35,
             serie: 1,
-            n_nf: 38,
-            c_mun_fg: "3550308".to_string(),
+            n_nf: 3,
+            c_mun_fg: "3507605".to_string(),
             tp_emis: 1,
             tp_amb: 2,
             ind_final: 1,
@@ -63,8 +63,8 @@ async fn test_emit_nfe_nfce() {
             ..Default::default()
         },
         emit: Emit {
-            cnpj: Some("01111111000111".to_string()),
-            ie: Some("448111111110".to_string()),
+            cnpj: Some("00000000000000".to_string()),
+            ie: Some("000000000000".to_string()),
             crt: 3,
             x_nome: "EMPRESA DE TESTE".to_string(),
             x_fant: Some("TESTANDO EMPREENDIMENTOS".to_string()),
@@ -116,9 +116,23 @@ async fn test_emit_nfe_nfce() {
                 // orig -> 0
                 // CST -> 41
                 // csosn -> 102
-                icms: "ICMS40".to_string(),
-                pis: "PISNT".to_string(),
-                cofins: "COFINSNT".to_string(),
+                icms: "ICMS00".to_string(),
+                orig: Some(0),
+                cst: Some("00".to_string()),
+                mod_bc: Some(3),
+                v_bc: Some(10.0),
+                p_icms: Some(12.0),
+                v_icms: Some(1.20),
+                pis: "PISAliq".to_string(),
+                pis_cst: Some("01".to_string()),
+                pis_v_bc: Some(8.80),
+                pis_p_pis: Some(1.0),
+                pis_v_pis: Some(0.88),
+                cofins: "COFINSAliq".to_string(),
+                cofins_cst: Some("01".to_string()),
+                cofins_v_bc: Some(8.80),
+                cofins_p_cofins: Some(1.0),
+                cofins_v_cofins: Some(0.88),
                 ..Default::default()
             },
             Det {
@@ -134,15 +148,29 @@ async fn test_emit_nfe_nfce() {
                 q_trib: 2.0,
                 v_un_trib: 10.0,
                 ind_tot: 1,
-                icms: "ICMS40".to_string(), // ICMS40 ou ICMSSN102
-                pis: "PISNT".to_string(),
-                cofins: "COFINSNT".to_string(),
+                icms: "ICMS00".to_string(),
+                orig: Some(0),
+                cst: Some("00".to_string()),
+                mod_bc: Some(3),
+                v_bc: Some(20.0),
+                p_icms: Some(12.0),
+                v_icms: Some(2.40),
+                pis: "PISAliq".to_string(),
+                pis_cst: Some("01".to_string()),
+                pis_v_bc: Some(17.60),
+                pis_p_pis: Some(1.0),
+                pis_v_pis: Some(1.76),
+                cofins: "COFINSAliq".to_string(),
+                cofins_cst: Some("01".to_string()),
+                cofins_v_bc: Some(17.60),
+                cofins_p_cofins: Some(1.0),
+                cofins_v_cofins: Some(1.76),
                 ..Default::default()
             },
         ],
         total: Total {
-            v_bc: 0.0,
-            v_icms: 0.0,
+            v_bc: 30.0,
+            v_icms: 3.6,
             v_icms_deson: 0.0,
             v_fcpuf_dest: 0.0,
             v_icms_uf_dest: 0.0,
@@ -159,8 +187,8 @@ async fn test_emit_nfe_nfce() {
             v_ii: 0.0,
             v_ipi: 0.0,
             v_ipi_devol: 0.0,
-            v_pis: 0.0,
-            v_cofins: 0.0,
+            v_pis: 2.64,
+            v_cofins: 2.64,
             v_outro: 0.0,
             v_nf: 30.0,
             v_tot_trib: 0.0,
@@ -170,6 +198,7 @@ async fn test_emit_nfe_nfce() {
             ..Default::default()
         },
         pag: Pag {
+            ind_pag: 1,
             t_pag: "01".to_string(),
             v_pag: 30.0,
         },
@@ -181,10 +210,11 @@ async fn test_emit_nfe_nfce() {
         println!("Erro: {:?}", e);
     } else {
         if let Ok(response) = teste {
-            println!("Response: {:?}", response);
+            println!("Response: {:?}", response.protocolo);
 
-            // print xml
-            println!("XML: {:?}", response.xml);
+            std::fs::write("tested_response_from_sefaz.xml", response.xml)
+                .expect("Falha ao salvar o XML");
+            println!("XML salvo em ./tested_response_from_sefaz.xml");
         }
     }
 }
