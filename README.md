@@ -1,15 +1,12 @@
 # dfe
 DFE - Documentos Fiscais Eletrônicos Brasileiros.
 
-Se caiu de paraquedas aqui, sim, o código está um C#! Tenho que refatorar muito ainda. 
+# Doações:
+[![Sponsor GustavoOta](https://img.shields.io/badge/sponsor-GustavoOta-%23EA4AAA?style=flat&logo=github)](https://github.com/sponsors/GustavoOta)
 
-Estou escrevendo este projeto por necessidade própria e espero terminar todos os recursos necessários, a intenção é escrever uma API REST que consuma essa crate.
-
-Porque RUST?
-Porque estou aprendendo a linguagem KKK.
 
 ## Instalação:
--> É necessário instalar o OPENSSL no seu ambiente de desenvolvimento. No ambiente Windows (como o meu), instale também o Pear.   
+-> É necessário instalar o OPENSSL no seu ambiente de desenvolvimento.
 -> Copie a pasta dfe que contém os arquivos de SCHEMA para o diretório do seu executável.   
 -> cargo add dfe  
 
@@ -214,8 +211,3 @@ println!("t_med: {}", teste.t_med);
 ## Notas importantes:
 
 Este software está em desenvolvimento e não deve ser usado em produção a não ser que você saiba o que está fazendo.
-
-Este software é distribuído sem garantia e sem nenhuma responsabilidade do autor.
-Autor: Gustavo Ota - Gravis Tec
-Para doações entre em contato WhatsApp: +55 13 99782 1459
-
