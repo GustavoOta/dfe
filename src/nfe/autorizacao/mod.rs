@@ -373,8 +373,9 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
                 .to_string()
                 + &xml;
             // save to root as nfe_request.xml
-            let mut file = File::create("D:/Projetos/dfe/nfe_request.xml")
-                .expect("Não foi possível criar o arquivo");
+            // TODO: BUG Corrigir para retornar erro ao tentar salvar o arquivo que foi bem sucedido
+            let mut file =
+                File::create("./nfe_request.xml").expect("Não foi possível criar o arquivo");
             file.write_all(xml.as_bytes())
                 .expect("Não foi possível escrever o arquivo");
 
