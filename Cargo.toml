@@ -12,7 +12,9 @@ homepage = "https://github.com/GustavoOta/dfe"
 repository = "https://github.com/GustavoOta/dfe"
 
 exclude = [
-    "dfe/manuais_sefaz/*"
+    "dfe/manuais_sefaz/*",
+    "dfe/shema/*",
+    "dfe/thirdparty/*"
 ]
 
 [package.metadata.vcpkg]
