@@ -11,6 +11,10 @@ categories = ["api-bindings", "parsing"]
 homepage = "https://github.com/GustavoOta/dfe"
 repository = "https://github.com/GustavoOta/dfe"
 
+exclude = [
+    "manuais_sefaz/*"
+]
+
 [package.metadata.vcpkg]
 triplet = "x64-windows-static"
 
