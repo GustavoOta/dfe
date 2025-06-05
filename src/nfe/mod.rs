@@ -4,6 +4,7 @@ pub mod common;
 pub mod connection;
 pub mod mod_status_service;
 pub mod types;
+pub mod xml_extractor;
 
 use anyhow::{Error, Result};
 

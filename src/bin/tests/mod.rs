@@ -9,6 +9,8 @@
 
 /// Este software está em desenvolvimento e não deve ser usado em produção a não ser que você saiba o que está fazendo.
 /// Este software é distribuído sem garantia e sem nenhuma responsabilidade de seus autores ou contribuidores.
+mod test_xml_extractor;
+
 #[cfg(test)]
 
 /// TODO: Mudar o tipo USE para receber path, pass, environment, federative_unit, svc, nfe e nfce
