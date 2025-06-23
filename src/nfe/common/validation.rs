@@ -13,18 +13,43 @@ pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<String, Error> {
     if let Err(errors) = xsd {
         let mut messages = Vec::new();
         for err in &errors {
-            messages.push(err.message.as_ref().unwrap().to_string());
+            messages.push(
+                err.message
+                    .as_ref()
+                    .map(|s| s.to_string())
+                    .ok_or_else(|| Error::msg(format!("StructuredError: {:?}", err)))?,
+            );
         }
         save_xml(&raw_incoming_xml)?;
         return Err(Error::msg(messages.join("\n")));
     }
 
-    let mut xsd = xsd.unwrap();
+    let mut xsd = match xsd {
+        Ok(val) => val,
+        Err(errors) => {
+            let mut messages = Vec::new();
+            for err in &errors {
+                messages.push(
+                    err.message
+                        .as_ref()
+                        .map(|s| s.to_string())
+                        .ok_or_else(|| Error::msg(format!("StructuredError: {:?}", err)))?,
+                );
+            }
+            save_xml(&raw_incoming_xml)?;
+            return Err(Error::msg(messages.join("\n")));
+        }
+    };
 
     if let Err(errors) = xsd.validate_document(&xml) {
         let mut messages = Vec::new();
         for err in &errors {
-            messages.push(err.message.as_ref().unwrap().to_string());
+            messages.push(
+                err.message
+                    .as_ref()
+                    .map(|s| s.to_string())
+                    .ok_or_else(|| Error::msg(format!("StructuredError: {:?}", err)))?,
+            );
         }
         save_xml(&raw_incoming_xml)?;
         return Err(Error::msg(messages.join("\n")));
@@ -46,8 +71,9 @@ mod tests {
 
     #[test]
     fn test_is_xml_valid() {
-        let xml = "<NFe></NFe>";
-        let xsd = "./dfe/shema/PL_009p_NT2024_003_v1.02/nfe_v4.00.xsd";
+        let xml =
+            std::fs::read_to_string("D:\\Projetos\\dfe-api\\xml_validation_error.xml").unwrap();
+        let xsd = "./dfe/shema/PL_009p_NT2024_003_v1.03/nfe_v4.00.xsd";
         let result = is_xml_valid(&xml, xsd);
         if result.is_err() {
             println!("Error test_is_xml_valid:{:?}", result.err());

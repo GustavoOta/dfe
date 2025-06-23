@@ -24,7 +24,7 @@ async fn test_xml_extractor_file() {
     let xml_extractor = XmlExtractor::new();
 
     // Test extracting from a file
-    let file_path = "./nfe_request.xml";
+    let file_path = "D:\\Projetos\\dfe-api\\xml_validation_error.xml";
     let result: Result<NFeProc, XMLExtractorError> = xml_extractor.nfe_proc_from_file(file_path);
     if result.is_err() {
         println!("Error: {:?}", result.unwrap_err());
