@@ -50,7 +50,7 @@ async fn test_emit_nfe_nfce() {
 
     let teste = emit(NFe {
         cert_path: "D:/Projetos/cert.pfx".to_string(),
-        cert_pass: "xxxxxx".to_string(),
+        cert_pass: "4101".to_string(),
         ide: Ide {
             c_uf: 35,
             serie: 1,
@@ -126,7 +126,7 @@ async fn test_emit_nfe_nfce() {
                 p_icms: Some(12.0),
                 v_icms: Some(1.20),
                 pis: "PISAliq".to_string(),
-                pis_cst: Some("01".to_string()),
+                pis_cst: Some("77".to_string()),
                 pis_v_bc: Some(8.80),
                 pis_p_pis: Some(1.0),
                 pis_v_pis: Some(0.88),

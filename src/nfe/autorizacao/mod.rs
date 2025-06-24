@@ -295,8 +295,13 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         + "</NFe>";
 
     // validação do xml ----------------------------------------------------
-    let signed_xml = is_xml_valid(&xml, "./dfe/shema/PL_009p_NT2024_003_v1.03/nfe_v4.00.xsd")?;
-
+    match is_xml_valid(&xml, "./dfe/shema/PL_009p_NT2024_003_v1.03/nfe_v4.00.xsd") {
+        Ok(_) => {}
+        Err(e) => {
+            println!("Erro de validação XML: {}", e);
+            return Err(Error::msg(format!("{}", e.to_string())));
+        }
+    };
     // envelope -------------------------------------------------------------
     // TODO: Identificador de controle do Lote de envio do Evento.
     // Número sequencial autoincremental único para identificação
