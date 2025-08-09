@@ -51,7 +51,9 @@ async fn test_emit_nfe_nfce() {
 
     let teste = emit(NFe {
         cert_path: "D:/Projetos/cert.pfx".to_string(),
-        cert_pass: "4101".to_string(),
+        cert_pass: "1234".to_string(),
+        id_csc: None,
+        csc: None,
         ide: Ide {
             c_uf: 35,
             serie: 1,
@@ -80,7 +82,7 @@ async fn test_emit_nfe_nfce() {
             cep: "11850000".to_string(),
             ..Default::default()
         },
-        dest: Dest {
+        dest: Some(Dest {
             cpf: Some("07068093868".to_string()),
             //cnpj: Some("56196407000190".to_string()), // com ie
             //cnpj: Some("46395000000139".to_string()), // sem ie
@@ -98,7 +100,7 @@ async fn test_emit_nfe_nfce() {
             ind_ie_dest: Some(9),
             //ie: Some("150344006118".to_string()),
             ..Default::default()
-        },
+        }),
         det: vec![
             Det {
                 c_prod: "123456".to_string(),
