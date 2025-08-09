@@ -1,3 +1,4 @@
+mod certificate_info;
 /// Direitos de autor e licença:
 /// Este arquivo fonte é parte do projeto dfe-rs.
 /// O projeto dfe-rs pode ser usado de acordo com a Licença MIT
@@ -203,6 +204,7 @@ async fn test_emit_nfe_nfce() {
             ind_pag: 1,
             t_pag: "01".to_string(),
             v_pag: 30.0,
+            ..Default::default()
         },
         inf_adic: None,
     })

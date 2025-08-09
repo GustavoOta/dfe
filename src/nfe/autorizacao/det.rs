@@ -2,14 +2,24 @@ use super::det_process::entity::*;
 use super::Det;
 use anyhow::{Error, Result};
 
-pub fn det_process(prod: Vec<Det>) -> Result<Vec<DetProcess>, Error> {
+pub fn det_process(prod: Vec<Det>, mod_: u32, tp_amb: u8) -> Result<Vec<DetProcess>, Error> {
     let mut det_process_values: Vec<DetProcess> = Vec::new();
+    let mut first_item = 0;
+
     for d in &prod {
+        let mut x_prod = d.x_prod.clone();
+        if first_item == 0 {
+            if mod_ == 65 && tp_amb == 2 {
+                x_prod =
+                    "NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL".to_string();
+            }
+        }
+        first_item += 1;
         det_process_values.push(DetProcess {
             prod: ProdProcess {
                 c_prod: d.c_prod.to_string(),
                 c_ean: d.c_ean.to_string(),
-                x_prod: d.x_prod.to_string(),
+                x_prod: x_prod.clone(),
                 ncm: d.ncm.to_string(),
                 cfop: d.cfop.to_string(),
                 cest: d.cest.clone(),
@@ -38,6 +48,7 @@ pub fn det_process(prod: Vec<Det>) -> Result<Vec<DetProcess>, Error> {
 }
 
 fn select_icms_process(d: &Det) -> ICMSProcess {
+    //println!("Processing ICMS for product on DFE RAW: {:?}", d);
     let icms = match d.icms.as_str() {
         "ICMSSN101" => {
             // Tributada pelo Simples Nacional com permissão de crédito. (v2.0)
@@ -46,11 +57,29 @@ fn select_icms_process(d: &Det) -> ICMSProcess {
                 None => return validate_icms("orig", d),
             };
 
-            let csosn = match d.csosn {
+            let csosn = match d.csosn.clone() {
                 Some(csosn) => csosn,
                 None => return validate_icms("csosn", d),
             };
-            ICMSProcess::ICMSSN101(ICMSSN101 { orig, csosn })
+
+            let p_cred_sn = match d.p_cred_sn {
+                Some(p_cred_sn) => {
+                    format!("{:.2}", p_cred_sn)
+                }
+                None => return validate_icms("p_cred_sn", d),
+            };
+            let v_cred_icmssn = match d.v_cred_icmssn {
+                Some(v_cred_icmssn) => {
+                    format!("{:.2}", v_cred_icmssn)
+                }
+                None => return validate_icms("v_cred_icmssn", d),
+            };
+            ICMSProcess::ICMSSN101(ICMSSN101 {
+                orig,
+                csosn,
+                p_cred_sn,
+                v_cred_icmssn,
+            })
         }
         "ICMSSN102" => {
             // Tributada pelo Simples Nacional sem permissão de crédito e com cobrança do ICMS por substituição tributária. (v2.0)
@@ -58,24 +87,12 @@ fn select_icms_process(d: &Det) -> ICMSProcess {
                 Some(orig) => orig,
                 None => return validate_icms("orig", d),
             };
-            let csosn = match d.csosn {
+            let csosn = match d.csosn.clone() {
                 Some(csosn) => csosn,
                 None => return validate_icms("csosn", d),
             };
-            let p_cred_sn = match d.p_cred_sn {
-                Some(p_cred_sn) => p_cred_sn,
-                None => return validate_icms("p_cred_sn", d),
-            };
-            let v_cred_icmssn = match d.v_cred_icmssn {
-                Some(v_cred_icmssn) => v_cred_icmssn,
-                None => return validate_icms("v_cred_icmssn", d),
-            };
-            ICMSProcess::ICMSSN102(ICMSSN102 {
-                orig,
-                csosn,
-                p_cred_sn,
-                v_cred_icmssn,
-            })
+
+            ICMSProcess::ICMSSN102(ICMSSN102 { orig, csosn })
         }
         "ICMS00" => {
             let orig = match d.orig {
@@ -128,6 +145,7 @@ fn select_icms_process(d: &Det) -> ICMSProcess {
             ICMSProcess::ICMS90(ICMS90 { orig, cst })
         }
         _ => {
+            println!("Unsupported ICMS type on DFE RAW: {}", d.icms);
             return ICMSProcess::ICMSError(format!("Unsupported ICMS type: {}", d.icms));
         }
     };
@@ -148,9 +166,9 @@ fn select_pis_process(d: &Det) -> PISProcess {
         "PISOutr" => PISProcess {
             pis_outr: Some(PISOutr {
                 cst: "99".to_string(),
-                qbc_prod: Some("0.00".to_string()),
-                valiq_prod: Some("0.00".to_string()),
-                vpis: Some("0.00".to_string()),
+                qbc_prod: Some("0.00".to_string()), // informando 0 por calculo em valor
+                valiq_prod: Some("0.00".to_string()), // informando 0 por calculo em valor
+                vpis: Some("0.00".to_string()),     // informando 0 por calculo em valor
             }),
             ..Default::default()
         },
@@ -178,11 +196,9 @@ fn select_cofins_process(d: &Det) -> COFINSProcess {
                     .cofins_cst
                     .clone()
                     .unwrap_or("cofins cst inválido.".to_string()),
-                vbc: d.cofins_v_bc,
-                p_cofins: d.cofins_p_cofins,
-                qbc_prod: d.cofins_q_bc_prod,
-                valiq_prod: d.cofins_v_aliq_prod,
-                vcofins: d.cofins_v_cofins,
+                v_bc: Some(0.0),
+                p_cofins: Some(0.0),
+                v_cofins: Some(0.0),
             }),
             ..Default::default()
         },

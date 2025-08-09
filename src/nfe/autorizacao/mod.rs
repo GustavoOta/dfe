@@ -4,7 +4,7 @@ mod det_process;
 mod emit;
 mod ide;
 mod inf_adic;
-mod pag;
+pub mod pag;
 mod total;
 mod transp;
 
@@ -104,7 +104,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         c_nf: Some(codigo_numerico.clone()),
         nat_op: nfe.ide.nat_op.clone(),
         ind_pag: nfe.ide.ind_pag,
-        mod_: nfe.ide.mod_,
+        mod_: nfe.ide.mod_.clone(),
         serie: nfe.ide.serie,
         n_nf: nfe.ide.n_nf,
         dh_emi: Some(dh_emi.clone()),
@@ -115,7 +115,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         tp_imp: nfe.ide.tp_imp,
         tp_emis: nfe.ide.tp_emis,
         c_dv: Some(dv),
-        tp_amb: nfe.ide.tp_amb,
+        tp_amb: nfe.ide.tp_amb.clone(),
         fin_nfe: nfe.ide.fin_nfe,
         ind_final: nfe.ide.ind_final,
         ind_pres: nfe.ide.ind_pres,
@@ -128,7 +128,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
             c_nf: Some(codigo_numerico),
             nat_op: nfe.ide.nat_op,
             ind_pag: nfe.ide.ind_pag,
-            mod_: nfe.ide.mod_,
+            mod_: nfe.ide.mod_.clone(),
             serie: nfe.ide.serie,
             n_nf: nfe.ide.n_nf,
             dh_emi: Some(dh_emi),
@@ -139,7 +139,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
             tp_imp: nfe.ide.tp_imp,
             tp_emis: nfe.ide.tp_emis,
             c_dv: Some(dv),
-            tp_amb: nfe.ide.tp_amb,
+            tp_amb: nfe.ide.tp_amb.clone(),
             fin_nfe: nfe.ide.fin_nfe,
             ind_final: nfe.ide.ind_final,
             ind_pres: nfe.ide.ind_pres,
@@ -167,12 +167,19 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         ie: nfe.emit.ie,
         crt: nfe.emit.crt,
     };
+    let dest_string = match nfe.dest {
+        Some(ref dest) => {
+            let dest = dest_process(dest.clone())?;
+            let dest_string = to_string(&dest)?;
+            corrigir_tags_dest(dest_string)
+        }
+        None => {
+            // Se não houver destinatário, retornar uma string vazia
+            String::new()
+        }
+    };
 
-    let dest = dest_process(nfe.dest)?;
-    let dest_string = to_string(&dest)?;
-    let dest_string = corrigir_tags_dest(dest_string);
-
-    let dets = det_process(nfe.det)?;
+    let dets = det_process(nfe.det, nfe.ide.mod_, nfe.ide.tp_amb)?;
     let mut det_string = String::new();
     for (i, det) in dets.iter().enumerate() {
         let prod = to_string(&det.prod).unwrap_or_else(|e| {
@@ -288,20 +295,76 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         + "</KeyInfo>"
         + "</Signature>";
 
+    // QRcode ------------------------------------------------------
+    let mut qrcode = String::new();
+    if nfe.ide.mod_ == 65 {
+        // Exemplo de montagem do QR Code NFC-e (ajuste os campos conforme sua lógica)
+        let mut url_base = String::new();
+        if nfe.ide.tp_amb == 2 {
+            url_base = "https://www.homologacao.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx".to_string();
+        } else if nfe.ide.tp_amb == 1 {
+            url_base = "https://www.nfce.fazenda.sp.gov.br/qrcode".to_string();
+        }
+
+        let chave = &chave_acesso;
+        let versao_qr = "2";
+        let ambiente = nfe.ide.tp_amb.to_string();
+
+        let id_csc = match nfe.id_csc {
+            Some(id) => id,
+            None => {
+                return Err(Error::msg("ID do CSC não foi informado."));
+            }
+        };
+        let csc = match nfe.csc {
+            Some(c) => c,
+            None => {
+                return Err(Error::msg("CSC não foi informado."));
+            }
+        };
+        let c_hash = qrcode_hash(&chave_acesso, &versao_qr, &ambiente, &id_csc, &csc)?;
+        let url_qrcode = format!("{url_base}?p={chave}|{versao_qr}|{ambiente}|{id_csc}|{c_hash}");
+
+        let consulta_homologacao = "https://www.homologacao.nfce.fazenda.sp.gov.br/consulta";
+        let consulta_producao = "https://www.nfce.fazenda.sp.gov.br/consulta";
+        let url_consulta = if nfe.ide.tp_amb == 2 {
+            format!("{consulta_homologacao}")
+        } else {
+            format!("{consulta_producao}")
+        };
+        qrcode = format!(
+            r#"<infNFeSupl>
+                <qrCode><![CDATA[{url_qrcode}]]></qrCode>
+                <urlChave>{url_consulta}</urlChave>
+            </infNFeSupl>"#
+        );
+        // limpar qrcode
+        qrcode = cleaner::Strings::clear_xml_string(&qrcode);
+    }
+
     // add on top of xml ----------------------------------------------------
     let xml = "<NFe xmlns=\"http://www.portalfiscal.inf.br/nfe\">".to_string()
         + &xml
+        + &qrcode
         + &signed_xml
         + "</NFe>";
 
+    // salvar o XML assinado no arquivo nfe_request.xml ---------------------
+    let mut file = File::create("./nfe_request.xml")
+        .expect("Não foi possível criar o arquivo nfe_request.xml");
+    file.write_all(&xml.as_bytes())
+        .expect("Não foi possível escrever o arquivo nfe_request.xml");
+
     // validação do xml ----------------------------------------------------
-    match is_xml_valid(&xml, "./dfe/shema/PL_009p_NT2024_003_v1.03/nfe_v4.00.xsd") {
-        Ok(_) => {}
+    let signed_xml = match is_xml_valid(&xml, "./dfe/shema/PL_009p_NT2024_003_v1.03/nfe_v4.00.xsd")
+    {
+        Ok(xml) => xml,
         Err(e) => {
-            println!("Erro de validação XML: {}", e);
+            //println!("Erro de validação XML: {}", e);
             return Err(Error::msg(format!("{}", e.to_string())));
         }
     };
+
     // envelope -------------------------------------------------------------
     // TODO: Identificador de controle do Lote de envio do Evento.
     // Número sequencial autoincremental único para identificação
@@ -451,4 +514,28 @@ fn corrigir_tags_dest(string: String) -> String {
     let dest_string = re.replace_all(&dest_string, "</enderDest>").to_string();
 
     dest_string
+}
+
+fn qrcode_hash(
+    chave_acesso: &str,
+    versao_qr: &str,
+    ambiente: &str,
+    id_csc: &str,
+    csc: &str,
+) -> Result<String, Error> {
+    use sha1::{Digest, Sha1};
+
+    // Passo 1: Concatenar parâmetros separados por "|"
+    let dados = format!("{chave_acesso}|{versao_qr}|{ambiente}|{id_csc}");
+
+    // Passo 2: Adicionar o CSC ao final da string
+    let dados_csc = format!("{dados}{csc}");
+
+    // Passo 3: Aplicar SHA-1 e converter para hexadecimal
+    let mut hasher = Sha1::new();
+    hasher.update(dados_csc.as_bytes());
+    let hash = hasher.finalize();
+    let hash_hex = format!("{:x}", hash);
+
+    Ok(hash_hex)
 }

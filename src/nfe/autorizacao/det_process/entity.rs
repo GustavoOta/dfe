@@ -197,7 +197,11 @@ pub struct ICMSSN101 {
     // Campos específicos para ICMSSN101
     pub orig: u8,
     #[serde(rename = "CSOSN")]
-    pub csosn: u16,
+    pub csosn: String,
+    #[serde(rename = "pCredSN")]
+    pub p_cred_sn: String,
+    #[serde(rename = "vCredICMSSN")]
+    pub v_cred_icmssn: String,
 }
 
 /// 245.46 N10f ICMSSN102 Grupo CRT=1 – Simples Nacional e CSOSN = 102 CG N01  1-1  Tributação ICMS pelo Simples Nacional, CSOSN=102 (v2.0)
@@ -211,11 +215,7 @@ pub struct ICMSSN102 {
     /// Ex: 300 = Imune
     /// Ex: 400 = Não tributada pelo Simples Nacional
     #[serde(rename = "CSOSN")]
-    pub csosn: u16,
-    #[serde(rename = "pCredSN")]
-    pub p_cred_sn: f64,
-    #[serde(rename = "vCredICMSSN")]
-    pub v_cred_icmssn: f64,
+    pub csosn: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -234,7 +234,7 @@ pub struct ICMSSN500 {
     #[serde(rename = "orig")]
     pub orig: u8, // Origem da mercadoria
     #[serde(rename = "CSOSN")]
-    pub csosn: u16, // Código de Situação da Operação - Simples Nacional
+    pub csosn: String, // Código de Situação da Operação - Simples Nacional
     #[serde(rename = "vBCSTRet")]
     pub vbcst_ret: Option<String>, // Valor da BC do ICMS ST retido
     #[serde(rename = "vICMSSTRet")]
@@ -245,7 +245,7 @@ impl Default for ICMSSN500 {
     fn default() -> Self {
         ICMSSN500 {
             orig: 0,
-            csosn: 500,
+            csosn: "500".to_string(),
             vbcst_ret: None,
             vicmsst_ret: None,
         }
@@ -469,38 +469,24 @@ pub struct COFINSNT {
 pub struct COFINSOutr {
     #[serde(rename = "CST")]
     pub cst: String,
-    /// -*-
     #[serde(
         rename = "vBC",
         skip_serializing_if = "Option::is_none",
         serialize_with = "serialize_option_f64_2_decimals"
     )]
-    pub vbc: Option<f64>,
+    pub v_bc: Option<f64>,
     #[serde(
         rename = "pCOFINS",
         skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_option_f64_4_decimals"
+        serialize_with = "serialize_option_f64_2_decimals"
     )]
     pub p_cofins: Option<f64>,
-    /// -*-
-    #[serde(
-        rename = "qBCProd",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_option_f64_4_decimals"
-    )]
-    pub qbc_prod: Option<f64>,
-    #[serde(
-        rename = "vAliqProd",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_option_f64_4_decimals"
-    )]
-    pub valiq_prod: Option<f64>,
     #[serde(
         rename = "vCOFINS",
         skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_option_f64_4_decimals"
+        serialize_with = "serialize_option_f64_2_decimals"
     )]
-    pub vcofins: Option<f64>,
+    pub v_cofins: Option<f64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -554,7 +540,7 @@ where
     }
 }
 
-fn serialize_option_f64_4_decimals<S>(x: &Option<f64>, s: S) -> Result<S::Ok, S::Error>
+/* fn serialize_option_f64_4_decimals<S>(x: &Option<f64>, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
 {
@@ -563,3 +549,4 @@ where
         None => s.serialize_none(),
     }
 }
+ */

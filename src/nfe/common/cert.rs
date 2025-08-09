@@ -3,6 +3,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use openssl::pkcs12::Pkcs12;
 use openssl::sign::Signer;
 use openssl::x509::X509;
+use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use std::fs::File;
 use std::io::Read;
@@ -117,5 +118,65 @@ impl Sign {
         let signature = STANDARD.encode(&signature);
 
         Ok(signature)
+    }
+}
+
+// display certificate information
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CertificateInfo {
+    pub subject: String,
+    pub issuer: String,
+    pub valid_from: String,
+    pub valid_to: String,
+}
+impl CertificateInfo {
+    pub fn from_pfx(pfx_path: &str, password: &str) -> Result<CertificateInfo, Error> {
+        let mut file = File::open(pfx_path)?;
+        let mut der = vec![];
+        file.read_to_end(&mut der)?;
+
+        let pkcs12 = Pkcs12::from_der(&der)?;
+        let x509: openssl::pkcs12::ParsedPkcs12_2 = pkcs12.parse2(password)?;
+
+        let cert = x509
+            .cert
+            .ok_or_else(|| anyhow::anyhow!("Certificado não encontrado"))?;
+        let cert = X509::from_der(&cert.to_der()?)?;
+        let subject = cert
+            .subject_name()
+            .entries()
+            .fold(String::new(), |mut acc, entry| {
+                if !acc.is_empty() {
+                    acc.push_str(", ");
+                }
+                acc.push_str(&format!(
+                    "{}={}",
+                    entry.object().nid().short_name().unwrap_or(""),
+                    entry.data().as_utf8().unwrap()
+                ));
+                acc
+            });
+        let issuer = cert
+            .issuer_name()
+            .entries()
+            .fold(String::new(), |mut acc, entry| {
+                if !acc.is_empty() {
+                    acc.push_str(", ");
+                }
+                acc.push_str(&format!(
+                    "{}={}",
+                    entry.object().nid().short_name().unwrap_or(""),
+                    entry.data().as_utf8().unwrap()
+                ));
+                acc
+            });
+        let valid_from = cert.not_before().to_string();
+        let valid_to = cert.not_after().to_string();
+        Ok(CertificateInfo {
+            subject,
+            issuer,
+            valid_from,
+            valid_to,
+        })
     }
 }

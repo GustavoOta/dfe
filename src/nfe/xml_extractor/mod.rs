@@ -24,7 +24,7 @@ impl XmlExtractorSignature for XmlExtractor {
         if xml.is_empty() {
             return Err(XMLExtractorError {
                 error: 0,
-                msg: "XML string is empty".to_string(),
+                msg: "XMLExtractorError string is empty: O XML enviado para converter para JSON está vazio.".to_string(),
                 data: None,
             });
         }
@@ -33,7 +33,7 @@ impl XmlExtractorSignature for XmlExtractor {
         if nfe.is_err() {
             return Err(XMLExtractorError {
                 error: 1,
-                msg: format!("Failed to parse XML: {}", nfe.unwrap_err()),
+                msg: format!("Erro fatal: Ao tentar converter o XML para o formato JSON, o formato da estrutura do XML não é compativel com NFeProc: {:?}", nfe.unwrap_err()),
                 data: Some(xml.to_string()),
             });
         }

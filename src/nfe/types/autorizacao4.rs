@@ -4,9 +4,11 @@ use serde::{Deserialize, Serialize};
 pub struct NFe {
     pub cert_path: String,
     pub cert_pass: String,
+    pub id_csc: Option<String>,
+    pub csc: Option<String>,
     pub ide: Ide,
     pub emit: Emit,
-    pub dest: Dest,
+    pub dest: Option<Dest>,
     pub det: Vec<Det>,
     pub total: Total,
     pub transp: Transp,
@@ -425,7 +427,7 @@ pub struct Det {
     pub v_bc: Option<f64>,
     pub p_icms: Option<f64>,
     pub v_icms: Option<f64>,
-    pub csosn: Option<u16>,
+    pub csosn: Option<String>,
     pub p_cred_sn: Option<f64>,
     pub v_cred_icmssn: Option<f64>,
     // ******* PIS ******* //
@@ -731,6 +733,17 @@ pub struct Pag {
     pub t_pag: String,
     /// Valor do pagamento
     pub v_pag: f64,
+    // Campos para cartão (opcionais)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tp_integra: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cnpj: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub t_band: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub c_aut: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub v_troco: Option<String>,
 }
 
 impl Default for Pag {
@@ -739,6 +752,11 @@ impl Default for Pag {
             ind_pag: 0,
             t_pag: "99".to_string(),
             v_pag: 0.0,
+            tp_integra: None,
+            cnpj: None,
+            t_band: None,
+            c_aut: None,
+            v_troco: None,
         }
     }
 }
