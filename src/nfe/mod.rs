@@ -5,6 +5,7 @@ pub mod connection;
 pub mod mod_status_service;
 pub mod types;
 pub mod xml_extractor;
+pub mod xml_rules;
 
 use anyhow::{Error, Result};
 

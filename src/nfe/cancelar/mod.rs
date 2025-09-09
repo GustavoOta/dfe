@@ -49,8 +49,11 @@ pub async fn nfe_cancelar(cancelar: NFeCancelar) -> Result<Response, Error> {
     let mut file = File::create("cancelar.xml")?;
     file.write_all(envelope.as_bytes())?;
 
+    // Selecionar mod_ modelo NF
+    let mod_ = cancelar.mod_.clone().unwrap_or_else(|| 55);
+
     // Selecionar o url do webservice -----------------------
-    let url = nfe_recepcao_evento(cancelar.tp_amb, "SP", 55, false)?;
+    let url = nfe_recepcao_evento(cancelar.tp_amb, "SP", mod_, false)?;
 
     let cert = Cert::from_pfx(&cancelar.cert_path, &cancelar.cert_pass)?;
     let client = WebService::client(cert.identity)?;

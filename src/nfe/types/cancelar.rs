@@ -11,6 +11,9 @@ pub struct NFeCancelar {
     pub cert_pass: String,
     /// Tipo de ambiente (1 - Produção, 2 - Homologação)
     pub tp_amb: u8,
+    /// Modelo da NFe
+    /// Exemplo: "65" None = "55"
+    pub mod_: Option<u32>,
     /// Chave de acesso da NFe
     /// Exemplo: "35241211111111111111550010000000361491395167"
     pub chave: String,

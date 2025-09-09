@@ -41,14 +41,46 @@ fn url<'a>(service: &'a str, ambiente: u8, uf: &'a str, modelo: u32, svn: bool) 
     if modelo != 55 && modelo != 65 {
         return Err(anyhow!("Modelo inválido"));
     }
-    // NFCE
-    if modelo == 65 && service == "NFeAutorizacao" {
-        let url = match ambiente {
-            1 => "https://nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx",
-            2 => "https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx",
-            _ => {
-                return Err(anyhow!("Ambiente inválido"));
+    // NFCE (modelo 65) SP (sem SVC-AN aqui; adicionar se necessário)
+    if modelo == 65 {
+        let url = match (service, ambiente, uf) {
+            ("NFeAutorizacao", 1, "SP") => "https://nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx",
+            ("NFeRetAutorizacao", 1, "SP") => {
+                "https://nfce.fazenda.sp.gov.br/ws/NFeRetAutorizacao4.asmx"
             }
+            ("NfeInutilizacao", 1, "SP") => {
+                "https://nfce.fazenda.sp.gov.br/ws/NFeInutilizacao4.asmx"
+            }
+            ("NfeConsultaProtocolo", 1, "SP") => {
+                "https://nfce.fazenda.sp.gov.br/ws/NFeConsultaProtocolo4.asmx"
+            }
+            ("RecepcaoEvento", 1, "SP") => {
+                "https://nfce.fazenda.sp.gov.br/ws/NFeRecepcaoEvento4.asmx"
+            }
+            ("NfeStatusServico", 1, "SP") => {
+                "https://nfce.fazenda.sp.gov.br/ws/NFeStatusServico4.asmx"
+            }
+
+            ("NFeAutorizacao", 2, "SP") => {
+                "https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx"
+            }
+            ("NFeRetAutorizacao", 2, "SP") => {
+                "https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeRetAutorizacao4.asmx"
+            }
+            ("NfeInutilizacao", 2, "SP") => {
+                "https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeInutilizacao4.asmx"
+            }
+            ("NfeConsultaProtocolo", 2, "SP") => {
+                "https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeConsultaProtocolo4.asmx"
+            }
+            ("RecepcaoEvento", 2, "SP") => {
+                "https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeRecepcaoEvento4.asmx"
+            }
+            ("NfeStatusServico", 2, "SP") => {
+                "https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeStatusServico4.asmx"
+            }
+
+            _ => return Err(anyhow!("Service endpoint (NFCE) not found")),
         };
         return Ok(url);
     }

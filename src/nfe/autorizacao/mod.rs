@@ -1,4 +1,3 @@
-mod dest;
 mod det;
 mod det_process;
 mod emit;
@@ -10,7 +9,6 @@ mod transp;
 
 use crate::nfe;
 use anyhow::{Error, Result};
-use dest::dest_process;
 use det::det_process;
 use emit::{EmitProcess, EnderEmitProcess};
 use ide::*;
@@ -25,6 +23,7 @@ use nfe::common::ws::nfe_autorizacao;
 use nfe::connection::WebService;
 use nfe::types::autorizacao4::*;
 use nfe::types::chave_acesso_props::ChaveAcessoProps;
+use nfe::xml_rules::dest::*;
 use pag::pag_process;
 use regex::Regex;
 use serde_xml_rs::to_string;
@@ -65,7 +64,7 @@ pub struct TagInfProt {
 }
 
 pub async fn emit(nfe: NFe) -> Result<Response, Error> {
-    let codigo_numerico = ChaveAcesso::gerar_codigo_numerico(nfe.ide.c_nf);
+    let codigo_numerico = ChaveAcesso::gerar_codigo_numerico(nfe.ide.c_nf.clone());
 
     // atribua a doc a condicao que atribui o valor de nfe.emit.cnpj se some ou nfe.emit.cpf se some
     let doc = match (nfe.emit.cnpj.as_ref(), nfe.emit.cpf.as_ref()) {
@@ -86,13 +85,13 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
     let chave_acesso = ch_acc.chave;
     let dv = ch_acc.dv;
 
-    let dh_emi = if let Some(dh_emi) = nfe.ide.dh_emi {
+    let dh_emi = if let Some(dh_emi) = nfe.ide.dh_emi.clone() {
         dh_emi
     } else {
         get_current_date_time()
     };
 
-    let dh_sai_ent = if let Some(dh_sai_ent) = nfe.ide.dh_sai_ent {
+    let dh_sai_ent = if let Some(dh_sai_ent) = nfe.ide.dh_sai_ent.clone() {
         dh_sai_ent
     } else {
         get_current_date_time()
@@ -126,7 +125,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         ide = IdeProcess {
             c_uf: nfe.ide.c_uf,
             c_nf: Some(codigo_numerico),
-            nat_op: nfe.ide.nat_op,
+            nat_op: nfe.ide.nat_op.clone(),
             ind_pag: nfe.ide.ind_pag,
             mod_: nfe.ide.mod_.clone(),
             serie: nfe.ide.serie,
@@ -135,7 +134,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
             dh_sai_ent: None,
             tp_nf: nfe.ide.tp_nf,
             id_dest: nfe.ide.id_dest,
-            c_mun_fg: nfe.ide.c_mun_fg,
+            c_mun_fg: nfe.ide.c_mun_fg.clone(),
             tp_imp: nfe.ide.tp_imp,
             tp_emis: nfe.ide.tp_emis,
             c_dv: Some(dv),
@@ -144,7 +143,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
             ind_final: nfe.ide.ind_final,
             ind_pres: nfe.ide.ind_pres,
             proc_emi: nfe.ide.proc_emi,
-            ver_proc: nfe.ide.ver_proc,
+            ver_proc: nfe.ide.ver_proc.clone(),
         };
     }
 
@@ -167,17 +166,8 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         ie: nfe.emit.ie,
         crt: nfe.emit.crt,
     };
-    let dest_string = match nfe.dest {
-        Some(ref dest) => {
-            let dest = dest_process(dest.clone())?;
-            let dest_string = to_string(&dest)?;
-            corrigir_tags_dest(dest_string)
-        }
-        None => {
-            // Se não houver destinatário, retornar uma string vazia
-            String::new()
-        }
-    };
+
+    let dest_string = DestTAG::build(&nfe.dest, &nfe.ide)?;
 
     let dets = det_process(nfe.det, nfe.ide.mod_, nfe.ide.tp_amb)?;
     let mut det_string = String::new();
@@ -476,44 +466,6 @@ fn xml_result(response: &str, signed_xml: String) -> Result<Response, Error> {
         protocolo: tag_inf_prot,
         xml: signed_xml,
     })
-}
-// TODO - ??? GAMBIARRA ??? Usar o quick_xml para gerar o XML.
-// O serde_xml_rs para deserializar a resposta é bom
-// mas para gerar é melhor o quick_xml
-fn corrigir_tags_dest(string: String) -> String {
-    // remover de dest string <CPF><CPF> e substituir por <CPF>
-    let re = Regex::new(r"<CPF><CPF>").unwrap();
-    let dest_string = re.replace_all(&string, "<CPF>").to_string();
-
-    // remover de dest string <CNPJ><CNPJ> e substituir por <CNPJ>
-    let re = Regex::new(r"<CNPJ><CNPJ>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "<CNPJ>").to_string();
-
-    // remover de dest string <idEstrangeiro><idEstrangeiro> e substituir por <idEstrangeiro>
-    let re = Regex::new(r"<idEstrangeiro><idEstrangeiro>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "<idEstrangeiro>").to_string();
-
-    // remover de dest string </CPF></CPF> e substituir por ""
-    let re = Regex::new(r"</enderDest></CPF>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "</enderDest>").to_string();
-
-    // remover de dest string </CNPJ></CNPJ> e substituir por ""
-    let re = Regex::new(r"</enderDest></CNPJ>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "</enderDest>").to_string();
-
-    // remover de dest string </CNPJ></dest> e substituir por "</dest>"
-    let re = Regex::new(r"</CNPJ></dest>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "</dest>").to_string();
-
-    // remover de dest string </CPF></dest> e substituir por "</dest>"
-    let re = Regex::new(r"</CPF></dest>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "</dest>").to_string();
-
-    // remover de dest string </idEstrangeiro></idEstrangeiro> e substituir por ""
-    let re = Regex::new(r"</enderDest></idEstrangeiro>").unwrap();
-    let dest_string = re.replace_all(&dest_string, "</enderDest>").to_string();
-
-    dest_string
 }
 
 fn qrcode_hash(

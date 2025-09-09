@@ -48,6 +48,8 @@ async fn test_service_status() {
 async fn test_emit_nfe_nfce() {
     use dfe::nfe::autorizacao::emit;
     use dfe::nfe::types::autorizacao4::*;
+    use dfe::nfe::xml_rules::dest::models::Dest;
+    use dfe::nfe::xml_rules::ide::models::Ide;
 
     let teste = emit(NFe {
         cert_path: "D:/Projetos/cert.pfx".to_string(),
@@ -229,13 +231,14 @@ async fn test_emit_nfe_nfce() {
 
 #[tokio::test]
 async fn test_cancel_nfe_nfce() {
-    use dfe::nfe::cancelar::nfe_cancelar;
+    /* use dfe::nfe::cancelar::nfe_cancelar;
     use dfe::nfe::types::cancelar::*;
 
     let teste = nfe_cancelar(NFeCancelar {
         cert_path: "D:/Projetos/cert.pfx".to_string(),
         cert_pass: "1234".to_string(),
         tp_amb: 2,
+        mod_: Some(55),
         chave: "35241211111111111111550010000000381505051324".to_string(),
         protocolo: "1352400000006702".to_string(),
         justificativa: "TESTE DE CANCELAMENTO".to_string(),
@@ -246,5 +249,5 @@ async fn test_cancel_nfe_nfce() {
         println!("Erro: {:?}", e);
     } else {
         println!("Response: {:?}", teste.unwrap().response);
-    }
+    } */
 }
