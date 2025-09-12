@@ -346,7 +346,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         .expect("Não foi possível escrever o arquivo nfe_request.xml");
 
     // validação do xml ----------------------------------------------------
-    let signed_xml = match is_xml_valid(&xml, "./dfe/shema/PL_009p_NT2024_003_v1.03/nfe_v4.00.xsd")
+    let signed_xml = match is_xml_valid(&xml, "./dfe/shema/PL_010b_NT2025_002_v1.21/nfe_v4.00.xsd")
     {
         Ok(xml) => xml,
         Err(e) => {

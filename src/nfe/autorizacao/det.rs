@@ -40,6 +40,10 @@ pub fn det_process(prod: Vec<Det>, mod_: u32, tp_amb: u8) -> Result<Vec<DetProce
                 icms: select_icms_process(d),
                 pis: select_pis_process(d),
                 cofins: select_cofins_process(d),
+                ibs_cbs: IBSCBSProcess {
+                    cst: Some("000".to_string()),
+                    c_class_trib: Some("000001".to_string()),
+                },
             },
             inf_ad_prod: d.inf_ad_prod.clone(),
         });
@@ -245,68 +249,3 @@ fn validade_cofins_cst(pis_cst_opt: Option<String>) -> String {
         None => "COFINS CST não recebido, verifique se cofins_cst foi enviado.".to_string(), // or handle as needed
     }
 }
-/*
-
-ERro: duplicando vetor por extend
-pub fn det_process(prod: Vec<Det>) -> Result<Vec<DetProcess>, Error> {
-    let mut det_process_values: Vec<DetProcess> = Vec::new();
-    for d in &prod {
-        let icms = match d.icms.as_str() {
-            "ICMSSN102" => ICMSProcess::ICMSSN102(ICMSSN102 {
-                orig: 0,
-                csosn: 102,
-            }),
-            "ICMS40" => ICMSProcess::ICMS40(ICMS40 {
-                orig: 0,
-                cst: 41,
-                ..Default::default()
-            }),
-            _ => return Err(Error::msg("Unsupported ICMS type")),
-        };
-
-        det_process_values.extend(
-            prod.iter()
-                .map(|d| DetProcess {
-                    prod: ProdProcess {
-                        c_prod: d.c_prod.to_string(),
-                        c_ean: d.c_ean.to_string(),
-                        x_prod: d.x_prod.to_string(),
-                        ncm: d.ncm.to_string(),
-                        cfop: d.cfop.to_string(),
-                        cest: d.cest.clone(),
-                        u_com: d.u_com.to_string(),
-                        q_com: format!("{:.2}", d.q_com),
-                        v_un_com: format!("{:.2}", d.v_un_com),
-                        v_prod: format!("{:.2}", d.v_prod),
-                        c_ean_trib: d.c_ean_trib.to_string(),
-                        u_trib: d.u_trib.to_string(),
-                        q_trib: format!("{:.2}", d.q_trib),
-                        v_un_trib: format!("{:.2}", d.v_un_trib),
-                        ind_tot: d.ind_tot.to_string(),
-                    },
-                    imposto: ImpostoProcess {
-                        v_tot_trib: format!("{:.2}", d.v_tot_trib),
-                        icms: icms.clone(),
-                        pis: PISProcess {
-                            pis_outr: PISOutr {
-                                cst: 99.to_string(),
-                                qbc_prod: Some("0.00".to_string()),
-                                valiq_prod: Some("0.00".to_string()),
-                                vpis: Some("0.00".to_string()),
-                            },
-                        },
-                        cofins: COFINSProcess {
-                            cofins_outr: COFINSOutr {
-                                cst: 99.to_string(),
-                                qbc_prod: "0.00".to_string(),
-                                valiq_prod: "0.00".to_string(),
-                                vcofins: "0.00".to_string(),
-                            },
-                        },
-                    },
-                })
-                .collect::<Vec<_>>(),
-        );
-    }
-    Ok(det_process_values)
-} */

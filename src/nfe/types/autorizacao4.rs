@@ -243,6 +243,8 @@ pub struct Det {
     // pub cofins_v_aliq_prod: Option<f64>,
     // pub cofins_v_cofins: Option<f64>,
     // TODO: ISSQN
+    // IBS CBS : TESTES
+
     // TODO: impostoDevol
     /// vTotTrib 13v2 Valor aproximado total de tributos federais, estaduais e municipais.
     /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.

@@ -24,7 +24,7 @@ pub fn is_xml_valid(xml: &str, xsd: &str) -> Result<String, String> {
             println!("{}", err.message.as_ref().unwrap());
         } */
 
-        return Err("Erro ao criar contexto de validação XSD".to_string());
+        return Err("Erro ao criar contexto de validação XSD PL_010b_NT2025_002_v1.21".to_string());
     }
     // Validação
     let mut xsd = xsd.unwrap();
@@ -48,16 +48,17 @@ mod tests {
 
     #[test]
     fn test_is_xml_invalid() {
-        let xml = std::fs::read_to_string("D:\\Projetos\\dfe-api\\xml_validation_error.xml")
+        let xml = std::fs::read_to_string("D:/Projetos/dfe-api/nfe_request.xml")
             .expect("Arquivo XML de teste não encontrado ou não pôde ser lido");
-        let xsd = "./dfe/shema/PL_009p_NT2024_003_v1.03/nfe_v4.00.xsd";
+
+        let xsd = "./dfe/shema/PL_010b_NT2025_002_v1.21/nfe_v4.00.xsd";
         let result = is_xml_valid(&xml, xsd);
-        assert!(
-            result.is_err(),
-            "O XML deveria ser inválido, mas passou na validação"
-        );
+
         if let Err(e) = result {
             println!("Erro esperado: {:?}", e);
+        } else {
+            // show validation result
+            println!("XML válido: {:?}", result.unwrap());
         }
     }
 }

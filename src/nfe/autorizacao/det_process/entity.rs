@@ -50,6 +50,25 @@ pub struct ImpostoProcess {
     pub pis: PISProcess,
     #[serde(rename = "COFINS")]
     pub cofins: COFINSProcess,
+    #[serde(rename = "IBSCBS")]
+    pub ibs_cbs: IBSCBSProcess,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct IBSCBSProcess {
+    #[serde(rename = "CST")]
+    pub cst: Option<String>,
+    #[serde(rename = "cClassTrib")]
+    pub c_class_trib: Option<String>,
+}
+
+impl Default for IBSCBSProcess {
+    fn default() -> Self {
+        IBSCBSProcess {
+            cst: Some("000".to_string()),
+            c_class_trib: Some("000001".to_string()),
+        }
+    }
 }
 
 /// 164 N01 ICMS Informações do ICMS da Operação própria e ST CG M01  1-1  Informar apenas um dos grupos de tributação do ICMS (ICMS00, ICMS10, ...) (v2.0)
