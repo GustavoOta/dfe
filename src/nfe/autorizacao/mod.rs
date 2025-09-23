@@ -170,6 +170,8 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
     let dest_string = DestTAG::build(&nfe.dest, &nfe.ide)?;
 
     let dets = det_process(nfe.det, nfe.ide.mod_, nfe.ide.tp_amb)?;
+    let dets_total = dets.clone();
+
     let mut det_string = String::new();
     for (i, det) in dets.iter().enumerate() {
         let prod = to_string(&det.prod).unwrap_or_else(|e| {
@@ -195,7 +197,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         ));
     }
 
-    let total = total_process(nfe.total)?;
+    let total = total_process(nfe.total, dets_total, nfe.ide.tp_amb)?;
     let transp = transp_process(nfe.transp)?;
     let pag = pag_process(nfe.pag)?;
     let inf_adic = inf_adic_process(nfe.inf_adic)?;
@@ -348,10 +350,16 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
     // validação do xml ----------------------------------------------------
     let signed_xml = match is_xml_valid(&xml, "./dfe/shema/PL_010b_NT2025_002_v1.21/nfe_v4.00.xsd")
     {
-        Ok(xml) => xml,
+        Ok(xml) => {
+            println!("XML válido de acordo com o XSD.");
+            xml
+        }
         Err(e) => {
             //println!("Erro de validação XML: {}", e);
-            return Err(Error::msg(format!("{}", e.to_string())));
+            return Err(Error::msg(format!(
+                "Error at is_xml_valid: [{}]",
+                e.to_string()
+            )));
         }
     };
 
@@ -398,10 +406,19 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         .await?;
 
     if response.status().is_success() {
+        println!(
+            "Requisição enviada com sucesso. Resposta : [{:?}]",
+            response
+        );
         let result = xml_result(&response.text().await?, signed_xml)?;
         if result.protocolo.inf_prot.c_stat != 100 {
+            println!(
+                "Erro na Requisição: {} - {:?}",
+                result.protocolo.inf_prot.c_stat, result
+            );
             return Ok(result);
         } else {
+            println!("Requisição bem sucedida: {:?}", result);
             // build protocolo into xml
             let protocolo = format!(
                 r#"</NFe><protNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><infProt><tpAmb>{}</tpAmb><verAplic>{}</verAplic><chNFe>{}</chNFe><dhRecbto>{}</dhRecbto><nProt>{}</nProt><digVal>{}</digVal><cStat>{}</cStat><xMotivo>{}</xMotivo></infProt></protNFe></nfeProc>"#,
@@ -448,20 +465,62 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
             Ok(response)
         }
     } else {
+        let status = response.status().clone();
+        let body = response.text().await?;
+        println!("Erro na Requisição: {:?} -> Body: {:?}", status, body,);
         return Err(Error::msg(format!(
             "Erro na Requisição: {:?} -> Body: {:?}",
-            response.status(),
-            response.text().await?
+            status, body
         )));
     }
 }
 
 fn xml_result(response: &str, signed_xml: String) -> Result<Response, Error> {
+    println!("DEBUG: Iniciando processamento xml_result");
+    println!(
+        "DEBUG: Response recebida (primeiros 500 chars): {}",
+        if response.len() > 500 {
+            &response[..500]
+        } else {
+            response
+        }
+    );
+
     let re = Regex::new(r#"<protNFe versao="4.00">(.*?)</protNFe>"#)?;
-    let prot_nfe = re.captures(&response).unwrap().get(0).unwrap().as_str();
+    println!("DEBUG: Regex criada com sucesso");
 
+    let prot_nfe = match re.captures(&response) {
+        Some(captures) => {
+            println!(
+                "DEBUG: Regex encontrou matches: {} captures",
+                captures.len()
+            );
+            match captures.get(0) {
+                Some(matched) => {
+                    println!("DEBUG: Match encontrado: {}", matched.as_str());
+                    matched.as_str()
+                }
+                None => {
+                    println!("DEBUG: Nenhum match encontrado no grupo de captura");
+                    return Err(Error::msg("No match found in regex capture group"));
+                }
+            }
+        }
+        None => {
+            println!("DEBUG: Regex não encontrou nenhum match na response");
+            // Show what was actually found in the response
+            return Err(Error::msg(format!(
+                "Protocol NFe not found in response. Response content: {}",
+                response
+            )));
+        }
+    };
+
+    println!("DEBUG: Tentando deserializar protNFe XML: {}", prot_nfe);
     let tag_inf_prot: TagInfProt = serde_xml_rs::from_str(&prot_nfe)?;
+    println!("DEBUG: Deserialização bem-sucedida: {:?}", tag_inf_prot);
 
+    println!("DEBUG: Criando Response final");
     Ok(Response {
         protocolo: tag_inf_prot,
         xml: signed_xml,

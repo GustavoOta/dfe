@@ -1,5 +1,6 @@
 use crate::nfe::xml_rules::dest::models::Dest;
 use crate::nfe::xml_rules::ide::models::Ide;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -252,8 +253,29 @@ pub struct Det {
     pub v_tot_trib: f64,
     /// infAdProd
     pub inf_ad_prod: Option<String>,
+    /// IBS e CBS *************************************
+    /// Código da Situação Tributária do IBS e CBS
+    pub ibs_cbs_cst: String, // N3 EX: "000"
+    /// Código de Classificação Tributária do IBS e CBS
+    pub ibs_cbs_class_trib: String, // N6 EX: "000001"
+    /// Valor da Base de Cálculo do IBS e CBS
+    /// Decimal com até 2 dígitos, sendo 11 inteiros e 2 decimais.
+    pub ibs_cbs_v_bc: Decimal, // EX: 100.00
+    /// Alíquota do IBS e CBS na UF do emitente
+    pub p_ibs_uf: Decimal, // EX: 0.90
+    /// Valor do IBS na UF do emitente
+    pub v_ibs_uf: Decimal, // EX: 0.90
+    /// Alíquota do IBS e CBS no Município do emitente
+    pub p_ibs_mun: Decimal, // EX: 0.00
+    /// Valor do IBS no Município do emitente
+    pub v_ibs_mun: Decimal, // EX: 0.00
+    /// Alíquota do CBS
+    pub p_cbs: Decimal, // EX: 0.10
+    /// Valor do CBS
+    pub v_cbs: Decimal, // EX: 0.10
 }
 
+/// TODO: verficar o Default e excluir o uso
 impl Default for Det {
     fn default() -> Self {
         Det {
@@ -306,6 +328,15 @@ impl Default for Det {
             cofins_v_cofins: None,
             v_tot_trib: 0.0,
             inf_ad_prod: None,
+            ibs_cbs_cst: "IBS CBS CST não informado.".to_string(),
+            ibs_cbs_class_trib: "IBS CBS Classificação Tributária não informado.".to_string(),
+            ibs_cbs_v_bc: Decimal::new(-10, 2), // retorna -0.1 para valor invalido
+            p_ibs_uf: Decimal::new(-10, 2),     // retorna -0.1 para valor invalido
+            v_ibs_uf: Decimal::new(-10, 2),     // retorna -0.1 para valor invalido
+            p_ibs_mun: Decimal::new(-10, 2),    // retorna -0.1 para valor invalido
+            v_ibs_mun: Decimal::new(-10, 2),    // retorna -0.1 para valor invalido
+            p_cbs: Decimal::new(-10, 2),        // retorna -0.1 para valor invalido
+            v_cbs: Decimal::new(-10, 2),        // retorna -0.1 para valor invalido
         }
     }
 }

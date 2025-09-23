@@ -40,15 +40,56 @@ pub fn det_process(prod: Vec<Det>, mod_: u32, tp_amb: u8) -> Result<Vec<DetProce
                 icms: select_icms_process(d),
                 pis: select_pis_process(d),
                 cofins: select_cofins_process(d),
-                ibs_cbs: IBSCBSProcess {
-                    cst: Some("000".to_string()),
-                    c_class_trib: Some("000001".to_string()),
-                },
+                ibs_cbs: ibs_cbs_process(d, tp_amb),
             },
             inf_ad_prod: d.inf_ad_prod.clone(),
         });
     }
     Ok(det_process_values)
+}
+
+fn ibs_cbs_process(d: &Det, tp_amb: u8) -> Option<IBSCBSProcess> {
+    let send_ibscbs = Some(IBSCBSProcess {
+        cst: d.ibs_cbs_cst.clone(),
+        c_class_trib: d.ibs_cbs_class_trib.clone(),
+        g_ibscbs: GIBSCBS {
+            v_bc: format!("{:.2}", d.ibs_cbs_v_bc),
+            g_ibs_uf: GIBSUF {
+                p_ibs_uf: format!("{:.4}", d.p_ibs_uf.clone()), // 0,1%
+                v_ibs_uf: format!("{:.2}", d.v_ibs_uf.clone()),
+                ..Default::default()
+            },
+            g_ibs_mun: GIBSMun {
+                p_ibs_mun: format!("{:.4}", d.p_ibs_mun.clone()), // 0,0%
+                v_ibs_mun: format!("{:.2}", d.v_ibs_mun.clone()),
+                ..Default::default()
+            },
+            v_ibs: format!("{:.2}", d.v_ibs_uf + d.v_ibs_mun),
+            g_cbs: GCBS {
+                p_cbs: format!("{:.4}", d.p_cbs.clone()), // 0,9%
+                v_cbs: format!("{:.2}", d.v_cbs.clone()),
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    });
+
+    // verificar se a data do sistema é maior ou igual a  que 2026-01-01
+    let data_limite =
+        chrono::NaiveDate::from_ymd_opt(2026, 1, 1).expect("Data limite inválida para IBSCBS");
+    let data_atual = chrono::Local::now().naive_local().date();
+    if data_atual >= data_limite {
+        return send_ibscbs;
+    }
+
+    match tp_amb {
+        2 => send_ibscbs,
+        1 => None,
+        _ => {
+            println!("Ambiente inválido para processamento do IBSCBS: {}", tp_amb);
+            None
+        }
+    }
 }
 
 fn select_icms_process(d: &Det) -> ICMSProcess {
