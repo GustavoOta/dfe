@@ -17,6 +17,7 @@ pub struct NFe {
     pub transp: Transp,
     pub pag: Pag,
     pub inf_adic: Option<InfAdic>,
+    pub active_ibs_cbs: Option<String>, // String pode ser qqr coisa a validação esta em some = desativado e none = ativado
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -151,13 +151,15 @@ pub fn total_process(
     total: Total,
     dets: Vec<DetProcess>,
     ambiente: u8,
+    active_ibscbs: Option<String>,
 ) -> Result<TotalProcess, Error> {
     let mut v_bc_ibs_cbs_total = 0.0;
     for det in &dets {
-        let ibs_cbs = det.imposto.ibs_cbs.as_ref().unwrap();
-        let v_bc_ibs_cbs = ibs_cbs.g_ibscbs.v_bc.clone();
-        let v_bc_ibs_cbs = v_bc_ibs_cbs.to_string().parse::<f64>().unwrap_or(0.0);
-        v_bc_ibs_cbs_total += v_bc_ibs_cbs;
+        if let Some(ibs_cbs) = det.imposto.ibs_cbs.as_ref() {
+            let v_bc_ibs_cbs = ibs_cbs.g_ibscbs.v_bc.clone();
+            let v_bc_ibs_cbs = v_bc_ibs_cbs.to_string().parse::<f64>().unwrap_or(0.0);
+            v_bc_ibs_cbs_total += v_bc_ibs_cbs;
+        }
     }
 
     let ibs_uf_total = v_bc_ibs_cbs_total * 0.001; // 0.1%
@@ -217,6 +219,9 @@ pub fn total_process(
         v_tot_trib: format!("{:.2}", total.v_tot_trib),
     };
 
+    // active_ibscbs onde None = ativado por padrão e Some('quarquer coisa') = desativado
+    //
+    // decidir se envia ou não o IBSCBS conforme ambiente e data
     // verificar se a data do sistema é maior ou igual a  que 2026-01-01
     let data_limite =
         chrono::NaiveDate::from_ymd_opt(2026, 1, 1).expect("Data limite inválida para IBSCBS");
@@ -228,15 +233,17 @@ pub fn total_process(
         });
     }
 
-    if ambiente == 2 {
-        Ok(TotalProcess {
-            icms_tot: send_icms_tot,
-            ibs_cbs_tot: send_ibs_cbs,
-        })
-    } else {
-        Ok(TotalProcess {
+    // active_ibscbs onde None = ativado por padrão e Some(false) ou Some(true) = desativado
+    if let Some(_) = active_ibscbs {
+        return Ok(TotalProcess {
             icms_tot: send_icms_tot,
             ibs_cbs_tot: None,
-        })
+        });
+    } else {
+        // se for None, ativa por padrão
+        return Ok(TotalProcess {
+            icms_tot: send_icms_tot,
+            ibs_cbs_tot: send_ibs_cbs,
+        });
     }
 }

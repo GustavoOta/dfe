@@ -2,7 +2,12 @@ use super::det_process::entity::*;
 use super::Det;
 use anyhow::{Error, Result};
 
-pub fn det_process(prod: Vec<Det>, mod_: u32, tp_amb: u8) -> Result<Vec<DetProcess>, Error> {
+pub fn det_process(
+    prod: Vec<Det>,
+    mod_: u32,
+    tp_amb: u8,
+    active_ibscbs: Option<String>,
+) -> Result<Vec<DetProcess>, Error> {
     let mut det_process_values: Vec<DetProcess> = Vec::new();
     let mut first_item = 0;
 
@@ -40,7 +45,7 @@ pub fn det_process(prod: Vec<Det>, mod_: u32, tp_amb: u8) -> Result<Vec<DetProce
                 icms: select_icms_process(d),
                 pis: select_pis_process(d),
                 cofins: select_cofins_process(d),
-                ibs_cbs: ibs_cbs_process(d, tp_amb),
+                ibs_cbs: ibs_cbs_process(d, tp_amb, active_ibscbs.clone()),
             },
             inf_ad_prod: d.inf_ad_prod.clone(),
         });
@@ -48,7 +53,7 @@ pub fn det_process(prod: Vec<Det>, mod_: u32, tp_amb: u8) -> Result<Vec<DetProce
     Ok(det_process_values)
 }
 
-fn ibs_cbs_process(d: &Det, tp_amb: u8) -> Option<IBSCBSProcess> {
+fn ibs_cbs_process(d: &Det, _tp_amb: u8, active_ibscbs: Option<String>) -> Option<IBSCBSProcess> {
     let send_ibscbs = Some(IBSCBSProcess {
         cst: d.ibs_cbs_cst.clone(),
         c_class_trib: d.ibs_cbs_class_trib.clone(),
@@ -74,6 +79,7 @@ fn ibs_cbs_process(d: &Det, tp_amb: u8) -> Option<IBSCBSProcess> {
         },
     });
 
+    // Se a data atual for menor que 2026-01-01, não enviar o IBSCBS
     // verificar se a data do sistema é maior ou igual a  que 2026-01-01
     let data_limite =
         chrono::NaiveDate::from_ymd_opt(2026, 1, 1).expect("Data limite inválida para IBSCBS");
@@ -81,14 +87,10 @@ fn ibs_cbs_process(d: &Det, tp_amb: u8) -> Option<IBSCBSProcess> {
     if data_atual >= data_limite {
         return send_ibscbs;
     }
-
-    match tp_amb {
-        2 => send_ibscbs,
-        1 => None,
-        _ => {
-            println!("Ambiente inválido para processamento do IBSCBS: {}", tp_amb);
-            None
-        }
+    if let Some(_) = active_ibscbs {
+        return None;
+    } else {
+        return send_ibscbs;
     }
 }
 
@@ -138,6 +140,40 @@ fn select_icms_process(d: &Det) -> ICMSProcess {
             };
 
             ICMSProcess::ICMSSN102(ICMSSN102 { orig, csosn })
+        }
+        "ICMSSN500" => {
+            // ICMS cobrado anteriormente por substituição tributária (v2.0)
+            let orig = match d.orig {
+                Some(orig) => orig,
+                None => return validate_icms("orig", d),
+            };
+            let csosn = match d.csosn.clone() {
+                Some(csosn) => csosn,
+                None => return validate_icms("csosn", d),
+            };
+
+            ICMSProcess::ICMSSN500(ICMSSN500 {
+                orig,
+                csosn,
+                ..Default::default()
+            })
+        }
+        "ICMSSN900" => {
+            // Tributada pelo Simples Nacional com permissão de crédito e com cobrança do ICMS por substituição tributária. (v2.0)
+            let orig = match d.orig {
+                Some(orig) => orig,
+                None => return validate_icms("orig", d),
+            };
+            let csosn = match d.csosn.clone() {
+                Some(csosn) => csosn,
+                None => return validate_icms("csosn", d),
+            };
+
+            ICMSProcess::ICMSSN900(ICMSSN900 {
+                orig,
+                csosn,
+                ..Default::default()
+            })
         }
         "ICMS00" => {
             let orig = match d.orig {

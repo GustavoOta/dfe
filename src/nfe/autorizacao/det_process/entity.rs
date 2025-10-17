@@ -466,64 +466,53 @@ pub struct ICMSSN202 {
 }
 
 /// 245.47 N10g ICMSSN500 Grupo CRT=1 – Simples Nacional e CSOSN = 500 CG N01  1-1  Tributação ICMS pelo Simples Nacional, CSOSN=500 (v2.0)
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMSSN500 {
     #[serde(rename = "orig")]
     pub orig: u8, // Origem da mercadoria
     #[serde(rename = "CSOSN")]
     pub csosn: String, // Código de Situação da Operação - Simples Nacional
-    #[serde(rename = "vBCSTRet")]
+    #[serde(rename = "vBCSTRet", skip_serializing_if = "Option::is_none")]
     pub vbcst_ret: Option<String>, // Valor da BC do ICMS ST retido
-    #[serde(rename = "vICMSSTRet")]
+    #[serde(rename = "vICMSSTRet", skip_serializing_if = "Option::is_none")]
     pub vicmsst_ret: Option<String>, // Valor do ICMS ST retido
 }
 
-impl Default for ICMSSN500 {
-    fn default() -> Self {
-        ICMSSN500 {
-            orig: 0,
-            csosn: "500".to_string(),
-            vbcst_ret: None,
-            vicmsst_ret: None,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMSSN900 {
     // Campos específicos para ICMSSN900
     #[serde(rename = "orig")]
-    pub orig: String, // Origem da mercadoria
+    pub orig: u8, // Origem da mercadoria
     #[serde(rename = "CSOSN")]
     // 245.55 N12.1 -x- Sequência XML G N10h  0-1  Grupo opcional.
     pub csosn: String, // Código de Situação da Operação - Simples Nacional
-    #[serde(rename = "modBC")]
+    #[serde(rename = "modBC", skip_serializing_if = "Option::is_none")]
     pub modbc: Option<String>, // Modalidade de determinação da BC do ICMS
-    #[serde(rename = "vBC")]
+    #[serde(rename = "vBC", skip_serializing_if = "Option::is_none")]
     pub vbc: Option<String>, // Valor da BC do ICMS
-    #[serde(rename = "pRedBC")]
+    #[serde(rename = "pRedBC", skip_serializing_if = "Option::is_none")]
     pub pred_bc: Option<String>, // Percentual de redução da BC
-    #[serde(rename = "pICMS")]
+    #[serde(rename = "pICMS", skip_serializing_if = "Option::is_none")]
     pub picms: Option<String>, // Alíquota do ICMS
-    #[serde(rename = "vICMS")]
+    #[serde(rename = "vICMS", skip_serializing_if = "Option::is_none")]
     pub vicms: Option<String>, // Valor do ICMS
     // 245.60 N17.1 -x- Sequência XML G N10h  0-1  Grupo opcional.
-    #[serde(rename = "modBCST")]
+    #[serde(rename = "modBCST", skip_serializing_if = "Option::is_none")]
     pub modbcst: Option<String>, // Modalidade de determinação da BC do ICMS ST
-    #[serde(rename = "pMVAST")]
+    #[serde(rename = "pMVAST", skip_serializing_if = "Option::is_none")]
     pub pmvast: Option<String>, // Percentual da margem de valor Adicionado do ICMS ST
-    #[serde(rename = "pRedBCST")]
+    #[serde(rename = "pRedBCST", skip_serializing_if = "Option::is_none")]
     pub pred_bcst: Option<String>, // Percentual de redução da BC do ICMS ST
-    #[serde(rename = "vBCST")]
+    #[serde(rename = "vBCST", skip_serializing_if = "Option::is_none")]
     pub vbcst: Option<String>, // Valor da BC do ICMS ST
-    #[serde(rename = "pICMSST")]
+    #[serde(rename = "pICMSST", skip_serializing_if = "Option::is_none")]
     pub picmsst: Option<String>, // Alíquota do ICMS ST
-    #[serde(rename = "vICMSST")]
+    #[serde(rename = "vICMSST", skip_serializing_if = "Option::is_none")]
     pub vicmsst: Option<String>, // Valor do ICMS ST
     // 245.52 N27.1 -x- Sequência XML G N10h  0-1  Grupo opcional.
-    #[serde(rename = "pCredSN")]
+    #[serde(rename = "pCredSN", skip_serializing_if = "Option::is_none")]
     pub pcred_sn: Option<String>, // Alíquota aplicável de cálculo do crédito (Simples Nacional)
-    #[serde(rename = "vCredICMSSN")]
+    #[serde(rename = "vCredICMSSN", skip_serializing_if = "Option::is_none")]
     pub vcred_icmssn: Option<String>, // Valor crédito do ICMS que pode ser aproveitado nos termos do art. 23 da LC 123 (Simples Nacional)
 }
 

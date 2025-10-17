@@ -211,6 +211,7 @@ async fn test_emit_nfe_nfce() {
             ..Default::default()
         },
         inf_adic: None,
+        active_ibs_cbs: None,
     })
     .await;
 
