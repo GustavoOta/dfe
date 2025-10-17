@@ -150,7 +150,7 @@ pub struct ICMSTot {
 pub fn total_process(
     total: Total,
     dets: Vec<DetProcess>,
-    ambiente: u8,
+    _ambiente: u8,
     active_ibscbs: Option<String>,
 ) -> Result<TotalProcess, Error> {
     let mut v_bc_ibs_cbs_total = 0.0;
