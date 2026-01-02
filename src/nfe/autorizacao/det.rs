@@ -1,17 +1,64 @@
 use super::det_process::entity::*;
 use super::Det;
 use anyhow::{Error, Result};
+use rust_decimal::prelude::FromPrimitive;
+use rust_decimal::Decimal;
 
 pub fn det_process(
     prod: Vec<Det>,
     mod_: u32,
     tp_amb: u8,
+    desconto_rateio: Option<Decimal>,
     active_ibscbs: Option<String>,
 ) -> Result<Vec<DetProcess>, Error> {
     let mut det_process_values: Vec<DetProcess> = Vec::new();
     let mut first_item = 0;
 
+    // desconto por rateio nos itens *********************************************************
+    let desconto_rateado = if desconto_rateio.is_some() {
+        desconto_rateio.unwrap()
+    } else {
+        Decimal::new(0, 2)
+    };
+
+    let mut total_produtos = Decimal::new(0, 2);
     for d in &prod {
+        // soma o valor dos produtos para calcular o percentual do desconto
+        total_produtos += Decimal::from_f64(d.v_prod).unwrap_or(Decimal::new(0, 2));
+    }
+
+    // vamos definir a porcentagem do desconto, temos o valor total dos produtos e o valor do desconto
+    // exemplo: total produtos = 1000, desconto = 50, percentual = 50/1000 = 0.05 (5%)
+    let desconto_percentual = if total_produtos > Decimal::new(0, 2) {
+        desconto_rateado / total_produtos
+    } else {
+        Decimal::new(0, 2)
+    };
+
+    // com o valor do percentual, vamos calcular o valor do desconto para cada item
+    // armazenar cada desconto em um vetor para aplicar depois
+    let mut descontos_itens: Vec<Decimal> = Vec::new();
+    for d in &prod {
+        let v_prod_decimal = Decimal::from_f64(d.v_prod).unwrap_or(Decimal::new(0, 2));
+        let desconto_item = (v_prod_decimal * desconto_percentual).round_dp(2);
+        descontos_itens.push(desconto_item);
+    }
+
+    // verificar se a soma dos desconto é igual ao desconto total, se não for, ajustar o último item
+    let soma_descontos: Decimal = descontos_itens.iter().cloned().sum();
+    if soma_descontos != desconto_rateado {
+        let diferenca = desconto_rateado - soma_descontos;
+        if let Some(last) = descontos_itens.last_mut() {
+            *last += diferenca;
+        }
+    }
+    /* println!(
+        "Desconto por rateio aplicado nos itens: {:?}",
+        descontos_itens
+    ); */
+    // fim do desconto por rateio nos itens **************************************************
+
+    for (d, desconto_item) in prod.iter().zip(descontos_itens.iter()) {
         let mut x_prod = d.x_prod.clone();
         if first_item == 0 {
             if mod_ == 65 && tp_amb == 2 {
@@ -20,6 +67,14 @@ pub fn det_process(
             }
         }
         first_item += 1;
+
+        // pegar o valor do desconto do item
+        let v_desc_value: Option<Decimal> = if *desconto_item > Decimal::new(0, 2) {
+            Some(*desconto_item)
+        } else {
+            None
+        };
+
         det_process_values.push(DetProcess {
             prod: ProdProcess {
                 c_prod: d.c_prod.to_string(),
@@ -29,13 +84,14 @@ pub fn det_process(
                 cfop: d.cfop.to_string(),
                 cest: d.cest.clone(),
                 u_com: d.u_com.to_string(),
-                q_com: format!("{:.2}", d.q_com),
+                q_com: format!("{:.3}", d.q_com),
                 v_un_com: format!("{:.2}", d.v_un_com),
                 v_prod: format!("{:.2}", d.v_prod),
                 c_ean_trib: d.c_ean_trib.to_string(),
                 u_trib: d.u_trib.to_string(),
-                q_trib: format!("{:.2}", d.q_trib),
+                q_trib: format!("{:.3}", d.q_trib),
                 v_un_trib: format!("{:.2}", d.v_un_trib),
+                v_desc: v_desc_value,
                 ind_tot: d.ind_tot.to_string(),
                 x_ped: d.x_ped.clone(),
                 n_item_ped: d.n_item_ped.clone(),
@@ -53,7 +109,12 @@ pub fn det_process(
     Ok(det_process_values)
 }
 
-fn ibs_cbs_process(d: &Det, _tp_amb: u8, active_ibscbs: Option<String>) -> Option<IBSCBSProcess> {
+fn ibs_cbs_process(d: &Det, _tp_amb: u8, _active_ibscbs: Option<String>) -> Option<IBSCBSProcess> {
+    // Se receber some('string') em active_ibscbs, não enviar o IBSCBS
+
+    /*     if let Some(_) = active_ibscbs {
+        return None;
+    } */
     let send_ibscbs = Some(IBSCBSProcess {
         cst: d.ibs_cbs_cst.clone(),
         c_class_trib: d.ibs_cbs_class_trib.clone(),
@@ -87,11 +148,8 @@ fn ibs_cbs_process(d: &Det, _tp_amb: u8, active_ibscbs: Option<String>) -> Optio
     if data_atual >= data_limite {
         return send_ibscbs;
     }
-    if let Some(_) = active_ibscbs {
-        return None;
-    } else {
-        return send_ibscbs;
-    }
+
+    return send_ibscbs;
 }
 
 fn select_icms_process(d: &Det) -> ICMSProcess {

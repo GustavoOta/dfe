@@ -1,6 +1,7 @@
 mod det;
 mod det_process;
 mod emit;
+mod flag;
 mod ide;
 mod inf_adic;
 pub mod pag;
@@ -11,6 +12,8 @@ use crate::nfe;
 use anyhow::{Error, Result};
 use det::det_process;
 use emit::{EmitProcess, EnderEmitProcess};
+use flag::FlagAutorizacao;
+use flag::FlagAutorizacaoEnum;
 use ide::*;
 use inf_adic::inf_adic_process;
 use nfe::common::cert::Cert;
@@ -64,6 +67,21 @@ pub struct TagInfProt {
 }
 
 pub async fn emit(nfe: NFe) -> Result<Response, Error> {
+    // Flag de autorização Ready, se not for Ready, return error with message
+    let flag = FlagAutorizacao::start().await.map_err(|e| Error::msg(e))?;
+    match flag {
+        FlagAutorizacaoEnum::Ready => {
+            println!("Flag de autorização: Ready. Prosseguindo com a emissão.");
+        }
+        _ => {
+            return Err(Error::msg(format!(
+                "Flag de autorização inválida para emissão: [{:?}]. Tente novamente quando a flag estiver como Ready.",
+                flag
+            )));
+        }
+    }
+
+    // Gerar a chave de acesso
     let codigo_numerico = ChaveAcesso::gerar_codigo_numerico(nfe.ide.c_nf.clone());
 
     // atribua a doc a condicao que atribui o valor de nfe.emit.cnpj se some ou nfe.emit.cpf se some
@@ -173,6 +191,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         nfe.det,
         nfe.ide.mod_,
         nfe.ide.tp_amb,
+        nfe.desconto_rateio.clone(),
         nfe.active_ibs_cbs.clone(),
     )?;
     let dets_total = dets.clone();
@@ -361,7 +380,7 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
     let signed_xml = match is_xml_valid(&xml, "./dfe/shema/PL_010b_NT2025_002_v1.21/nfe_v4.00.xsd")
     {
         Ok(xml) => {
-            println!("XML válido de acordo com o XSD.");
+            //println!("XML válido de acordo com o XSD.");
             xml
         }
         Err(e) => {
@@ -404,6 +423,14 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n{}", xml)
     };
 
+    // salvar antes do envio
+    let mut file = File::create("./nfe_request_envelope.xml")
+        .expect("Não foi possível criar o arquivo nfe_request_envelope.xml");
+    file.write_all(&xml_with_declaration.as_bytes())
+        .expect("Não foi possível escrever o arquivo nfe_request_envelope.xml");
+    file.sync_all()
+        .expect("Não foi possível sincronizar o arquivo nfe_request_envelope.xml");
+
     // Calcular o comprimento do corpo da requisição
     let content_length = xml_with_declaration.len();
 
@@ -416,19 +443,19 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
         .await?;
 
     if response.status().is_success() {
-        /*         println!(
+        println!(
             "Requisição enviada com sucesso. Resposta : [{:?}]",
             response
-        ); */
+        );
         let result = xml_result(&response.text().await?, signed_xml)?;
         if result.protocolo.inf_prot.c_stat != 100 {
-            /*             println!(
-                "Erro na Requisição: {} - {:?}",
-                result.protocolo.inf_prot.c_stat, result
-            ); */
+            println!(
+                "Erro C_STAT diferente de 100, que é [{:?}]",
+                result.protocolo.inf_prot.c_stat
+            );
             return Ok(result);
         } else {
-            //println!("Requisição bem sucedida: {:?}", result);
+            println!("Requisição bem sucedida: {:?}", result);
             // build protocolo into xml
             let protocolo = format!(
                 r#"</NFe><protNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><infProt><tpAmb>{}</tpAmb><verAplic>{}</verAplic><chNFe>{}</chNFe><dhRecbto>{}</dhRecbto><nProt>{}</nProt><digVal>{}</digVal><cStat>{}</cStat><xMotivo>{}</xMotivo></infProt></protNFe></nfeProc>"#,
@@ -457,10 +484,10 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
             let xml = r#"<?xml version="1.0" encoding="UTF-8"?><nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">"#
                 .to_string()
                 + &xml;
-            // save to root as nfe_request.xml
+            // save to root as nfe_response.xml
             // TODO: BUG Corrigir para retornar erro ao tentar salvar o arquivo que foi bem sucedido
             let mut file =
-                File::create("./nfe_request.xml").expect("Não foi possível criar o arquivo");
+                File::create("./nfe_response.xml").expect("Não foi possível criar o arquivo");
             file.write_all(xml.as_bytes())
                 .expect("Não foi possível escrever o arquivo");
 
@@ -486,7 +513,17 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
 }
 
 fn xml_result(response: &str, signed_xml: String) -> Result<Response, Error> {
-    let re = Regex::new(r#"<protNFe versao="4.00">(.*?)</protNFe>"#)?;
+    println!("Response XML ------------->: {}", response);
+    let re = Regex::new(r#"<protNFe versao="4.00">(.*?)</protNFe>"#);
+    let re = match re {
+        Ok(regex) => regex,
+        Err(e) => {
+            return Err(Error::msg(format!(
+                "Erro ao compilar a expressão regular: {}",
+                e
+            )));
+        }
+    };
 
     let prot_nfe = match re.captures(&response) {
         Some(captures) => match captures.get(0) {
@@ -504,7 +541,16 @@ fn xml_result(response: &str, signed_xml: String) -> Result<Response, Error> {
         }
     };
 
-    let tag_inf_prot: TagInfProt = serde_xml_rs::from_str(&prot_nfe)?;
+    let tag_inf_prot = serde_xml_rs::from_str(&prot_nfe);
+    let tag_inf_prot = match tag_inf_prot {
+        Ok(tag) => tag,
+        Err(e) => {
+            return Err(Error::msg(format!(
+                "Erro ao desserializar o XML do protocolo: {} Response content: {}",
+                e, prot_nfe
+            )));
+        }
+    };
 
     Ok(Response {
         protocolo: tag_inf_prot,

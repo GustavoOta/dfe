@@ -18,6 +18,8 @@ pub struct NFe {
     pub pag: Pag,
     pub inf_adic: Option<InfAdic>,
     pub active_ibs_cbs: Option<String>, // String pode ser qqr coisa a validação esta em some = desativado e none = ativado
+    pub desconto_rateio: Option<Decimal>, // percentual de desconto para rateio do valor do desconto no total dos itens
+    pub acrescimo_rateio: Option<Decimal>, // percentual de acrescimo para rateio do valor do acrescimo no total dos itens
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

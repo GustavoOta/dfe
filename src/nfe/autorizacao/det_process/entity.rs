@@ -32,6 +32,8 @@ pub struct ProdProcess {
     pub q_trib: String,
     #[serde(rename = "vUnTrib")]
     pub v_un_trib: String,
+    #[serde(rename = "vDesc", skip_serializing_if = "Option::is_none")]
+    pub v_desc: Option<Decimal>,
     #[serde(rename = "indTot")]
     pub ind_tot: String,
     #[serde(rename = "xPed", skip_serializing_if = "Option::is_none")]

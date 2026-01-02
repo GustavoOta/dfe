@@ -212,6 +212,8 @@ async fn test_emit_nfe_nfce() {
         },
         inf_adic: None,
         active_ibs_cbs: None,
+        desconto_rateio: None,
+        acrescimo_rateio: None,
     })
     .await;
 

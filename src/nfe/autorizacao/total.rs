@@ -151,7 +151,7 @@ pub fn total_process(
     total: Total,
     dets: Vec<DetProcess>,
     _ambiente: u8,
-    active_ibscbs: Option<String>,
+    _active_ibscbs: Option<String>,
 ) -> Result<TotalProcess, Error> {
     let mut v_bc_ibs_cbs_total = 0.0;
     for det in &dets {
@@ -223,7 +223,7 @@ pub fn total_process(
     //
     // decidir se envia ou não o IBSCBS conforme ambiente e data
     // verificar se a data do sistema é maior ou igual a  que 2026-01-01
-    let data_limite =
+    /*     let data_limite =
         chrono::NaiveDate::from_ymd_opt(2026, 1, 1).expect("Data limite inválida para IBSCBS");
     let data_atual = chrono::Local::now().naive_local().date();
     if data_atual >= data_limite {
@@ -231,10 +231,15 @@ pub fn total_process(
             icms_tot: send_icms_tot,
             ibs_cbs_tot: send_ibs_cbs,
         });
-    }
+    } */
+    return Ok(TotalProcess {
+        icms_tot: send_icms_tot,
+        ibs_cbs_tot: send_ibs_cbs,
+    });
 
     // active_ibscbs onde None = ativado por padrão e Some(false) ou Some(true) = desativado
-    if let Some(_) = active_ibscbs {
+
+    /*     if let Some(_) = active_ibscbs {
         return Ok(TotalProcess {
             icms_tot: send_icms_tot,
             ibs_cbs_tot: None,
@@ -245,5 +250,5 @@ pub fn total_process(
             icms_tot: send_icms_tot,
             ibs_cbs_tot: send_ibs_cbs,
         });
-    }
+    } */
 }

@@ -72,6 +72,11 @@ pub async fn nfe_cancelar(cancelar: NFeCancelar) -> Result<Response, Error> {
 
     let response = response.text().await?;
 
+    // Salvar o response em um arquivo
+    let mut file = File::create("cancelar_response.xml")?;
+    file.write_all(response.as_bytes())?;
+
+    // Capturar o infEvento do response ------------------------------------------------------
     let re = regex::bytes::Regex::new(r"(?s)<infEvento.*?</infEvento>").unwrap();
     let ret_evento = re.captures(response.as_bytes());
     if let Some(captures) = ret_evento {
