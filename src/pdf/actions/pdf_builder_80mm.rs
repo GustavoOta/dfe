@@ -74,13 +74,7 @@ pub fn build_pdf_80mm(
     let mut y = page_height_mm - MARGIN_MM;
 
     // ── TITULO ──────────────────────────────
-    write_center(
-        &layer,
-        &font_bold,
-        FONT_SIZE_TITLE,
-        y,
-        "DANFE SIMPLIFICADO - ETIQUETA",
-    );
+    write_center(&layer, &font_bold, FONT_SIZE_TITLE, y, "DANFE SIMPLIFICADO");
     y -= 1.5;
     draw_line(&layer, y, 0.6);
     y -= SECTION_GAP;
