@@ -211,3 +211,67 @@ println!("t_med: {}", teste.t_med);
 ## Notas importantes:
 
 Este software está em desenvolvimento e não deve ser usado em produção a não ser que você saiba o que está fazendo.
+
+## DanfeBuilder - Geração de DANFE em PDF
+
+O `DanfeBuilder` é um builder para geração de DANFE (Documento Auxiliar da Nota Fiscal Eletrônica) em PDF a partir do XML autorizado da NF-e (`nfeProc`).
+
+### Funcionalidades
+
+- Gera DANFE Simplificado para impressoras térmicas 80mm, 56mm ou A4
+- Suporta saída como arquivo PDF ou string base64
+
+### Tamanhos de papel suportados
+
+| Tamanho | Modelo 55 (NF-e) | Modelo 65 (NFC-e) |
+| ------- | ---------------- | ----------------- |
+| `a4`    | Em breve         | Em breve          |
+| `80mm`  | ✅ Disponível     | Em breve          |
+| `56mm`  | Em breve         | Em breve          |
+
+### Exemplo: Gerar DANFE como arquivo PDF
+
+```rust
+use dfe::pdf::DanfeBuilder;
+
+let resultado = DanfeBuilder::new()
+    .xml("./nota_autorizada.xml")
+    .paper_size("80mm")
+    .as_file("./danfe.pdf")
+    .build()
+    .await;
+
+match resultado {
+    Ok(path) => println!("PDF salvo em: {}", path),
+    Err(e) => println!("Erro: {}", e),
+}
+```
+
+### Exemplo: Gerar DANFE como base64
+
+```rust
+use dfe::pdf::DanfeBuilder;
+
+let resultado = DanfeBuilder::new()
+    .xml("<nfeProc>...</nfeProc>")
+    .paper_size("80mm")
+    .as_base64()
+    .build()
+    .await;
+
+match resultado {
+    Ok(base64) => println!("Base64: {}", base64),
+    Err(e) => println!("Erro: {}", e),
+}
+```
+
+### Métodos
+
+| Método                   | Descrição                                              |
+| ------------------------ | ------------------------------------------------------ |
+| `new()`                  | Cria uma nova instância do builder                     |
+| `xml(xml: &str)`         | Define o XML (caminho do arquivo `.xml` ou string XML) |
+| `paper_size(size: &str)` | Define o tamanho do papel (`"a4"`, `"80mm"`, `"56mm"`) |
+| `as_file(path: &str)`    | Configura saída como arquivo PDF no caminho indicado   |
+| `as_base64()`            | Configura saída como string base64                     |
+| `build()`                | Gera o PDF e retorna `Result<String, String>`          |

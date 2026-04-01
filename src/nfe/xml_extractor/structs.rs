@@ -129,6 +129,8 @@ pub struct EnderEmit {
 pub struct Dest {
     #[serde(rename = "CNPJ")]
     pub cnpj: Option<String>,
+    #[serde(rename = "CPF")]
+    pub cpf: Option<String>,
     #[serde(rename = "xNome")]
     pub x_nome: Option<String>,
     #[serde(rename = "enderDest")]
