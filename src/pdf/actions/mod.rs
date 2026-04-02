@@ -35,7 +35,13 @@ impl DanfeBuilderActions {
             .unwrap_or_default();
 
         // b) Emitente
-        let emit_x_nome = emit.x_nome.clone().unwrap_or_default();
+        let emit_x_nome = emit
+            .x_fant
+            .as_deref()
+            .filter(|v| !v.trim().is_empty())
+            .or(emit.x_nome.as_deref().filter(|v| !v.trim().is_empty()))
+            .unwrap_or_default()
+            .to_string();
         let emit_uf = emit.ender_emit.uf.clone().unwrap_or_default();
         let emit_cnpj = emit.cnpj.clone().unwrap_or_default();
         let emit_ie = emit.ie.clone().unwrap_or_default();

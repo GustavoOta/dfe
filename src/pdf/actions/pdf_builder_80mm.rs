@@ -9,10 +9,13 @@ const FONT_SIZE_TITLE: f32 = 8.0;
 const FONT_SIZE_HEADER: f32 = 7.0;
 const FONT_SIZE_NORMAL: f32 = 6.5;
 const FONT_SIZE_SMALL: f32 = 6.0;
+const FONT_SIZE_CREDITS: f32 = 5.0;
 const FONT_SIZE_VALUE: f32 = 9.0;
 
 const LINE_HEIGHT: f32 = 3.0;
 const SECTION_GAP: f32 = 3.0;
+const EMIT_NAME_LINE_CHARS: usize = 34;
+const DEST_NAME_LINE_CHARS: usize = 34;
 
 pub struct PdfItem {
     pub n_item: String,
@@ -44,9 +47,34 @@ pub fn build_pdf_80mm(
     inf_cpl: &str,
     items: &[PdfItem],
 ) -> Result<Vec<u8>, String> {
+    let emit_name_fallback = "EMITENTE NAO INFORMADO";
+    let emit_name = if emit_x_nome.trim().is_empty() {
+        emit_name_fallback
+    } else {
+        emit_x_nome
+    };
+    let mut emit_name_lines = wrap_text(emit_name, EMIT_NAME_LINE_CHARS);
+    if emit_name_lines.is_empty() {
+        emit_name_lines.push(emit_name_fallback.to_string());
+    }
+
+    let dest_name_fallback = "DESTINATARIO NAO INFORMADO";
+    let dest_name = if dest_x_nome.trim().is_empty() {
+        dest_name_fallback
+    } else {
+        dest_x_nome
+    };
+    let mut dest_name_lines = wrap_text(dest_name, DEST_NAME_LINE_CHARS);
+    if dest_name_lines.is_empty() {
+        dest_name_lines.push(dest_name_fallback.to_string());
+    }
+
     // Altura dinamica: base + itens + barcode + observacao
     let barcode_height_mm = 10.0;
-    let base_height = 105.0 + barcode_height_mm;
+    let extra_emit_lines = emit_name_lines.len().saturating_sub(1) as f32;
+    let extra_dest_lines = dest_name_lines.len().saturating_sub(1) as f32;
+    let base_height =
+        105.0 + barcode_height_mm + (extra_emit_lines + extra_dest_lines) * LINE_HEIGHT;
     let items_height = items.len() as f32 * (LINE_HEIGHT * 2.0 + 1.0);
     let obs_lines = if inf_cpl.is_empty() {
         2
@@ -82,8 +110,10 @@ pub fn build_pdf_80mm(
     // ── EMITENTE ────────────────────────────
     write_center(&layer, &font_bold, FONT_SIZE_HEADER, y, "EMITENTE");
     y -= LINE_HEIGHT;
-    write_center(&layer, &font, FONT_SIZE_NORMAL, y, emit_x_nome);
-    y -= LINE_HEIGHT;
+    for line in &emit_name_lines {
+        write_center(&layer, &font, FONT_SIZE_NORMAL, y, line);
+        y -= LINE_HEIGHT;
+    }
     write_center(
         &layer,
         &font,
@@ -130,8 +160,10 @@ pub fn build_pdf_80mm(
     // ── DESTINATARIO ────────────────────────
     write_center(&layer, &font_bold, FONT_SIZE_HEADER, y, "DESTINATARIO");
     y -= LINE_HEIGHT;
-    write_center(&layer, &font, FONT_SIZE_NORMAL, y, dest_x_nome);
-    y -= LINE_HEIGHT;
+    for line in &dest_name_lines {
+        write_center(&layer, &font, FONT_SIZE_NORMAL, y, line);
+        y -= LINE_HEIGHT;
+    }
     let mut dest_info = format!(
         "CNPJ/CPF: {}  UF: {}",
         format_cnpj_cpf(dest_cnpj_cpf),
@@ -311,7 +343,7 @@ pub fn build_pdf_80mm(
     write_center(
         &layer,
         &font,
-        FONT_SIZE_SMALL,
+        FONT_SIZE_CREDITS,
         y,
         "Gerado por dfe - https://crates.io/crates/dfe",
     );
@@ -483,25 +515,40 @@ fn draw_barcode_128(
     let encoded: Vec<u8> = barcode.encode();
 
     let total_modules = encoded.len() as f32;
-    let module_width = USABLE_WIDTH / total_modules;
+    let module_width_mm = USABLE_WIDTH / total_modules;
+    // printpdf usa espessura em pontos (pt), nao em mm.
+    let module_width_pt = module_width_mm * 72.0 / 25.4;
 
     let y_bottom = y_top - bar_height_mm;
 
-    for (i, &bar) in encoded.iter().enumerate() {
-        if bar == 1 {
-            let x = MARGIN_MM + i as f32 * module_width + module_width / 2.0;
-            let points = vec![
-                (Point::new(Mm(x), Mm(y_top)), false),
-                (Point::new(Mm(x), Mm(y_bottom)), false),
-            ];
-            let line = Line {
-                points,
-                is_closed: false,
-            };
-            layer.set_outline_color(Color::Greyscale(Greyscale::new(0.0, None)));
-            layer.set_outline_thickness(module_width);
-            layer.add_line(line);
+    let mut i = 0usize;
+    while i < encoded.len() {
+        if encoded[i] == 0 {
+            i += 1;
+            continue;
         }
+
+        let start = i;
+        while i < encoded.len() && encoded[i] == 1 {
+            i += 1;
+        }
+
+        let run_modules = (i - start) as f32;
+        let run_width_pt = module_width_pt * run_modules;
+        let run_center_x_mm =
+            MARGIN_MM + start as f32 * module_width_mm + (run_modules * module_width_mm / 2.0);
+
+        let points = vec![
+            (Point::new(Mm(run_center_x_mm), Mm(y_top)), false),
+            (Point::new(Mm(run_center_x_mm), Mm(y_bottom)), false),
+        ];
+        let line = Line {
+            points,
+            is_closed: false,
+        };
+        layer.set_outline_color(Color::Greyscale(Greyscale::new(0.0, None)));
+        layer.set_outline_thickness(run_width_pt);
+        layer.add_line(line);
     }
 
     Ok(y_bottom)
