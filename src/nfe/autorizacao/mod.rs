@@ -168,27 +168,27 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
     let emit = EmitProcess {
         cnpj: nfe.emit.cnpj.clone(),
         cpf: nfe.emit.cpf.clone(),
-        x_nome: nfe.emit.x_nome,
-        x_fant: nfe.emit.x_fant,
+        x_nome: nfe.emit.x_nome.clone(),
+        x_fant: nfe.emit.x_fant.clone(),
         ender_emit: EnderEmitProcess {
-            x_lgr: nfe.emit.x_lgr,
-            nro: nfe.emit.nro,
-            x_bairro: nfe.emit.x_bairro,
-            c_mun: nfe.emit.c_mun,
-            x_mun: nfe.emit.x_mun,
-            uf: nfe.emit.uf,
-            cep: nfe.emit.cep,
+            x_lgr: nfe.emit.x_lgr.clone(),
+            nro: nfe.emit.nro.clone(),
+            x_bairro: nfe.emit.x_bairro.clone(),
+            c_mun: nfe.emit.c_mun.clone(),
+            x_mun: nfe.emit.x_mun.clone(),
+            uf: nfe.emit.uf.clone(),
+            cep: nfe.emit.cep.clone(),
             c_pais: nfe.emit.c_pais.unwrap_or(0),
-            x_pais: nfe.emit.x_pais.unwrap_or("".to_string()),
+            x_pais: nfe.emit.x_pais.clone().unwrap_or("".to_string()),
         },
-        ie: nfe.emit.ie,
+        ie: nfe.emit.ie.clone(),
         crt: nfe.emit.crt,
     };
 
     let dest_string = DestTAG::build(&nfe.dest, &nfe.ide)?;
 
     let dets = det_process(
-        nfe.det,
+        nfe.det.clone(),
         nfe.ide.mod_,
         nfe.ide.tp_amb,
         nfe.desconto_rateio.clone(),
@@ -222,13 +222,13 @@ pub async fn emit(nfe: NFe) -> Result<Response, Error> {
     }
 
     let total = total_process(
-        nfe.total,
+        nfe.total.clone(),
         dets_total,
         nfe.ide.tp_amb,
         nfe.active_ibs_cbs.clone(),
     )?;
-    let transp = transp_process(nfe.transp)?;
-    let pag = pag_process(nfe.pag)?;
+    let transp = transp_process(nfe.transp.clone())?;
+    let pag = pag_process(nfe.clone())?;
     let inf_adic = inf_adic_process(nfe.inf_adic)?;
 
     let xml = format!(

@@ -154,30 +154,84 @@ pub fn total_process(
     _active_ibscbs: Option<String>,
 ) -> Result<TotalProcess, Error> {
     let mut v_bc_ibs_cbs_total = 0.0;
+    let mut ibs_uf_total = 0.0;
+    let mut ibs_uf_dif_total = 0.0;
+    let mut ibs_uf_dev_trib_total = 0.0;
+    let mut ibs_mun_total = 0.0;
+    let mut ibs_mun_dif_total = 0.0;
+    let mut ibs_mun_dev_trib_total = 0.0;
+    let mut ibs_total = 0.0;
+    let mut cbs_total = 0.0;
+    let mut cbs_dif_total = 0.0;
+    let mut cbs_dev_trib_total = 0.0;
+
     for det in &dets {
         if let Some(ibs_cbs) = det.imposto.ibs_cbs.as_ref() {
-            let v_bc_ibs_cbs = ibs_cbs.g_ibscbs.v_bc.clone();
-            let v_bc_ibs_cbs = v_bc_ibs_cbs.to_string().parse::<f64>().unwrap_or(0.0);
-            v_bc_ibs_cbs_total += v_bc_ibs_cbs;
+            let v_bc = ibs_cbs.g_ibscbs.v_bc.parse::<f64>().unwrap_or(0.0);
+            v_bc_ibs_cbs_total += v_bc;
+
+            // IBS UF
+            let v_ibs_uf = ibs_cbs
+                .g_ibscbs
+                .g_ibs_uf
+                .v_ibs_uf
+                .parse::<f64>()
+                .unwrap_or(0.0);
+            ibs_uf_total += v_ibs_uf;
+            if let Some(ref g_dif) = ibs_cbs.g_ibscbs.g_ibs_uf.g_dif {
+                ibs_uf_dif_total += g_dif.v_dif.to_string().parse::<f64>().unwrap_or(0.0);
+            }
+            if let Some(ref g_dev) = ibs_cbs.g_ibscbs.g_ibs_uf.g_dev_trib {
+                ibs_uf_dev_trib_total += g_dev.v_dev_trib.to_string().parse::<f64>().unwrap_or(0.0);
+            }
+
+            // IBS Mun
+            let v_ibs_mun = ibs_cbs
+                .g_ibscbs
+                .g_ibs_mun
+                .v_ibs_mun
+                .parse::<f64>()
+                .unwrap_or(0.0);
+            ibs_mun_total += v_ibs_mun;
+            if let Some(ref g_dif) = ibs_cbs.g_ibscbs.g_ibs_mun.g_dif {
+                ibs_mun_dif_total += g_dif.v_dif.to_string().parse::<f64>().unwrap_or(0.0);
+            }
+            if let Some(ref g_dev) = ibs_cbs.g_ibscbs.g_ibs_mun.g_dev_trib {
+                ibs_mun_dev_trib_total +=
+                    g_dev.v_dev_trib.to_string().parse::<f64>().unwrap_or(0.0);
+            }
+
+            // IBS total (UF + Mun)
+            let v_ibs = ibs_cbs.g_ibscbs.v_ibs.parse::<f64>().unwrap_or(0.0);
+            ibs_total += v_ibs;
+
+            // CBS
+            let v_cbs = ibs_cbs.g_ibscbs.g_cbs.v_cbs.parse::<f64>().unwrap_or(0.0);
+            cbs_total += v_cbs;
+            if let Some(ref g_dif) = ibs_cbs.g_ibscbs.g_cbs.g_dif {
+                cbs_dif_total += g_dif.v_dif.to_string().parse::<f64>().unwrap_or(0.0);
+            }
+            if let Some(ref g_dev) = ibs_cbs.g_ibscbs.g_cbs.g_dev_trib {
+                cbs_dev_trib_total += g_dev.v_dev_trib.to_string().parse::<f64>().unwrap_or(0.0);
+            }
         }
     }
-
-    let ibs_uf_total = v_bc_ibs_cbs_total * 0.001; // 0.1%
-    let ibs_mun_total = v_bc_ibs_cbs_total * 0.000; // 0.0%
-    let ibs_total = ibs_uf_total + ibs_mun_total;
-    let cbs_total = v_bc_ibs_cbs_total * 0.009; // 0.9%
 
     let send_ibs_cbs = Some(IBSCBSTot {
         v_bc_ibs_cbs: format!("{:.2}", v_bc_ibs_cbs_total),
         g_ibs: GIBS {
             g_ibs_uf: GIBSUF {
-                v_dif: Decimal::new(0, 2),
-                v_dev_trib: Decimal::new(0, 2),
+                v_dif: Decimal::from_str_exact(&format!("{:.2}", ibs_uf_dif_total))
+                    .unwrap_or(Decimal::new(0, 2)),
+                v_dev_trib: Decimal::from_str_exact(&format!("{:.2}", ibs_uf_dev_trib_total))
+                    .unwrap_or(Decimal::new(0, 2)),
                 v_ibs_uf: format!("{:.2}", ibs_uf_total),
             },
             g_ibs_mun: GIBSMun {
-                v_dif: Decimal::new(0, 2),
-                v_dev_trib: Decimal::new(0, 2),
+                v_dif: Decimal::from_str_exact(&format!("{:.2}", ibs_mun_dif_total))
+                    .unwrap_or(Decimal::new(0, 2)),
+                v_dev_trib: Decimal::from_str_exact(&format!("{:.2}", ibs_mun_dev_trib_total))
+                    .unwrap_or(Decimal::new(0, 2)),
                 v_ibs_mun: format!("{:.2}", ibs_mun_total),
             },
             v_ibs: format!("{:.2}", ibs_total),
@@ -185,8 +239,10 @@ pub fn total_process(
             v_cred_pres_cond_sus: Some(Decimal::new(0, 2)),
         },
         g_cbs: GCBS {
-            v_dif: Decimal::new(0, 2),
-            v_dev_trib: Decimal::new(0, 2),
+            v_dif: Decimal::from_str_exact(&format!("{:.2}", cbs_dif_total))
+                .unwrap_or(Decimal::new(0, 2)),
+            v_dev_trib: Decimal::from_str_exact(&format!("{:.2}", cbs_dev_trib_total))
+                .unwrap_or(Decimal::new(0, 2)),
             v_cbs: format!("{:.2}", cbs_total),
             v_cred_pres: Some(Decimal::new(0, 2)),
             v_cred_pres_cond_sus: Some(Decimal::new(0, 2)),

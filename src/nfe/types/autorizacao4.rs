@@ -543,7 +543,7 @@ pub struct Pag {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub c_aut: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub v_troco: Option<String>,
+    pub v_troco: Option<Decimal>,
 }
 
 impl Default for Pag {

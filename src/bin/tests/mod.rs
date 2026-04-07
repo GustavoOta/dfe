@@ -1,9 +1,9 @@
 mod certificate_info;
 /// Direitos de autor e licença:
-/// Este arquivo fonte é parte do projeto dfe-rs.
-/// O projeto dfe-rs pode ser usado de acordo com a Licença MIT
+/// Este arquivo fonte é parte do projeto dfe em crates.io.
+/// O projeto dfe pode ser usado de acordo com a Licença MIT
 /// que pode ser encontrada no arquivo LICENSE na raiz do projeto.
-/// Todos os arquivos fonte do projeto dfe-rs, exceto indicado o contrário, são distribuídos
+/// Todos os arquivos fonte do projeto dfe, exceto indicado o contrário, são distribuídos
 /// sob a licença MIT. Se você não recebeu uma cópia da licença, consulte o arquivo LICENSE.
 /// Autor: Gustavo Ota - Gravis Tec
 /// WhatsApp: +55 13 99782 1459 - https://api.whatsapp.com/send?phone=5513997821459
@@ -50,6 +50,7 @@ async fn test_emit_nfe_nfce() {
     use dfe::nfe::types::autorizacao4::*;
     use dfe::nfe::xml_rules::dest::models::Dest;
     use dfe::nfe::xml_rules::ide::models::Ide;
+    use rust_decimal::Decimal;
 
     let teste = emit(NFe {
         cert_path: "D:/Projetos/cert.pfx".to_string(),
@@ -208,6 +209,7 @@ async fn test_emit_nfe_nfce() {
             ind_pag: 1,
             t_pag: "01".to_string(),
             v_pag: 30.0,
+            v_troco: Some(Decimal::new(1213, 2)), // 12.13 de troco
             ..Default::default()
         },
         inf_adic: None,
