@@ -20,7 +20,27 @@ impl Cert {
         let mut pfx = File::open(path)?;
         pfx.read_to_end(&mut buf)?;
 
-        let pkcs2 = reqwest::Identity::from_pkcs12_der(&buf, password)?;
+        Pkcs12::from_der(&buf)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Arquivo de certificado inválido (não é PKCS12/PFX válido): {}",
+                    e
+                )
+            })?
+            .parse2(password)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Falha ao abrir o PFX. Verifique a senha do certificado: {}",
+                    e
+                )
+            })?;
+
+        let pkcs2 = reqwest::Identity::from_pkcs12_der(&buf, password).map_err(|e| {
+            anyhow::anyhow!(
+                "Falha ao criar identidade TLS a partir do PFX (backend reqwest/native-tls): {}",
+                e
+            )
+        })?;
 
         Ok(Cert { identity: pkcs2 })
     }

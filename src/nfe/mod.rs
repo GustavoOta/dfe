@@ -2,6 +2,7 @@ pub mod autorizacao;
 pub mod cancelar;
 pub mod common;
 pub mod connection;
+pub mod manifestacao;
 pub mod mod_status_service;
 pub mod types;
 pub mod xml_extractor;

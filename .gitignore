@@ -11,3 +11,5 @@ cancelar_response.xml
 cancelar.xml
 inf_evento.xml
 .vscode
+distribuicao-logs/
+distribuicao.conf.ini

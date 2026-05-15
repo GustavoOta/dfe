@@ -1,6 +1,6 @@
 [package]
 name = "dfe"
-version = "0.5.4"
+version = "0.5.5"
 edition = "2021"
 description = "DFE - Documentos Fiscais Eletrônicos Brasileiros"
 license = "MIT"
@@ -44,3 +44,4 @@ sha2 = "0.10.8"
 tokio = { version = "1.41.1", features = ["full"] }
 printpdf = "0.7.0"
 barcoders = "2.0.0"
+flate2 = "1.0"

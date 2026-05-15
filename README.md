@@ -275,3 +275,174 @@ match resultado {
 | `as_file(path: &str)`    | Configura saída como arquivo PDF no caminho indicado   |
 | `as_base64()`            | Configura saída como string base64                     |
 | `build()`                | Gera o PDF e retorna `Result<String, String>`          |
+
+---
+
+## Distribuição de DF-e
+
+O módulo `distribuicao` permite consultar documentos fiscais eletrônicos de interesse do destinatário (NF-e, CT-e, etc.) via webservice da SEFAZ.
+
+### Exemplo: Consultar novos documentos (último NSU)
+
+```rust
+use dfe::distribuicao::Distribuicao;
+
+let resposta = Distribuicao::new()
+    .cert_path("D:/Projetos/cert.pfx")
+    .cert_pass("1234")
+    .cnpj("11111111111111")
+    .uf(35)         // código IBGE do estado do autor (SP = 35)
+    .ambiente(2)    // 1 = Produção, 2 = Homologação
+    .send()
+    .await;
+
+match resposta {
+    Ok(r) => {
+        println!("cStat: {}", r.c_stat);
+        println!("xMotivo: {}", r.x_motivo);
+        println!("ultNSU: {}", r.ult_nsu);
+        println!("maxNSU: {}", r.max_nsu);
+        if let Some(lote) = r.lote_dist_dfe_int {
+            for doc in lote {
+                println!("NSU: {} | Schema: {}", doc.nsu, doc.schema);
+            }
+        }
+    }
+    Err(e) => println!("Erro: {}", e),
+}
+```
+
+### Exemplo: Consultar por NSU específico
+
+```rust
+use dfe::distribuicao::DistribuicaoNSU;
+
+let resposta = DistribuicaoNSU::new()
+    .cert_path("D:/Projetos/cert.pfx")
+    .cert_pass("1234")
+    .cnpj("11111111111111")
+    .uf(35)
+    .ambiente(2)
+    .nsu("000000000000100")
+    .send()
+    .await;
+```
+
+### Exemplo: Consultar por chave de acesso
+
+```rust
+use dfe::distribuicao::DistribuicaoChaveAcesso;
+
+let resposta = DistribuicaoChaveAcesso::new()
+    .cert_path("D:/Projetos/cert.pfx")
+    .cert_pass("1234")
+    .cnpj("11111111111111")
+    .uf(35)
+    .ambiente(2)
+    .chave_acesso("35241211111111111111550010000000381505051324")
+    .send()
+    .await;
+```
+
+### Métodos comuns (Distribuição)
+
+| Método                      | Descrição                                                           |
+| --------------------------- | ------------------------------------------------------------------- |
+| `new()`                     | Cria uma nova instância do builder                                  |
+| `cert_path(path: &str)`     | Caminho do certificado `.pfx`                                       |
+| `cert_pass(pass: &str)`     | Senha do certificado                                                |
+| `cnpj(cnpj: &str)`          | CNPJ do destinatário                                                |
+| `uf(uf: u8)`                | Código IBGE da UF do autor                                          |
+| `ambiente(amb: u8)`         | `1` = Produção, `2` = Homologação                                   |
+| `nsu(nsu: &str)`            | NSU específico (apenas `DistribuicaoNSU`)                           |
+| `chave_acesso(chave: &str)` | Chave de acesso (apenas `DistribuicaoChaveAcesso`)                  |
+| `check_flag()`              | Ativa verificação de flag de pendência                              |
+| `send()`                    | Executa a consulta e retorna `Result<DistribuicaoResposta, String>` |
+
+---
+
+## Manifestação do Destinatário
+
+O módulo `distribuicao` também expõe os builders de manifestação, que permitem registrar eventos de ciência, confirmação, desconhecimento ou operação não realizada para uma NF-e.
+
+### Exemplo: Ciência da Operação
+
+```rust
+use dfe::distribuicao::CienciaOperacao;
+
+let resposta = CienciaOperacao::new()
+    .cert_path("D:/Projetos/cert.pfx")
+    .cert_pass("1234")
+    .cnpj("11111111111111")
+    .ambiente(2)
+    .chave_acesso("35241211111111111111550010000000381505051324")
+    .send()
+    .await;
+
+match resposta {
+    Ok(r) => {
+        println!("cStat: {}", r.response.c_stat);
+        println!("xMotivo: {}", r.response.x_motivo);
+    }
+    Err(e) => println!("Erro: {}", e),
+}
+```
+
+### Exemplo: Confirmação da Operação
+
+```rust
+use dfe::distribuicao::ConfirmacaoOperacao;
+
+let resposta = ConfirmacaoOperacao::new()
+    .cert_path("D:/Projetos/cert.pfx")
+    .cert_pass("1234")
+    .cnpj("11111111111111")
+    .ambiente(2)
+    .chave_acesso("35241211111111111111550010000000381505051324")
+    .send()
+    .await;
+```
+
+### Exemplo: Desconhecimento da Operação
+
+```rust
+use dfe::distribuicao::DesconhecimentoOperacao;
+
+let resposta = DesconhecimentoOperacao::new()
+    .cert_path("D:/Projetos/cert.pfx")
+    .cert_pass("1234")
+    .cnpj("11111111111111")
+    .ambiente(2)
+    .chave_acesso("35241211111111111111550010000000381505051324")
+    .send()
+    .await;
+```
+
+### Exemplo: Operação Não Realizada
+
+```rust
+use dfe::distribuicao::OperacaoNaoRealizada;
+
+let resposta = OperacaoNaoRealizada::new()
+    .cert_path("D:/Projetos/cert.pfx")
+    .cert_pass("1234")
+    .cnpj("11111111111111")
+    .ambiente(2)
+    .chave_acesso("35241211111111111111550010000000381505051324")
+    .justificativa("Mercadoria não recebida pelo destinatário")
+    .send()
+    .await;
+```
+
+### Métodos comuns (Manifestação)
+
+| Método                      | Descrição                                                         |
+| --------------------------- | ----------------------------------------------------------------- |
+| `new()`                     | Cria uma nova instância do builder                                |
+| `cert_path(path: &str)`     | Caminho do certificado `.pfx`                                     |
+| `cert_pass(pass: &str)`     | Senha do certificado                                              |
+| `cnpj(cnpj: &str)`          | CNPJ do destinatário                                              |
+| `ambiente(amb: u8)`         | `1` = Produção, `2` = Homologação                                 |
+| `chave_acesso(chave: &str)` | Chave de acesso da NF-e                                           |
+| `justificativa(just: &str)` | Justificativa (apenas `OperacaoNaoRealizada`, mín. 15 chars)      |
+| `send()`                    | Executa o evento e retorna `Result<ManifestacaoResposta, String>` |
