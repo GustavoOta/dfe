@@ -446,3 +446,62 @@ let resposta = OperacaoNaoRealizada::new()
 | `chave_acesso(chave: &str)` | Chave de acesso da NF-e                                           |
 | `justificativa(just: &str)` | Justificativa (apenas `OperacaoNaoRealizada`, mín. 15 chars)      |
 | `send()`                    | Executa o evento e retorna `Result<ManifestacaoResposta, String>` |
+
+---
+
+## Validação de XML (XSD)
+
+O módulo `nfe::common::validation` fornece funções para validar o XML de uma NF-e contra os schemas XSD oficiais da SEFAZ antes do envio.
+
+### Como funciona
+
+1. **Verificação dos schemas**: na primeira chamada, a rotina verifica se a pasta de schemas `./dfe/shema/PL_010b_NT2025_002_v1.21/` existe e se todos os 5 arquivos XSD necessários estão presentes.
+2. **Download automático**: qualquer arquivo ausente é baixado automaticamente do repositório oficial em `https://raw.githubusercontent.com/GustavoOta/dfe/main/dfe/shema/PL_010b_NT2025_002_v1.21/`. Se o download falhar, a função retorna `Err` com o nome do arquivo e o motivo.
+3. **Parse do XML**: o XML recebido é parseado via `libxml`.
+4. **Validação XSD**: o documento parseado é validado contra `nfe_v4.00.xsd`. Em caso de erro, a mensagem do primeiro erro de validação é retornada.
+
+### Arquivos XSD utilizados
+
+| Arquivo                         | Descrição                     |
+| ------------------------------- | ----------------------------- |
+| `nfe_v4.00.xsd`                 | Schema principal da NF-e 4.00 |
+| `leiauteNFe_v4.00.xsd`          | Leiaute da NF-e               |
+| `tiposBasico_v4.00.xsd`         | Tipos básicos                 |
+| `DFeTiposBasicos_v1.00.xsd`     | Tipos básicos de DF-e         |
+| `xmldsig-core-schema_v1.01.xsd` | Schema de assinatura digital  |
+
+### Exemplo de uso
+
+```rust
+use dfe::nfe::common::validation::{validate_xml, is_xml_valid};
+
+// Versão async (recomendada — executa em thread de blocking do Tokio)
+let xml = std::fs::read_to_string("nfe_request.xml").unwrap();
+match validate_xml(xml).await {
+    Ok(xml_valido) => println!("XML válido"),
+    Err(e) => println!("Erro de validação: {}", e),
+}
+
+// Versão síncrona (use dentro de spawn_blocking ou em contexto não-async)
+match is_xml_valid(&xml) {
+    Ok(_) => println!("XML válido"),
+    Err(e) => println!("Erro: {}", e),
+}
+```
+
+### Assinaturas
+
+| Função                                                | Descrição                                                                                               |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `validate_xml(xml: String) -> Result<String, String>` | Async — delega para `is_xml_valid` via `spawn_blocking`. Retorna o XML original em caso de sucesso.     |
+| `is_xml_valid(xml: &str) -> Result<String, String>`   | Síncrona — verifica schemas, faz download se necessário, valida e retorna o XML ou um `Err` descritivo. |
+
+### Erros possíveis
+
+| Situação                              | Mensagem retornada                                                       |
+| ------------------------------------- | ------------------------------------------------------------------------ |
+| Falha ao criar diretório de schemas   | `"Erro ao criar diretório './dfe/shema/...': <motivo>"`                  |
+| Arquivo XSD ausente e download falhou | `"Arquivo '<nome>' não existia, tentei baixar e não consegui: <motivo>"` |
+| XML mal formado                       | `"Erro ao parsear o XML"`                                                |
+| Contexto XSD inválido                 | `"Erro ao criar contexto de validação XSD: ..."`                         |
+| XML inválido segundo o schema         | Mensagem do primeiro erro retornado pelo validador XSD                   |
