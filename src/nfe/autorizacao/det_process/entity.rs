@@ -332,17 +332,50 @@ pub struct ICMS00 {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ICMS10 {
-    // Campos específicos para ICMS10
+    // TODO: implementar ICMS10 — Tributada e com cobrança do ICMS por substituição tributária
+    // pub orig: u8,
+    // #[serde(rename = "CST")] pub cst: String,         // "10"
+    // #[serde(rename = "modBC")] pub mod_bc: u8,
+    // #[serde(rename = "vBC")] pub v_bc: f64,
+    // #[serde(rename = "pICMS")] pub p_icms: f64,
+    // #[serde(rename = "vICMS")] pub v_icms: f64,
+    // #[serde(rename = "modBCST")] pub mod_bcst: u8,
+    // #[serde(rename = "pMVAST")] pub p_mvast: f64,
+    // #[serde(rename = "pRedBCST", skip_serializing_if = "Option::is_none")] pub p_red_bcst: Option<f64>,
+    // #[serde(rename = "vBCST")] pub v_bcst: f64,
+    // #[serde(rename = "pICMSST")] pub p_icmsst: f64,
+    // #[serde(rename = "vICMSST")] pub v_icmsst: f64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ICMS20 {
-    // Campos específicos para ICMS20
+    // TODO: implementar ICMS20 — Com redução de base de cálculo
+    // pub orig: u8,
+    // #[serde(rename = "CST")] pub cst: String,         // "20"
+    // #[serde(rename = "modBC")] pub mod_bc: u8,
+    // #[serde(rename = "pRedBC")] pub p_red_bc: f64,
+    // #[serde(rename = "vBC")] pub v_bc: f64,
+    // #[serde(rename = "pICMS")] pub p_icms: f64,
+    // #[serde(rename = "vICMS")] pub v_icms: f64,
+    // ** OPCIONAIS **
+    // #[serde(rename = "vICMSDeson", skip_serializing_if = "Option::is_none")] pub v_icms_deson: Option<f64>,
+    // #[serde(rename = "motDesICMS", skip_serializing_if = "Option::is_none")] pub mot_des_icms: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ICMS30 {
-    // Campos específicos para ICMS30
+    // TODO: implementar ICMS30 — Isenta/não tributada e com cobrança do ICMS por ST
+    // pub orig: u8,
+    // #[serde(rename = "CST")] pub cst: String,         // "30"
+    // #[serde(rename = "modBCST")] pub mod_bcst: u8,
+    // #[serde(rename = "pMVAST")] pub p_mvast: f64,
+    // #[serde(rename = "pRedBCST", skip_serializing_if = "Option::is_none")] pub p_red_bcst: Option<f64>,
+    // #[serde(rename = "vBCST")] pub v_bcst: f64,
+    // #[serde(rename = "pICMSST")] pub p_icmsst: f64,
+    // #[serde(rename = "vICMSST")] pub v_icmsst: f64,
+    // ** OPCIONAIS **
+    // #[serde(rename = "vICMSDeson", skip_serializing_if = "Option::is_none")] pub v_icms_deson: Option<f64>,
+    // #[serde(rename = "motDesICMS", skip_serializing_if = "Option::is_none")] pub mot_des_icms: Option<u16>,
 }
 
 /// Campos específicos para ICMS40
@@ -396,17 +429,61 @@ impl Default for ICMS40 {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ICMS51 {
-    // Campos específicos para ICMS51
+    // TODO: implementar ICMS51 — Diferimento (preenchimento a critério de cada UF)
+    // pub orig: u8,
+    // #[serde(rename = "CST")] pub cst: String,         // "51"
+    // ** OPCIONAIS **
+    // #[serde(rename = "modBC", skip_serializing_if = "Option::is_none")] pub mod_bc: Option<u8>,
+    // #[serde(rename = "pRedBC", skip_serializing_if = "Option::is_none")] pub p_red_bc: Option<f64>,
+    // #[serde(rename = "vBC", skip_serializing_if = "Option::is_none")] pub v_bc: Option<f64>,
+    // #[serde(rename = "pICMS", skip_serializing_if = "Option::is_none")] pub p_icms: Option<f64>,
+    // #[serde(rename = "vICMSOp", skip_serializing_if = "Option::is_none")] pub v_icms_op: Option<f64>,
+    // #[serde(rename = "pDif", skip_serializing_if = "Option::is_none")] pub p_dif: Option<f64>,
+    // #[serde(rename = "vICMSDif", skip_serializing_if = "Option::is_none")] pub v_icms_dif: Option<f64>,
+    // #[serde(rename = "vICMS", skip_serializing_if = "Option::is_none")] pub v_icms: Option<f64>,
 }
 
+/// ICMS60 — ICMS cobrado anteriormente por substituição tributária
+/// Usar quando o produto entrou no estoque com ICMS-ST já retido (CFOP 5403, 5405, 6403, 6405)
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ICMS60 {
-    // Campos específicos para ICMS60
+    pub orig: u8,
+    #[serde(rename = "CST")]
+    pub cst: String, // sempre "60"
+    // ** OPCIONAIS ** — xs:sequence minOccurs="0": todos presentes ou nenhum (NT 2011/004)
+    /// Valor da BC do ICMS ST retido anteriormente 13v2
+    #[serde(rename = "vBCSTRet", skip_serializing_if = "Option::is_none")]
+    pub v_bcst_ret: Option<String>,
+    /// Alíquota suportada pelo consumidor final 3v2-4 (TDec_0302a04Opc)
+    #[serde(rename = "pST", skip_serializing_if = "Option::is_none")]
+    pub p_st: Option<String>,
+    /// Valor do ICMS Próprio do Substituto cobrado em operação anterior 13v2
+    #[serde(rename = "vICMSSubstituto", skip_serializing_if = "Option::is_none")]
+    pub v_icms_substituto: Option<String>,
+    /// Valor do ICMS ST retido anteriormente 13v2
+    #[serde(rename = "vICMSSTRet", skip_serializing_if = "Option::is_none")]
+    pub v_icmsst_ret: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ICMS70 {
-    // Campos específicos para ICMS70
+    // TODO: implementar ICMS70 — Com redução de BC e cobrança do ICMS por ST
+    // pub orig: u8,
+    // #[serde(rename = "CST")] pub cst: String,         // "70"
+    // #[serde(rename = "modBC")] pub mod_bc: u8,
+    // #[serde(rename = "pRedBC", skip_serializing_if = "Option::is_none")] pub p_red_bc: Option<f64>,
+    // #[serde(rename = "vBC")] pub v_bc: f64,
+    // #[serde(rename = "pICMS")] pub p_icms: f64,
+    // #[serde(rename = "vICMS")] pub v_icms: f64,
+    // #[serde(rename = "modBCST")] pub mod_bcst: u8,
+    // #[serde(rename = "pMVAST")] pub p_mvast: f64,
+    // #[serde(rename = "pRedBCST", skip_serializing_if = "Option::is_none")] pub p_red_bcst: Option<f64>,
+    // #[serde(rename = "vBCST")] pub v_bcst: f64,
+    // #[serde(rename = "pICMSST")] pub p_icmsst: f64,
+    // #[serde(rename = "vICMSST")] pub v_icmsst: f64,
+    // ** OPCIONAIS **
+    // #[serde(rename = "vICMSDeson", skip_serializing_if = "Option::is_none")] pub v_icms_deson: Option<f64>,
+    // #[serde(rename = "motDesICMS", skip_serializing_if = "Option::is_none")] pub mot_des_icms: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -428,7 +505,22 @@ impl Default for ICMS90 {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ICMSPart {
-    // Campos específicos para ICMSPart
+    // TODO: implementar ICMSPart — Partilha do ICMS entre UF de origem e UF de destino
+    // pub orig: u8,
+    // #[serde(rename = "CST")] pub cst: String,         // "10" ou "90"
+    // #[serde(rename = "modBC")] pub mod_bc: u8,
+    // #[serde(rename = "vBC")] pub v_bc: f64,
+    // #[serde(rename = "pRedBC", skip_serializing_if = "Option::is_none")] pub p_red_bc: Option<f64>,
+    // #[serde(rename = "pICMS")] pub p_icms: f64,
+    // #[serde(rename = "vICMS")] pub v_icms: f64,
+    // #[serde(rename = "modBCST")] pub mod_bcst: u8,
+    // #[serde(rename = "pMVAST", skip_serializing_if = "Option::is_none")] pub p_mvast: Option<f64>,
+    // #[serde(rename = "pRedBCST", skip_serializing_if = "Option::is_none")] pub p_red_bcst: Option<f64>,
+    // #[serde(rename = "vBCST")] pub v_bcst: f64,
+    // #[serde(rename = "pICMSST")] pub p_icmsst: f64,
+    // #[serde(rename = "vICMSST")] pub v_icmsst: f64,
+    // #[serde(rename = "pBCOp")] pub p_bcop: f64,       // percentual da BC operação própria
+    // #[serde(rename = "UFST")] pub ufst: String,        // UF para qual é devido o ICMS ST
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -272,6 +272,68 @@ fn select_icms_process(d: &Det) -> ICMSProcess {
             cst: 41,
             ..Default::default()
         }),
+        "ICMS60" => {
+            // ICMS cobrado anteriormente por substituição tributária
+            // Usar com CFOP 5403, 5405, 6403, 6405
+            let orig = match d.orig {
+                Some(orig) => orig,
+                None => return validate_icms("orig", d),
+            };
+            let cst = match d.cst.clone() {
+                Some(cst) => cst,
+                None => return validate_icms("cst", d),
+            };
+            // Campos opcionais — xs:sequence minOccurs="0": todos ou nenhum (NT 2011/004)
+            let bcst_ret = d.v_bcst_ret.filter(|&v| v > 0.0);
+            let p_st_v = d.p_st.filter(|&v| v > 0.0);
+            let subst = d.v_icms_substituto.filter(|&v| v > 0.0);
+            let icmsst_ret = d.v_icmsst_ret.filter(|&v| v > 0.0);
+            let (v_bcst_ret, p_st, v_icms_substituto, v_icmsst_ret) =
+                if bcst_ret.is_some() || p_st_v.is_some() || icmsst_ret.is_some() {
+                    (
+                        Some(format!("{:.2}", bcst_ret.unwrap_or(0.0))),
+                        Some(format!("{:.2}", p_st_v.unwrap_or(0.0))),
+                        subst.map(|v| format!("{:.2}", v)),
+                        Some(format!("{:.2}", icmsst_ret.unwrap_or(0.0))),
+                    )
+                } else {
+                    (None, None, None, None)
+                };
+            ICMSProcess::ICMS60(ICMS60 {
+                orig,
+                cst,
+                v_bcst_ret,
+                p_st,
+                v_icms_substituto,
+                v_icmsst_ret,
+            })
+        }
+        // "ICMS10" => { TODO: Tributada e com cobrança do ICMS por ST
+        //     // orig, cst="10", mod_bc, v_bc, p_icms, v_icms
+        //     // + mod_bcst, p_mvast, p_red_bcst?, v_bcst, p_icmsst, v_icmsst
+        // }
+        // "ICMS20" => { TODO: Com redução de base de cálculo
+        //     // orig, cst="20", mod_bc, p_red_bc, v_bc, p_icms, v_icms
+        //     // + v_icms_deson?, mot_des_icms?
+        // }
+        // "ICMS30" => { TODO: Isenta/não tributada e com cobrança do ICMS por ST
+        //     // orig, cst="30", mod_bcst, p_mvast, p_red_bcst?, v_bcst, p_icmsst, v_icmsst
+        //     // + v_icms_deson?, mot_des_icms?
+        // }
+        // "ICMS51" => { TODO: Diferimento (campos a critério de cada UF)
+        //     // orig, cst="51"
+        //     // + mod_bc?, p_red_bc?, v_bc?, p_icms?, v_icms_op?, p_dif?, v_icms_dif?, v_icms?
+        // }
+        // "ICMS70" => { TODO: Com redução de BC e cobrança do ICMS por ST
+        //     // orig, cst="70", mod_bc, p_red_bc?, v_bc, p_icms, v_icms
+        //     // + mod_bcst, p_mvast, p_red_bcst?, v_bcst, p_icmsst, v_icmsst
+        //     // + v_icms_deson?, mot_des_icms?
+        // }
+        // "ICMSPart" => { TODO: Partilha do ICMS entre UF de origem e UF de destino
+        //     // orig, cst="10"|"90", mod_bc, v_bc, p_red_bc?, p_icms, v_icms
+        //     // + mod_bcst, p_mvast?, p_red_bcst?, v_bcst, p_icmsst, v_icmsst
+        //     // + p_bcop, ufst
+        // }
         "ICMS90" => {
             let orig = match d.orig {
                 Some(orig) => orig,

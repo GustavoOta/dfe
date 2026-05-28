@@ -194,6 +194,11 @@ pub struct Det {
     pub csosn: Option<String>,
     pub p_cred_sn: Option<f64>,
     pub v_cred_icmssn: Option<f64>,
+    // ICMS60 — opcionais (podem ser omitidos quando a legislação estadual não exigir)
+    pub v_bcst_ret: Option<f64>,
+    pub p_st: Option<f64>,
+    pub v_icms_substituto: Option<f64>,
+    pub v_icmsst_ret: Option<f64>,
     // ******* PIS ******* //
     pub pis: String,
     // PISAliq ---
@@ -315,6 +320,10 @@ impl Default for Det {
             csosn: None,
             p_cred_sn: None,
             v_cred_icmssn: None,
+            v_bcst_ret: None,
+            p_st: None,
+            v_icms_substituto: None,
+            v_icmsst_ret: None,
             pis: "ng".to_string(),
             pis_cst: None,
             pis_p_pis: None,
