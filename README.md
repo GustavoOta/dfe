@@ -434,6 +434,144 @@ Os testes de DANFE e XML não requerem certificado nem conexão.
 
 ---
 
+## Roadmap
+
+### Regras tributárias — implementações pendentes
+
+Atualmente o `NFeBuilder` suporta os principais grupos de ICMS, PIS e COFINS. Os itens abaixo estão planejados para as próximas versões:
+
+| Item | Status | Descrição |
+|---|:---:|---|
+| `ICMS10` — ST parcial | 🔜 | ICMS próprio + Substituição Tributária com MVA |
+| `ICMS20` — Redução de BC | 🔜 | Base de cálculo reduzida (CRT 3) |
+| `ICMS30` — Isenta + ST | 🔜 | Isenta/NT para o emitente com ST para o destinatário |
+| `ICMS51` — Diferimento | 🔜 | Diferimento total ou parcial |
+| `ICMS70` — BC reduzida + ST | 🔜 | Redução de BC combinada com Substituição Tributária |
+| `ICMS90` completo | 🔜 | Suporte a todos os campos opcionais (FCP, DIFAL) |
+| `Sn900` completo | 🔜 | CSOSN 900 com todos os campos opcionais |
+| **DIFAL / ICMS interestadual** | 🔜 | `v_icms_uf_dest`, `v_icms_uf_remet`, `v_fcpuf_dest` |
+| **IPI** por item | 🔜 | Campos `vIPI`, `pIPI`, `cEnq`, `cSelo` no `Det` |
+| **PIS/COFINS ST** | 🔜 | CST 05 — ST retida na cadeia |
+| **IBS / CBS** | 🔜 | Reforma tributária — campos opcionais já mapeados |
+| Validação de CNPJ/CPF | 🔜 | Verificação de dígito verificador antes da transmissão |
+| Contingência (EPEC / FS-DA) | 🔜 | Emissão offline com posterior transmissão |
+
+---
+
+### ESC/POS — Suporte a impressoras térmicas
+
+Implementação planejada de um builder fluente para geração de comandos **ESC/POS** (Epson Standard Code for Printers), padrão universal de impressoras térmicas de cupom.
+
+#### API planejada — layout personalizado
+
+```rust
+use dfe::escpos::EscPosBuilder;
+
+// Layout customizável com comandos ESC/POS
+let bytes = EscPosBuilder::new()
+    .paper_width(80)               // 80mm ou 58mm
+    .align_center()
+    .bold(true)
+    .text("EMPRESA LTDA\n")
+    .bold(false)
+    .align_left()
+    .text("CNPJ: 11.222.333/0001-81\n")
+    .divider()                     // linha separadora "--------------------------------"
+    .text(format!("{:<20} {:>10}\n", "PRODUTO EXEMPLO", "R$  50,00"))
+    .divider()
+    .align_right()
+    .bold(true)
+    .text("TOTAL  R$  50,00\n")
+    .bold(false)
+    .cut()                         // corte do papel
+    .build();                      // → Vec<u8> para enviar à porta serial/USB
+
+// Enviar para impressora (porta serial ou USB)
+std::fs::write("/dev/usb/lp0", &bytes)?;          // Linux
+std::fs::write("\\\\.\\COM3", &bytes)?;            // Windows
+```
+
+#### Comandos planejados
+
+| Método | Descrição |
+|---|---|
+| `.paper_width(mm)` | Define largura do papel (80mm ou 58mm) |
+| `.align_left()` / `.align_center()` / `.align_right()` | Alinhamento do texto |
+| `.bold(bool)` | Negrito |
+| `.underline(bool)` | Sublinhado |
+| `.font_size(u8)` | Tamanho da fonte (1 = normal, 2 = duplo) |
+| `.text(str)` | Insere texto |
+| `.divider()` | Linha separadora proporcional à largura do papel |
+| `.barcode_128(str)` | Code 128 nativo ESC/POS |
+| `.qr_code(str, size)` | QR Code nativo ESC/POS |
+| `.image(bytes)` | Imagem rasterizada (logo) |
+| `.feed(n)` | Avança `n` linhas |
+| `.cut()` | Corte total do papel |
+| `.partial_cut()` | Corte parcial |
+| `.build()` | Retorna `Vec<u8>` com os comandos ESC/POS |
+
+---
+
+### ESC/POS — Impressão de NFC-e (modelo 65)
+
+Impressão direta de cupom fiscal NFC-e em impressoras térmicas, sem geração de PDF.
+
+#### 80mm — planejado
+
+```rust
+use dfe::escpos::NfceEscPos;
+
+let bytes = NfceEscPos::new()
+    .xml("<nfeProc>...</nfeProc>")   // XML autorizado
+    .paper_width(80)
+    .logo("./logo.png")              // opcional
+    .build()
+    .await?;                         // → Vec<u8> prontos para envio
+
+std::fs::write("\\\\.\\COM3", &bytes)?;
+```
+
+#### 58mm — planejado
+
+```rust
+let bytes = NfceEscPos::new()
+    .xml("<nfeProc>...</nfeProc>")
+    .paper_width(58)
+    .build()
+    .await?;
+```
+
+#### Layout planejado do cupom NFC-e ESC/POS
+
+```
+         NOME DO EMITENTE
+  CNPJ: XX.XXX.XXX/XXXX-XX  IE: XXXXXXXX
+  End.: Rua Exemplo, 100 - Centro - SP
+─────────────────────────────────────────
+CUPOM FISCAL ELETRÔNICO - SAT/NFC-e
+─────────────────────────────────────────
+ #  DESCRIÇÃO            QTD   VL UNIT  TOTAL
+ 1  PRODUTO EXEMPLO      2,00    50,00 100,00
+─────────────────────────────────────────
+                    TOTAL R$      100,00
+DINHEIRO                          100,00
+─────────────────────────────────────────
+CHAVE: 3524 0509 4914 3500 ...
+[BARCODE 128]
+[QR CODE]
+─────────────────────────────────────────
+Protocolo: 135262060475222 27/05/2026
+Consulte em portalnfce.fazenda.sp.gov.br
+```
+
+| Formato | Status |
+|---|:---:|
+| NFC-e ESC/POS 80mm | 🔜 planejado |
+| NFC-e ESC/POS 58mm | 🔜 planejado |
+| Layout customizável (`EscPosBuilder`) | 🔜 planejado |
+
+---
+
 ## Licença
 
 MIT — veja [LICENSE](LICENSE).
