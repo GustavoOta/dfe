@@ -1,9 +1,9 @@
-use crate::nfe::common::cert::Cert;
-use crate::nfe::manifestacao::{
+use crate::interno::cert::Cert;
+use crate::manifestacao::{
     nfe_ciencia_operacao, nfe_confirmacao_operacao, nfe_desconhecimento_operacao,
     nfe_operacao_nao_realizada,
 };
-use crate::nfe::types::manifestacao::{
+use crate::tipos::manifestacao::{
     Manifestacao as NfeManifestacao, OperacaoNaoRealizada as NfeOperacaoNaoRealizada,
 };
 use base64::Engine;

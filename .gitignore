@@ -13,3 +13,14 @@ inf_evento.xml
 .vscode
 distribuicao-logs/
 distribuicao.conf.ini
+.claude
+testes/
+CLAUDE.md
+danfe_output.pdf
+flag_autorizacao.env
+manifestacao_inf_evento.xml
+manifestacao_response.xml
+manifestacao.xml
+test_nfce_output.pdf
+test_nfe_a4_output.pdf
+test_nfce_qr_side_output.pdf

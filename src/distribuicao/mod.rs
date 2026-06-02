@@ -195,7 +195,7 @@ pub struct OperacaoNaoRealizada {
     pub justificativa: String,
 }
 
-pub type ManifestacaoResposta = crate::nfe::types::manifestacao::Response;
+pub type ManifestacaoResposta = crate::tipos::manifestacao::Response;
 
 pub type Distribuicao = Consulta;
 pub type DistribuicaoNSU = ConsultaNSU;
