@@ -18,7 +18,12 @@ exclude = [
 ]
 
 [package.metadata.vcpkg]
-triplet = "x64-windows-static"
+git = "https://github.com/microsoft/vcpkg"
+branch = "master"
+install = ["libxml2"]
+
+[package.metadata.vcpkg.target]
+x86_64-pc-windows-msvc = { triplet = "x64-windows-static", install = ["libxml2"] }
 
 [profile.release]
 debug = false
