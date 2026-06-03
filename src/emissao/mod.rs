@@ -53,26 +53,40 @@ struct NFeInterno {
     pub desconto_rateio: Option<Decimal>,
 }
 
+/// Resposta da emissão de NF-e ou NFC-e retornada por [`NFeBuilder::emitir`].
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct Response {
+    /// Protocolo de autorização da SEFAZ.
     pub protocolo: TagInfProt,
+    /// XML `nfeProc` autorizado — deve ser persistido em disco.
     pub xml: String,
 }
 
+/// Dados do protocolo de autorização (`<infProt>`).
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct InfProt {
+    /// Ambiente: `1` = Produção · `2` = Homologação.
     #[serde(rename = "tpAmb")]   pub tp_amb: i32,
+    /// Versão do aplicativo da SEFAZ.
     #[serde(rename = "verAplic")] pub ver_aplic: String,
+    /// Chave de acesso da NF-e (44 dígitos).
     #[serde(rename = "chNFe")]   pub ch_nfe: String,
+    /// Data e hora do recebimento pela SEFAZ (ISO 8601).
     #[serde(rename = "dhRecbto")] pub dh_recbto: String,
+    /// Número do protocolo de autorização. Presente somente quando `c_stat == 100`.
     #[serde(rename = "nProt", skip_serializing_if = "Option::is_none")] pub n_prot: Option<String>,
+    /// Digest SHA-1 do XML assinado (base64).
     #[serde(rename = "digVal", skip_serializing_if = "Option::is_none")] pub dig_val: Option<String>,
+    /// Código de status da SEFAZ. `100` = autorizado.
     #[serde(rename = "cStat")]   pub c_stat: i32,
+    /// Descrição do status retornado pela SEFAZ.
     #[serde(rename = "xMotivo")] pub x_motivo: String,
 }
 
+/// Wrapper XML em torno de [`InfProt`] (`<protNFe><infProt>…`).
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct TagInfProt {
+    /// Dados do protocolo.
     #[serde(rename = "infProt")]
     pub inf_prot: InfProt,
 }
@@ -335,6 +349,36 @@ fn qrcode_hash(chave_acesso: &str, versao_qr: &str, ambiente: &str, id_csc: &str
 
 // ─── Builder público ──────────────────────────────────────────────────────────
 
+/// Builder fluente para emissão de **NF-e** (modelo 55) e **NFC-e** (modelo 65).
+///
+/// Monte a nota chamando os métodos de configuração em qualquer ordem e finalize
+/// com [`NFeBuilder::emitir`], que valida, assina e transmite para a SEFAZ.
+///
+/// # Exemplo
+///
+/// ```no_run
+/// use dfe::{NFeBuilder, DfeError};
+/// use dfe::tipos::{Det, Emit, Icms, Ide, Pag, Pis, Cofins, Total, Transp};
+///
+/// # async fn example() -> Result<(), DfeError> {
+/// let resp = NFeBuilder::new()
+///     .cert("./cert.pfx", "senha")
+///     .ide(Ide { c_uf: 35, mod_: 55, serie: 1, n_nf: 1, tp_amb: 2, ..Default::default() })
+///     .emitente(Emit { cnpj: Some("11111111111111".into()), ..Default::default() })
+///     .itens(vec![Det {
+///         icms: Icms::sn102(0, "400"),
+///         pis: Pis::Nt { cst: "07".into() },
+///         cofins: Cofins::Nt { cst: "07".into() },
+///         ..Default::default()
+///     }])
+///     .total(Total::default())
+///     .transporte(Transp::default())
+///     .pagamento(Pag::default())
+///     .emitir()
+///     .await?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct NFeBuilder {
     cert_path: Option<String>,
     cert_pass: Option<String>,
@@ -353,6 +397,7 @@ pub struct NFeBuilder {
 }
 
 impl NFeBuilder {
+    /// Cria um builder vazio. Chame os métodos de configuração antes de [`emitir`](Self::emitir).
     pub fn new() -> Self {
         Self {
             cert_path: None, cert_pass: None, ide: None, emitente: None,
@@ -362,22 +407,45 @@ impl NFeBuilder {
         }
     }
 
+    /// Caminho do certificado A1 (`.pfx`) e sua senha. **Obrigatório.**
     pub fn cert(mut self, path: &str, pass: &str) -> Self {
         self.cert_path = Some(path.to_string()); self.cert_pass = Some(pass.to_string()); self
     }
+    /// Identificação do documento (`<ide>`). **Obrigatório.**
     pub fn ide(mut self, ide: Ide)       -> Self { self.ide = Some(ide); self }
+    /// Dados do emitente (`<emit>`). **Obrigatório.**
     pub fn emitente(mut self, e: Emit)   -> Self { self.emitente = Some(e); self }
+    /// Dados do destinatário (`<dest>`). Obrigatório para NF-e modelo 55.
     pub fn destinatario(mut self, d: Dest) -> Self { self.destinatario = Some(d); self }
+    /// Lista de itens (`<det>`). **Obrigatório.** Totais calculados automaticamente.
     pub fn itens(mut self, itens: Vec<Det>) -> Self { self.itens.extend(itens); self }
+    /// Totais globais (`<total>`). **Obrigatório.** Informe apenas frete, seguro e ST; demais campos são auto-calculados.
     pub fn total(mut self, t: Total)     -> Self { self.total = Some(t); self }
+    /// Dados de transporte (`<transp>`). **Obrigatório.**
     pub fn transporte(mut self, t: Transp) -> Self { self.transporte = Some(t); self }
+    /// Forma de pagamento (`<pag>`). **Obrigatório.**
     pub fn pagamento(mut self, p: Pag)   -> Self { self.pagamento = Some(p); self }
+    /// Informações adicionais (`<infAdic>`). Opcional.
     pub fn informacoes_adicionais(mut self, i: InfAdic) -> Self { self.informacoes_adicionais = Some(i); self }
+    /// ID do CSC (Código de Segurança do Contribuinte). **Obrigatório para NFC-e.**
     pub fn id_csc(mut self, id: &str)    -> Self { self.id_csc = Some(id.to_string()); self }
+    /// Valor do CSC. **Obrigatório para NFC-e.**
     pub fn csc(mut self, csc: &str)      -> Self { self.csc = Some(csc.to_string()); self }
+    /// Ativa IBS/CBS (reforma tributária). Passe o código de classificação tributária.
     pub fn active_ibs_cbs(mut self, f: &str) -> Self { self.active_ibs_cbs = Some(f.to_string()); self }
+    /// Desconto global rateado proporcionalmente nos itens.
     pub fn desconto_rateio(mut self, v: Decimal) -> Self { self.desconto_rateio = Some(v); self }
 
+    /// Valida, assina e transmite a NF-e/NFC-e para a SEFAZ.
+    ///
+    /// Retorna [`Response`] com o protocolo de autorização e o XML `nfeProc`.
+    /// Em ambiente de homologação (`tp_amb = 2`), o `x_prod` do primeiro item
+    /// é substituído automaticamente pelo texto exigido pela SEFAZ.
+    ///
+    /// # Erros
+    ///
+    /// Retorna [`DfeError`](crate::DfeError) se algum campo obrigatório estiver ausente,
+    /// a assinatura falhar ou a SEFAZ retornar erro de transmissão.
     pub async fn emitir(self) -> Result<Response> {
         let cert_path  = self.cert_path.ok_or_else(|| DfeError::Configuracao("cert_path não informado".to_string()))?;
         let cert_pass  = self.cert_pass.ok_or_else(|| DfeError::Configuracao("cert_pass não informado".to_string()))?;

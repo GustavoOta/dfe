@@ -1,5 +1,5 @@
 use super::det_process::entity::*;
-use crate::tipos::{Cofins, Det, IbsCbs, Icms, Pis};
+use crate::tipos::{Cofins, Det, IbsCbs, Icms, Ipi, Pis};
 use crate::error::Result;
 use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
@@ -97,6 +97,7 @@ pub fn det_process(
             imposto: ImpostoProcess {
                 v_tot_trib: format!("{:.2}", d.v_tot_trib),
                 icms: select_icms_process(&d.icms),
+                ipi: d.ipi.as_ref().map(select_ipi_process),
                 pis: select_pis_process(&d.pis),
                 cofins: select_cofins_process(&d.cofins),
                 ibs_cbs: ibs_cbs_process(d.ibs_cbs.as_ref()),
@@ -138,16 +139,52 @@ fn ibs_cbs_process(ibs_cbs: Option<&IbsCbs>) -> Option<IBSCBSProcess> {
 fn select_icms_process(icms: &Icms) -> ICMSProcess {
     match icms {
         Icms::Icms00 { orig, mod_bc, v_bc, p_icms, v_icms } =>
-            ICMSProcess::ICMS00(ICMS00 { orig: *orig, cst: "00".to_string(), mod_bc: *mod_bc, v_bc: *v_bc, p_icms: *p_icms, v_icms: *v_icms }),
+            ICMSProcess::ICMS00(ICMS00 {
+                orig: *orig, cst: "00".to_string(), mod_bc: *mod_bc,
+                v_bc: *v_bc, p_icms: *p_icms, v_icms: *v_icms,
+            }),
+
+        Icms::Icms10 { orig, mod_bc, v_bc, p_icms, v_icms, mod_bcst, p_mvast, p_red_bcst, v_bcst, p_icmsst, v_icmsst } =>
+            ICMSProcess::ICMS10(ICMS10 {
+                orig: *orig, cst: "10".to_string(), mod_bc: *mod_bc,
+                v_bc: *v_bc, p_icms: *p_icms, v_icms: *v_icms,
+                mod_bcst: *mod_bcst, p_mvast: *p_mvast, p_red_bcst: *p_red_bcst,
+                v_bcst: *v_bcst, p_icmsst: *p_icmsst, v_icmsst: *v_icmsst,
+            }),
+
+        Icms::Icms20 { orig, mod_bc, p_red_bc, v_bc, p_icms, v_icms, v_icms_deson, mot_des_icms } =>
+            ICMSProcess::ICMS20(ICMS20 {
+                orig: *orig, cst: "20".to_string(), mod_bc: *mod_bc,
+                p_red_bc: *p_red_bc, v_bc: *v_bc, p_icms: *p_icms, v_icms: *v_icms,
+                v_icms_deson: *v_icms_deson, mot_des_icms: *mot_des_icms,
+            }),
+
+        Icms::Icms30 { orig, mod_bcst, p_mvast, p_red_bcst, v_bcst, p_icmsst, v_icmsst, v_icms_deson, mot_des_icms } =>
+            ICMSProcess::ICMS30(ICMS30 {
+                orig: *orig, cst: "30".to_string(), mod_bcst: *mod_bcst,
+                p_mvast: *p_mvast, p_red_bcst: *p_red_bcst,
+                v_bcst: *v_bcst, p_icmsst: *p_icmsst, v_icmsst: *v_icmsst,
+                v_icms_deson: *v_icms_deson, mot_des_icms: *mot_des_icms,
+            }),
 
         Icms::Icms40 { orig, cst, v_icms_deson, mot_des_icms } =>
-            ICMSProcess::ICMS40(ICMS40 { orig: *orig, cst: *cst, vicmsdeson: *v_icms_deson, mot_des_icms: *mot_des_icms }),
+            ICMSProcess::ICMS40(ICMS40 {
+                orig: *orig, cst: *cst, vicmsdeson: *v_icms_deson, mot_des_icms: *mot_des_icms,
+            }),
+
+        Icms::Icms51 { orig, mod_bc, p_red_bc, v_bc, p_icms, v_icms_op, p_dif, v_icms_dif, v_icms } =>
+            ICMSProcess::ICMS51(ICMS51 {
+                orig: *orig, cst: "51".to_string(), mod_bc: *mod_bc,
+                p_red_bc: *p_red_bc, v_bc: *v_bc, p_icms: *p_icms,
+                v_icms_op: *v_icms_op, p_dif: *p_dif, v_icms_dif: *v_icms_dif,
+                v_icms: *v_icms,
+            }),
 
         Icms::Icms60 { orig, v_bcst_ret, p_st, v_icms_substituto, v_icmsst_ret } => {
             // xs:sequence minOccurs="0": todos presentes ou nenhum (NT 2011/004)
-            let bcst  = v_bcst_ret.filter(|&v| v > 0.0);
-            let pst   = p_st.filter(|&v| v > 0.0);
-            let subst = v_icms_substituto.filter(|&v| v > 0.0);
+            let bcst   = v_bcst_ret.filter(|&v| v > 0.0);
+            let pst    = p_st.filter(|&v| v > 0.0);
+            let subst  = v_icms_substituto.filter(|&v| v > 0.0);
             let icmsst = v_icmsst_ret.filter(|&v| v > 0.0);
             let (v_bcst_ret, p_st, v_icms_substituto, v_icmsst_ret) =
                 if bcst.is_some() || pst.is_some() || icmsst.is_some() {
@@ -160,16 +197,34 @@ fn select_icms_process(icms: &Icms) -> ICMSProcess {
                 } else {
                     (None, None, None, None)
                 };
-            ICMSProcess::ICMS60(ICMS60 { orig: *orig, cst: "60".to_string(), v_bcst_ret, p_st, v_icms_substituto, v_icmsst_ret })
+            ICMSProcess::ICMS60(ICMS60 {
+                orig: *orig, cst: "60".to_string(),
+                v_bcst_ret, p_st, v_icms_substituto, v_icmsst_ret,
+            })
         }
 
-        Icms::Icms90 { orig } =>
-            ICMSProcess::ICMS90(ICMS90 { orig: *orig, cst: "90".to_string() }),
+        Icms::Icms70 { orig, mod_bc, p_red_bc, v_bc, p_icms, v_icms, mod_bcst, p_mvast, p_red_bcst, v_bcst, p_icmsst, v_icmsst, v_icms_deson, mot_des_icms } =>
+            ICMSProcess::ICMS70(ICMS70 {
+                orig: *orig, cst: "70".to_string(), mod_bc: *mod_bc,
+                p_red_bc: *p_red_bc, v_bc: *v_bc, p_icms: *p_icms, v_icms: *v_icms,
+                mod_bcst: *mod_bcst, p_mvast: *p_mvast, p_red_bcst: *p_red_bcst,
+                v_bcst: *v_bcst, p_icmsst: *p_icmsst, v_icmsst: *v_icmsst,
+                v_icms_deson: *v_icms_deson, mot_des_icms: *mot_des_icms,
+            }),
+
+        Icms::Icms90 { orig, mod_bc, p_red_bc, v_bc, p_icms, v_icms, mod_bcst, p_mvast, p_red_bcst, v_bcst, p_icmsst, v_icmsst, v_icms_deson, mot_des_icms } =>
+            ICMSProcess::ICMS90(ICMS90 {
+                orig: *orig, cst: "90".to_string(),
+                mod_bc: *mod_bc, p_red_bc: *p_red_bc, v_bc: *v_bc,
+                p_icms: *p_icms, v_icms: *v_icms,
+                mod_bcst: *mod_bcst, p_mvast: *p_mvast, p_red_bcst: *p_red_bcst,
+                v_bcst: *v_bcst, p_icmsst: *p_icmsst, v_icmsst: *v_icmsst,
+                v_icms_deson: *v_icms_deson, mot_des_icms: *mot_des_icms,
+            }),
 
         Icms::Sn101 { orig, p_cred_sn, v_cred_icmssn } =>
             ICMSProcess::ICMSSN101(ICMSSN101 {
-                orig: *orig,
-                csosn: "101".to_string(),
+                orig: *orig, csosn: "101".to_string(),
                 p_cred_sn: format!("{:.2}", p_cred_sn),
                 v_cred_icmssn: format!("{:.2}", v_cred_icmssn),
             }),
@@ -179,23 +234,28 @@ fn select_icms_process(icms: &Icms) -> ICMSProcess {
 
         Icms::Sn500 { orig, v_bcst_ret, v_icmsst_ret } =>
             ICMSProcess::ICMSSN500(ICMSSN500 {
-                orig: *orig,
-                csosn: "500".to_string(),
+                orig: *orig, csosn: "500".to_string(),
                 vbcst_ret: v_bcst_ret.map(|v| format!("{:.2}", v)),
                 vicmsst_ret: v_icmsst_ret.map(|v| format!("{:.2}", v)),
             }),
 
-        Icms::Sn900 { orig, mod_bc, v_bc, p_red_bc, p_icms, v_icms, p_cred_sn, v_cred_icmssn } =>
+        Icms::Sn900 { orig, mod_bc, v_bc, p_red_bc, p_icms, v_icms, p_cred_sn, v_cred_icmssn,
+                      mod_bcst, p_mvast, p_red_bcst, v_bcst, p_icmsst, v_icmsst } =>
             ICMSProcess::ICMSSN900(ICMSSN900 {
-                orig: *orig,
-                csosn: "900".to_string(),
+                orig: *orig, csosn: "900".to_string(),
                 modbc: mod_bc.map(|v| v.to_string()),
                 vbc: v_bc.map(|v| format!("{:.2}", v)),
-                pred_bc: p_red_bc.map(|v| format!("{:.2}", v)),
+                pred_bc: p_red_bc.map(|v| format!("{:.4}", v)),
                 picms: p_icms.map(|v| format!("{:.4}", v)),
                 vicms: v_icms.map(|v| format!("{:.2}", v)),
-                pcred_sn: p_cred_sn.map(|v| format!("{:.2}", v)),
+                pcred_sn: p_cred_sn.map(|v| format!("{:.4}", v)),
                 vcred_icmssn: v_cred_icmssn.map(|v| format!("{:.2}", v)),
+                modbcst: mod_bcst.map(|v| v.to_string()),
+                pmvast: p_mvast.map(|v| format!("{:.4}", v)),
+                pred_bcst: p_red_bcst.map(|v| format!("{:.4}", v)),
+                vbcst: v_bcst.map(|v| format!("{:.2}", v)),
+                picmsst: p_icmsst.map(|v| format!("{:.4}", v)),
+                vicmsst: v_icmsst.map(|v| format!("{:.2}", v)),
                 ..Default::default()
             }),
     }
@@ -229,6 +289,16 @@ fn select_pis_process(pis: &Pis) -> PISProcess {
             }),
             ..Default::default()
         },
+        Pis::St { v_bc, p_pis, q_bc_prod, v_aliq_prod, v_pis } => PISProcess {
+            pis_st: Some(PISST {
+                v_bc: v_bc.map(|v| format!("{:.2}", v)),
+                p_pis: p_pis.map(|v| format!("{:.4}", v)),
+                qbc_prod: q_bc_prod.map(|v| format!("{:.3}", v)),
+                valiq_prod: v_aliq_prod.map(|v| format!("{:.4}", v)),
+                vpis: Some(format!("{:.2}", v_pis)),
+            }),
+            ..Default::default()
+        },
     }
 }
 
@@ -255,5 +325,44 @@ fn select_cofins_process(cofins: &Cofins) -> COFINSProcess {
             }),
             ..Default::default()
         },
+        Cofins::St { v_bc, p_cofins, q_bc_prod, v_aliq_prod, v_cofins } => COFINSProcess {
+            cofins_st: Some(COFINSST {
+                v_bc: v_bc.map(|v| format!("{:.2}", v)),
+                p_cofins: p_cofins.map(|v| format!("{:.4}", v)),
+                qbc_prod: q_bc_prod.map(|v| format!("{:.3}", v)),
+                valiq_prod: v_aliq_prod.map(|v| format!("{:.4}", v)),
+                vcofins: Some(format!("{:.2}", v_cofins)),
+            }),
+            ..Default::default()
+        },
+    }
+}
+
+fn select_ipi_process(ipi: &Ipi) -> IpiProcess {
+    use quick_xml::se::to_string;
+    let cst_num: u8 = ipi.cst.trim().parse().unwrap_or(99);
+    // CST de saída tributada: 50, 99 (outros tributados)
+    let tributado = matches!(cst_num, 50 | 99);
+    let inner = if tributado {
+        let trib = IPITrib {
+            cst: ipi.cst.clone(),
+            v_bc: ipi.v_bc,
+            p_ipi: ipi.p_ipi,
+            q_bc_prod: ipi.q_bc_prod.map(|v| format!("{:.3}", v)),
+            v_aliq_prod: ipi.v_aliq_prod.map(|v| format!("{:.4}", v)),
+            v_ipi: ipi.v_ipi.unwrap_or(0.0),
+        };
+        let xml = to_string(&trib).unwrap_or_default();
+        format!("<IPITrib>{}</IPITrib>", &xml[xml.find('>').map(|i| i + 1).unwrap_or(0)..xml.rfind('<').unwrap_or(xml.len())])
+    } else {
+        let nt = IPINT { cst: ipi.cst.clone() };
+        to_string(&nt).unwrap_or_default()
+    };
+    IpiProcess {
+        c_enq: ipi.c_enq.clone(),
+        c_selo: ipi.c_selo.clone(),
+        q_selo: ipi.q_selo,
+        tributado,
+        inner,
     }
 }

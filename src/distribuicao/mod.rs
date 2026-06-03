@@ -7,22 +7,31 @@ mod service;
 #[cfg(test)]
 mod test;
 
+/// Resposta da consulta de distribuição de DF-e ao Ambiente Nacional.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DistribuicaoResposta {
+    /// Ambiente: `"1"` = Produção · `"2"` = Homologação.
     #[serde(rename = "tpAmb")]
     pub tp_amb: String,
+    /// Versão do aplicativo da SEFAZ.
     #[serde(rename = "verAplic")]
     pub ver_aplic: String,
+    /// Código de status (`"137"` = documentos localizados; `"138"` = nenhum documento).
     #[serde(rename = "cStat")]
     pub c_stat: String,
+    /// Descrição do status.
     #[serde(rename = "xMotivo")]
     pub x_motivo: String,
+    /// Data e hora da resposta.
     #[serde(rename = "dhResp")]
     pub dh_resp: String,
+    /// Último NSU consultado.
     #[serde(rename = "ultNSU", default)]
     pub ult_nsu: String,
+    /// NSU máximo disponível para o CNPJ.
     #[serde(rename = "maxNSU", default)]
     pub max_nsu: String,
+    /// Documentos retornados (descomprimidos automaticamente de `docZip`).
     #[serde(
         rename = "loteDistDFeInt",
         default,
@@ -31,37 +40,55 @@ pub struct DistribuicaoResposta {
     pub lote_dist_dfe_int: Option<Vec<LoteDistDFeInt>>,
 }
 
+/// Um documento DF-e retornado na distribuição.
 #[derive(Debug, Serialize)]
 pub struct LoteDistDFeInt {
+    /// Número Sequencial Único do documento.
     pub nsu: String,
+    /// Schema XML do documento (ex.: `"resNFe_v1.01.xsd"`).
     pub schema: String,
+    /// Metadados da NF-e, quando `schema == "resNFe_v1.01.xsd"`.
     pub content: Option<ResNFe>,
+    /// XML descomprimido do documento (base64 + GZIP decodificados automaticamente).
     pub content_xml: Option<String>,
+    /// Conteúdo bruto (base64) retornado pela SEFAZ.
     pub content_raw: String,
 }
 
+/// Metadados de um resumo de NF-e (`resNFe`) retornados na distribuição.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ResNFe {
+    /// Chave de acesso da NF-e (44 dígitos).
     #[serde(rename = "chNFe")]
     pub ch_nfe: String,
+    /// CNPJ do emitente.
     #[serde(rename = "CNPJ")]
     pub cnpj: String,
+    /// Razão social do emitente.
     #[serde(rename = "xNome")]
     pub x_nome: String,
+    /// Inscrição Estadual do emitente.
     #[serde(rename = "IE")]
     pub ie: String,
+    /// Data de emissão.
     #[serde(rename = "dhEmi")]
     pub dh_emi: String,
+    /// Tipo de operação: `"0"` = Entrada · `"1"` = Saída.
     #[serde(rename = "tpNF")]
     pub tp_nf: String,
+    /// Valor total da NF-e.
     #[serde(rename = "vNF")]
     pub v_nf: String,
+    /// Digest SHA-1 do XML assinado.
     #[serde(rename = "digVal")]
     pub dig_val: String,
+    /// Data e hora do recebimento pela SEFAZ.
     #[serde(rename = "dhRecbto")]
     pub dh_recbto: String,
+    /// Número do protocolo de autorização.
     #[serde(rename = "nProt")]
     pub n_prot: String,
+    /// Situação da NF-e na SEFAZ.
     #[serde(rename = "cSitNFe")]
     pub c_sit_nfe: String,
 }
@@ -133,75 +160,131 @@ impl<'de> Deserialize<'de> for LoteDistDFeInt {
     }
 }
 
+/// Builder para consulta de documentos fiscais no Ambiente Nacional (AN).
+/// Alias público: [`Distribuicao`].
 pub struct Consulta {
+    /// Caminho do certificado A1 (`.pfx`).
     pub cert_path: String,
+    /// Senha do certificado.
     pub cert_pass: String,
+    /// CNPJ do destinatário (14 dígitos).
     pub cnpj: String,
+    /// Código IBGE da UF (ex.: `35` para SP).
     pub uf: u8,
+    /// Ambiente: `1` = Produção · `2` = Homologação.
     pub ambiente: u8,
+    /// Se `Some(true)`, verifica o arquivo de flag antes de enviar.
     pub check_flag: Option<bool>,
 }
 
+/// Builder para consulta de documentos a partir de um NSU específico.
+/// Alias público: [`DistribuicaoNSU`].
 pub struct ConsultaNSU {
+    /// Caminho do certificado A1 (`.pfx`).
     pub cert_path: String,
+    /// Senha do certificado.
     pub cert_pass: String,
+    /// CNPJ do destinatário (14 dígitos).
     pub cnpj: String,
+    /// Código IBGE da UF.
     pub uf: u8,
+    /// Ambiente: `1` = Produção · `2` = Homologação.
     pub ambiente: u8,
+    /// NSU a partir do qual consultar (15 dígitos).
     pub nsu: String,
+    /// Se `Some(true)`, verifica o arquivo de flag antes de enviar.
     pub check_flag: Option<bool>,
 }
 
+/// Builder para consulta de um documento pela chave de acesso.
+/// Alias público: [`DistribuicaoChaveAcesso`].
 pub struct ConsultaChaveAcesso {
+    /// Caminho do certificado A1 (`.pfx`).
     pub cert_path: String,
+    /// Senha do certificado.
     pub cert_pass: String,
+    /// CNPJ do destinatário (14 dígitos).
     pub cnpj: String,
+    /// Código IBGE da UF.
     pub uf: u8,
+    /// Ambiente: `1` = Produção · `2` = Homologação.
     pub ambiente: u8,
+    /// Chave de acesso da NF-e (44 dígitos).
     pub chave_acesso: String,
+    /// Se `Some(true)`, verifica o arquivo de flag antes de enviar.
     pub check_flag: Option<bool>,
 }
 
+/// Manifestação **Ciência da Operação** (evento `210210`).
 pub struct CienciaOperacao {
+    /// Caminho do certificado A1 (`.pfx`).
     pub cert_path: String,
+    /// Senha do certificado.
     pub cert_pass: String,
+    /// CNPJ do destinatário.
     pub cnpj: String,
+    /// Ambiente: `1` = Produção · `2` = Homologação.
     pub ambiente: u8,
+    /// Chave de acesso da NF-e (44 dígitos).
     pub chave_acesso: String,
 }
 
+/// Manifestação **Confirmação da Operação** (evento `210200`).
 pub struct ConfirmacaoOperacao {
+    /// Caminho do certificado A1 (`.pfx`).
     pub cert_path: String,
+    /// Senha do certificado.
     pub cert_pass: String,
+    /// CNPJ do destinatário.
     pub cnpj: String,
+    /// Ambiente: `1` = Produção · `2` = Homologação.
     pub ambiente: u8,
+    /// Chave de acesso da NF-e (44 dígitos).
     pub chave_acesso: String,
 }
 
+/// Manifestação **Desconhecimento da Operação** (evento `210220`).
 pub struct DesconhecimentoOperacao {
+    /// Caminho do certificado A1 (`.pfx`).
     pub cert_path: String,
+    /// Senha do certificado.
     pub cert_pass: String,
+    /// CNPJ do destinatário.
     pub cnpj: String,
+    /// Ambiente: `1` = Produção · `2` = Homologação.
     pub ambiente: u8,
+    /// Chave de acesso da NF-e (44 dígitos).
     pub chave_acesso: String,
 }
 
+/// Manifestação **Operação Não Realizada** (evento `210240`).
 pub struct OperacaoNaoRealizada {
+    /// Caminho do certificado A1 (`.pfx`).
     pub cert_path: String,
+    /// Senha do certificado.
     pub cert_pass: String,
+    /// CNPJ do destinatário.
     pub cnpj: String,
+    /// Ambiente: `1` = Produção · `2` = Homologação.
     pub ambiente: u8,
+    /// Chave de acesso da NF-e (44 dígitos).
     pub chave_acesso: String,
+    /// Justificativa (mínimo 15 caracteres).
     pub justificativa: String,
 }
 
+/// Resposta das operações de manifestação do destinatário.
 pub type ManifestacaoResposta = crate::tipos::manifestacao::Response;
 
+/// Consulta todos os documentos disponíveis (a partir do último NSU).
 pub type Distribuicao = Consulta;
+/// Consulta documentos a partir de um NSU específico.
 pub type DistribuicaoNSU = ConsultaNSU;
+/// Consulta um documento pela chave de acesso.
 pub type DistribuicaoChaveAcesso = ConsultaChaveAcesso;
 
 impl Consulta {
+    /// Cria um builder vazio para consulta de distribuição.
     pub fn new() -> Self {
         Self {
             cert_path: String::new(),
@@ -213,36 +296,43 @@ impl Consulta {
         }
     }
 
+    /// Caminho do certificado A1 (`.pfx`).
     pub fn cert_path(mut self, cert_path: &str) -> Self {
         self.cert_path = cert_path.to_string();
         self
     }
 
+    /// Senha do certificado.
     pub fn cert_pass(mut self, cert_pass: &str) -> Self {
         self.cert_pass = cert_pass.to_string();
         self
     }
 
+    /// CNPJ do destinatário (14 dígitos, sem formatação).
     pub fn cnpj(mut self, cnpj: &str) -> Self {
         self.cnpj = cnpj.to_string();
         self
     }
 
+    /// Código IBGE da UF (ex.: `35` para SP).
     pub fn uf(mut self, uf: u8) -> Self {
         self.uf = uf;
         self
     }
 
+    /// Ambiente: `1` = Produção · `2` = Homologação.
     pub fn ambiente(mut self, ambiente: u8) -> Self {
         self.ambiente = ambiente;
         self
     }
 
+    /// Ativa verificação do arquivo de flag antes de enviar.
     pub fn check_flag(mut self) -> Self {
         self.check_flag = Some(true);
         self
     }
 
+    /// Envia a consulta ao Ambiente Nacional e retorna [`DistribuicaoResposta`].
     pub async fn send(self) -> Result<DistribuicaoResposta, String> {
         if self.cert_path.trim().is_empty() {
             return Err("Campo obrigatório não informado: cert_path".to_string());

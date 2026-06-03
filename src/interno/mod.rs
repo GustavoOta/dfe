@@ -1,4 +1,5 @@
 pub mod cert;
+pub mod cnpj_cpf;
 pub mod chave_acesso;
 pub mod chave_acesso_props;
 pub mod cleaner;

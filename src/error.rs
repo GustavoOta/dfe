@@ -1,13 +1,24 @@
 use std::fmt;
 
+/// Erros retornados pelas funções públicas do crate `dfe`.
+///
+/// Todas as operações assíncronas retornam `Result<T, DfeError>`.
+/// O tipo alias [`crate::error::Result<T>`] é equivalente a `std::result::Result<T, DfeError>`.
 #[derive(Debug, Clone)]
 pub enum DfeError {
+    /// Falha ao ler o certificado A1 (`.pfx`) ou senha incorreta.
     Certificado(String),
+    /// Erro de parsing ou serialização de XML.
     Xml(String),
+    /// Falha na assinatura digital RSA-SHA1.
     Assinatura(String),
+    /// Erro HTTP ou resposta inesperada da SEFAZ.
     Webservice(String),
+    /// Campo obrigatório ausente ou fora das regras de validação.
     Validacao(String),
+    /// Falha ao ler configuração ou credenciais (campo obrigatório não informado).
     Configuracao(String),
+    /// Erro de leitura ou escrita em disco.
     Io(String),
 }
 

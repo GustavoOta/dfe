@@ -376,9 +376,16 @@ impl DanfeBuilderActions {
         let v_nf = icms_tot.and_then(|t| t.v_nf.clone()).unwrap_or_default();
         let v_desc = icms_tot.and_then(|t| t.v_desc.clone()).unwrap_or_default();
         let v_prod = icms_tot.and_then(|t| t.v_prod.clone()).unwrap_or_default();
-        let v_tot_trib = icms_tot
-            .and_then(|t| t.v_tot_trib.clone())
-            .unwrap_or_default();
+        // Soma v_tot_trib de cada item; fallback para ICMSTot (XML pode tê-lo zerado)
+        let v_tot_trib_items: f64 = inf.det.iter()
+            .filter_map(|det| det.imposto.v_tot_trib.as_deref())
+            .filter_map(|s| s.parse::<f64>().ok())
+            .sum();
+        let v_tot_trib = if v_tot_trib_items > 0.0 {
+            format!("{:.2}", v_tot_trib_items)
+        } else {
+            icms_tot.and_then(|t| t.v_tot_trib.clone()).unwrap_or_default()
+        };
 
         // Troco
         let v_troco = inf.pag.v_troco.clone().unwrap_or_default();
@@ -397,12 +404,11 @@ impl DanfeBuilderActions {
         // Observação
         let inf_cpl = inf.inf_adic.inf_cpl.clone().unwrap_or_default();
 
-        // QR Code URL
+        // QR Code URL e URL de consulta
         let qr_code_url = supl
             .as_ref()
             .and_then(|s| s.qr_code.clone())
             .unwrap_or_default();
-
         // Itens
         let items: Vec<PdfItem> = inf
             .det

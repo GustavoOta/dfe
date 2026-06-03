@@ -1,3 +1,4 @@
+use barcoders::sym::code128::Code128;
 use printpdf::*;
 use qrcodegen::{QrCode, QrCodeEcc};
 
@@ -7,7 +8,6 @@ const PAGE_WIDTH_MM: f32 = 80.0;
 const MARGIN_MM: f32 = 3.0;
 const USABLE_WIDTH: f32 = PAGE_WIDTH_MM - MARGIN_MM * 2.0;
 
-const FONT_SIZE_TITLE: f32 = 9.0;
 const FONT_SIZE_HEADER: f32 = 7.0;
 const FONT_SIZE_NORMAL: f32 = 6.5;
 const FONT_SIZE_SMALL: f32 = 6.0;
@@ -74,7 +74,11 @@ pub fn build_pdf_nfce_80mm(
     let qr = QrCode::encode_text(&qr_url, QrCodeEcc::Medium)
         .map_err(|e| format!("Erro ao gerar QR code: {:?}", e))?;
     let qr_n = qr.size() as f32;
-    let qr_size_mm = if qr_side { 33.0 } else { USABLE_WIDTH.min(55.0) };
+    let qr_size_mm = if qr_side {
+        33.0
+    } else {
+        USABLE_WIDTH.min(55.0)
+    };
     let qr_module_mm = qr_size_mm / qr_n;
     let qr_actual_size = qr_module_mm * qr_n;
     let qr_x_origin = if qr_side {
@@ -91,13 +95,9 @@ pub fn build_pdf_nfce_80mm(
         0.0
     };
     let emit_h = 15.0 + extra_emit_lines * LINE_HEIGHT; // CNPJ/IE/addr + extra name lines
-    let items_h = items.len() as f32 * (LINE_HEIGHT * 2.0 + 0.5);
+    let items_h = items.len() as f32 * (LINE_HEIGHT * 2.0);
     let payments_h = payments.len() as f32 * LINE_HEIGHT + LINE_HEIGHT; // each + troco
-    let consumer_h = if dest_cpf_cnpj.is_empty() {
-        0.0
-    } else {
-        LINE_HEIGHT + SECTION_GAP
-    };
+    let consumer_h = if qr_side { 0.0 } else { LINE_HEIGHT };
     let prot_h = if n_prot.is_empty() {
         0.0
     } else {
@@ -116,36 +116,43 @@ pub fn build_pdf_nfce_80mm(
     };
     let obs_h = obs_lines as f32 * LINE_HEIGHT + if inf_cpl.is_empty() { 0.0 } else { SECTION_GAP };
 
-    // QR block height differs by layout: side layout absorbs the protocol into the column
-    let qr_block_h = if qr_side {
-        qr_actual_size + SECTION_GAP
-    } else {
-        LINE_HEIGHT             // QR label
-        + qr_actual_size        // QR code
-        + LINE_HEIGHT           // access key
-        + SECTION_GAP
-        + prot_h
-    };
+    // Bloco fixo: "Consulte" + URL + "CHAVE DE ACESSO" + chave + barcode (sempre acima do QR)
+    let barcode_height_mm: f32 = 8.0;
+    let compact_line: f32 = 2.2;
+    let key_block_h = LINE_HEIGHT * 2.0                                  // "Consulte..." + URL
+        + compact_line                                                   // chave formatada
+        + barcode_height_mm
+        + 1.5; // gap após barcode
+
+    // +1 linha: NF-e No/Serie (movido do topo para cá)
+    let nf_info_h = LINE_HEIGHT * 1.0;
+    let qr_block_h = key_block_h
+        + nf_info_h
+        + if qr_side {
+            qr_actual_size + SECTION_GAP
+        } else {
+            qr_actual_size + SECTION_GAP + prot_h
+        };
 
     let base_h = homolog_h
-        + LINE_HEIGHT * 3.0       // NFC-e title + subtitle
+        + LINE_HEIGHT * 1.0       // subtitle only
         + SECTION_GAP
         + emit_h
         + SECTION_GAP
-        + LINE_HEIGHT * 2.0       // NF info + items header
+        + LINE_HEIGHT * 1.0       // items header (NF info movido para seção QR)
         + SECTION_GAP
         + items_h
-        + SECTION_GAP
+        + 0.5
         + LINE_HEIGHT * 3.0       // totals
         + SECTION_GAP
         + LINE_HEIGHT * 2.0       // payment header
         + payments_h
         + SECTION_GAP
-        + consumer_h
         + qr_block_h
-        + trib_h
+        + consumer_h
         + obs_h
-        + LINE_HEIGHT * 2.0;     // credits
+        + trib_h
+        + LINE_HEIGHT * 2.0; // credits
 
     let page_height_mm = (base_h + MARGIN_MM * 2.0).max(120.0);
 
@@ -177,17 +184,13 @@ pub fn build_pdf_nfce_80mm(
     }
 
     // ── Título ────────────────────────────────────────────
-    write_center(&layer, &font_bold, FONT_SIZE_TITLE, y, "NFC-e");
-    y -= LINE_HEIGHT + 1.0;
     write_center(
         &layer,
-        &font,
+        &font_bold,
         FONT_SIZE_SMALL,
         y,
-        "Documento Auxiliar da NF-e",
+        "Documento Auxiliar da NFC-e",
     );
-    y -= LINE_HEIGHT;
-    write_center(&layer, &font, FONT_SIZE_SMALL, y, "para Consumidor Final");
     y -= 1.5;
     draw_line(&layer, y, 0.5);
     y -= SECTION_GAP;
@@ -240,26 +243,18 @@ pub fn build_pdf_nfce_80mm(
         }
     }
 
-    // NF-e nro / série / data
-    write_center(
-        &layer,
-        &font,
-        FONT_SIZE_SMALL,
-        y,
-        &format!(
-            "NF-e No {:>09}  Serie {}  {}",
-            n_nf,
-            serie,
-            format_datetime(dh_emi)
-        ),
-    );
-    y -= 1.5;
     draw_line(&layer, y, 0.3);
     y -= SECTION_GAP;
 
     // ── Cabeçalho dos itens ───────────────────────────────
     write_left(&layer, &font_bold, FONT_SIZE_SMALL, y, "#  Descricao");
-    write_right(&layer, &font_bold, FONT_SIZE_SMALL, y, "Qtd   UN    VlUnit    Total");
+    write_right(
+        &layer,
+        &font_bold,
+        FONT_SIZE_SMALL,
+        y,
+        "Qtd   UN    VlUnit    Total",
+    );
     y -= LINE_HEIGHT;
     draw_line(&layer, y + 0.5, 0.15);
     y -= 1.5;
@@ -294,11 +289,11 @@ pub fn build_pdf_nfce_80mm(
             y,
             &format!("R$ {}", format_brl(&item.v_prod)),
         );
-        y -= LINE_HEIGHT + 0.5;
+        y -= LINE_HEIGHT;
     }
 
     draw_line(&layer, y + 0.5, 0.3);
-    y -= SECTION_GAP;
+    y -= 1.5;
 
     // ── Totais ────────────────────────────────────────────
     write_left(
@@ -381,81 +376,104 @@ pub fn build_pdf_nfce_80mm(
     draw_line(&layer, y, 0.3);
     y -= SECTION_GAP;
 
-    // ── Consumidor ────────────────────────────────────────
-    if !dest_cpf_cnpj.is_empty() {
-        let doc_digits: String = dest_cpf_cnpj.chars().filter(|c| c.is_ascii_digit()).collect();
-        let doc_label = if doc_digits.len() == 14 { "CNPJ" } else { "CPF" };
-        let consumer_line = if dest_x_nome.trim().is_empty() {
-            format!("CONSUMIDOR - {}: {}", doc_label, format_cnpj_cpf(dest_cpf_cnpj))
-        } else {
-            format!(
-                "{} - {}: {}",
-                dest_x_nome,
-                doc_label,
-                format_cnpj_cpf(dest_cpf_cnpj)
-            )
-        };
-        for line in wrap_text(&consumer_line, 48) {
-            write_center(&layer, &font, FONT_SIZE_SMALL, y, &line);
-            y -= LINE_HEIGHT;
-        }
-        draw_line(&layer, y, 0.3);
-        y -= SECTION_GAP;
-    }
+    // ── Chave de acesso + código de barras (acima do QR) ─────────────────────
+    write_center(
+        &layer,
+        &font_bold,
+        FONT_SIZE_SMALL,
+        y,
+        "Consulte pela Chave de Acesso em",
+    );
+    y -= LINE_HEIGHT;
+    write_center(
+        &layer,
+        &font,
+        FONT_SIZE_SMALL,
+        y,
+        "www.nfce.fazenda.sp.gov.br/consulta",
+    );
+    y -= LINE_HEIGHT;
+    let chave_fmt = format_chave_acesso(chave_acesso);
+    write_center(&layer, &font, FONT_SIZE_SMALL - 0.5, y, &chave_fmt);
+    y -= compact_line;
+    y = draw_barcode_128(&layer, chave_acesso, y, barcode_height_mm)?;
+    y -= 1.5;
 
     // ── QR Code ───────────────────────────────────────────
     if qr_side {
-        // Side layout: QR on left, access key + protocol on right column
+        // Side layout: QR on left, protocol + consumer on right column
         let x_col = MARGIN_MM + qr_actual_size + 2.0;
         let fsz: f32 = 5.5;
         let w_col = USABLE_WIDTH - qr_actual_size - 2.0;
-        let col_chars = ((w_col / (fsz * 0.3528 * 556.0 / 1000.0)) as usize).max(10).min(40);
+        let col_chars = ((w_col / (fsz * 0.3528 * 556.0 / 1000.0)) as usize)
+            .max(10)
+            .min(40);
 
         let y_qr_bottom = draw_qr_code(&layer, &qr, qr_x_origin, y, qr_module_mm)?;
 
         let mut y_col = y - 1.5;
-        for line in wrap_text("Consulte pela Chave de Acesso em:", col_chars) {
-            layer.use_text(&line, fsz, Mm(x_col), Mm(y_col), &font_bold);
-            y_col -= LINE_HEIGHT;
-        }
-        let chave_fmt = format_chave_acesso(chave_acesso);
-        for line in wrap_text(&chave_fmt, col_chars) {
-            layer.use_text(&line, fsz, Mm(x_col), Mm(y_col), &font);
-            y_col -= LINE_HEIGHT;
-        }
         if !n_prot.is_empty() {
             y_col -= 0.5;
             layer.use_text("Protocolo:", fsz, Mm(x_col), Mm(y_col), &font_bold);
             y_col -= LINE_HEIGHT;
             layer.use_text(n_prot, fsz, Mm(x_col), Mm(y_col), &font);
             y_col -= LINE_HEIGHT;
-            layer.use_text(&format_datetime(dh_recbto), fsz, Mm(x_col), Mm(y_col), &font);
+            let date_emit = format!("Emissao: {}", format_datetime(dh_emi));
+            layer.use_text(&date_emit, fsz, Mm(x_col), Mm(y_col), &font);
             y_col -= LINE_HEIGHT;
         }
+        // NF-e nro / série / data emissão (abaixo do protocolo na coluna direita)
+        {
+            let nf_line = format!("NF-e {:>09} Serie {}", n_nf, serie);
+            for line in wrap_text(&nf_line, col_chars) {
+                layer.use_text(&line, fsz, Mm(x_col), Mm(y_col), &font);
+                y_col -= LINE_HEIGHT;
+            }
+        }
+        {
+            let consumer_line = if dest_cpf_cnpj.is_empty() {
+                "CONSUMIDOR NAO IDENTIFICADO".to_string()
+            } else {
+                let doc_digits: String = dest_cpf_cnpj
+                    .chars()
+                    .filter(|c| c.is_ascii_digit())
+                    .collect();
+                let doc_label = if doc_digits.len() == 14 {
+                    "CNPJ"
+                } else {
+                    "CPF"
+                };
+                if dest_x_nome.trim().is_empty() {
+                    format!(
+                        "CONSUMIDOR - {}: {}",
+                        doc_label,
+                        format_cnpj_cpf(dest_cpf_cnpj)
+                    )
+                } else {
+                    format!(
+                        "{} - {}: {}",
+                        dest_x_nome,
+                        doc_label,
+                        format_cnpj_cpf(dest_cpf_cnpj)
+                    )
+                }
+            };
+            y_col -= 0.5;
+            for line in wrap_text(&consumer_line, col_chars) {
+                layer.use_text(&line, fsz, Mm(x_col), Mm(y_col), &font);
+                y_col -= LINE_HEIGHT;
+            }
+        }
         y = y_qr_bottom.min(y_col);
-        draw_line(&layer, y, 0.3);
+
         y -= SECTION_GAP;
     } else {
-        // Center layout: QR centered, chave below, then protocol block
-        write_center(
-            &layer,
-            &font_bold,
-            FONT_SIZE_HEADER,
-            y,
-            "Consulte pela Chave de Acesso em:",
-        );
-        y -= LINE_HEIGHT + 1.0;
-
+        // Center layout: QR centralizado, depois protocolo
         y = draw_qr_code(&layer, &qr, qr_x_origin, y, qr_module_mm)?;
-        y -= 3.0;
-
-        let chave_fmt = format_chave_acesso(chave_acesso);
-        write_center(&layer, &font, FONT_SIZE_SMALL, y, &chave_fmt);
-        y -= 1.5;
+        y -= 2.0;
         draw_line(&layer, y, 0.3);
         y -= SECTION_GAP;
 
-        // ── Protocolo ─────────────────────────────────────────
         if !n_prot.is_empty() {
             write_center(
                 &layer,
@@ -472,61 +490,164 @@ pub fn build_pdf_nfce_80mm(
                 y,
                 &format!("{} - {}", n_prot, format_datetime(dh_recbto)),
             );
-            y -= 1.5;
-            draw_line(&layer, y, 0.3);
-            y -= SECTION_GAP;
+            y -= LINE_HEIGHT;
         }
-    }
-
-    // ── Tributos aproximados ──────────────────────────────
-    if v_tot_trib_f > 0.0 {
+        // NF-e nro / série / data emissão (centralizado, abaixo do protocolo)
         write_center(
             &layer,
             &font,
             FONT_SIZE_SMALL,
             y,
             &format!(
-                "Valor aprox. tributos: R$ {} (Fonte: IBPT)",
-                format_brl(v_tot_trib)
+                "NF-e No {:>09}  Serie {}  {}",
+                n_nf,
+                serie,
+                format_datetime(dh_emi)
             ),
         );
-        y -= LINE_HEIGHT;
+        y -= 1.5;
+        draw_line(&layer, y, 0.3);
+        y -= SECTION_GAP;
+    }
+
+    // ── Consumidor (centralizado — abaixo do protocolo) ──
+    if !qr_side {
+        let consumer_line = if dest_cpf_cnpj.is_empty() {
+            "CONSUMIDOR NAO IDENTIFICADO".to_string()
+        } else {
+            let doc_digits: String = dest_cpf_cnpj
+                .chars()
+                .filter(|c| c.is_ascii_digit())
+                .collect();
+            let doc_label = if doc_digits.len() == 14 {
+                "CNPJ"
+            } else {
+                "CPF"
+            };
+            if dest_x_nome.trim().is_empty() {
+                format!(
+                    "CONSUMIDOR - {}: {}",
+                    doc_label,
+                    format_cnpj_cpf(dest_cpf_cnpj)
+                )
+            } else {
+                format!(
+                    "{} - {}: {}",
+                    dest_x_nome,
+                    doc_label,
+                    format_cnpj_cpf(dest_cpf_cnpj)
+                )
+            }
+        };
+        for line in wrap_text(&consumer_line, 48) {
+            write_center(&layer, &font, FONT_SIZE_SMALL, y, &line);
+            y -= LINE_HEIGHT;
+        }
     }
 
     // ── Informações adicionais ────────────────────────────
     if !inf_cpl.is_empty() {
         draw_line(&layer, y, 0.3);
         y -= SECTION_GAP;
-        write_center(
-            &layer,
-            &font_bold,
-            FONT_SIZE_HEADER,
-            y,
-            "INFORMACOES ADICIONAIS",
-        );
-        y -= LINE_HEIGHT;
         for line in wrap_text(inf_cpl, 55) {
             write_left(&layer, &font, FONT_SIZE_SMALL, y, &line);
             y -= LINE_HEIGHT;
         }
     }
 
+    // ── Tributos aproximados (rodapé) ─────────────────────
+    if v_tot_trib_f > 0.0 {
+        draw_line(&layer, y, 0.3);
+        y -= SECTION_GAP;
+        write_center(
+            &layer,
+            &font,
+            FONT_SIZE_SMALL,
+            y,
+            &format!(
+                "Valor Aproximado dos Tributos R$ {} (Fonte: IBPT)",
+                format_brl(v_tot_trib)
+            ),
+        );
+        y -= LINE_HEIGHT;
+    }
+
     // ── Créditos ──────────────────────────────────────────
     draw_line(&layer, y, 0.3);
     y -= SECTION_GAP;
-    write_center(
-        &layer,
-        &font,
-        FONT_SIZE_CREDITS,
-        y,
-        "Gerado por dfe - https://crates.io/crates/dfe",
-    );
+    let credits_text = "Gerado por dfe - https://crates.io/crates/dfe";
+    write_center(&layer, &font, FONT_SIZE_CREDITS, y, credits_text);
 
-    let bytes = doc
+    // Bounds para a anotação de link (mm → pt: 1mm = 72/25.4 pt)
+    let mm_to_pt = 72.0_f32 / 25.4;
+    let tw = estimate_text_width(credits_text, FONT_SIZE_CREDITS);
+    let tx = (MARGIN_MM + (USABLE_WIDTH - tw) / 2.0).max(MARGIN_MM);
+    let font_h = FONT_SIZE_CREDITS * 0.3528;
+    let annot_rect = [
+        tx * mm_to_pt,
+        (y - 1.0) * mm_to_pt,
+        (tx + tw) * mm_to_pt,
+        (y + font_h) * mm_to_pt,
+    ];
+
+    let raw = doc
         .save_to_bytes()
         .map_err(|e| format!("Erro ao gerar PDF: {}", e))?;
 
-    Ok(bytes)
+    // PdfPageReference não expõe add_link_annotation — injeta via lopdf
+    let mut lpdf = lopdf::Document::load_mem(&raw)
+        .map_err(|e| format!("Erro ao parsear PDF para anotação: {}", e))?;
+
+    let mut a_dict = lopdf::Dictionary::new();
+    a_dict.set("S", lopdf::Object::Name(b"URI".to_vec()));
+    a_dict.set(
+        "URI",
+        lopdf::Object::String(
+            b"https://crates.io/crates/dfe".to_vec(),
+            lopdf::StringFormat::Literal,
+        ),
+    );
+    let mut annot_dict = lopdf::Dictionary::new();
+    annot_dict.set("Type", lopdf::Object::Name(b"Annot".to_vec()));
+    annot_dict.set("Subtype", lopdf::Object::Name(b"Link".to_vec()));
+    annot_dict.set(
+        "Rect",
+        lopdf::Object::Array(annot_rect.iter().map(|&v| lopdf::Object::Real(v)).collect()),
+    );
+    annot_dict.set("A", lopdf::Object::Dictionary(a_dict));
+    annot_dict.set(
+        "Border",
+        lopdf::Object::Array(vec![
+            lopdf::Object::Integer(0),
+            lopdf::Object::Integer(0),
+            lopdf::Object::Integer(0),
+        ]),
+    );
+    let annot = lopdf::Object::Dictionary(annot_dict);
+    let annot_id = lpdf.add_object(annot);
+
+    let pages = lpdf.get_pages();
+    if let Some(&page_id) = pages.get(&1) {
+        if let Ok(lopdf::Object::Dictionary(ref mut dict)) = lpdf.get_object_mut(page_id) {
+            match dict.get_mut(b"Annots") {
+                Ok(lopdf::Object::Array(ref mut arr)) => {
+                    arr.push(lopdf::Object::Reference(annot_id));
+                }
+                _ => {
+                    dict.set(
+                        "Annots",
+                        lopdf::Object::Array(vec![lopdf::Object::Reference(annot_id)]),
+                    );
+                }
+            }
+        }
+    }
+
+    let mut out = Vec::new();
+    lpdf.save_to(&mut out)
+        .map_err(|e| format!("Erro ao salvar PDF com link: {}", e))?;
+
+    Ok(out)
 }
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -557,12 +678,10 @@ fn estimate_text_width(text: &str, font_size: f32) -> f32 {
             'r' => 333.0,
             'I' | '[' | ']' | '(' | ')' | '/' | '-' => 278.0,
             'a' | 'c' | 'e' | 'o' | 's' => 556.0,
-            'b' | 'd' | 'g' | 'h' | 'k' | 'n' | 'p' | 'q' | 'u' | 'v' | 'x' | 'y' | 'z' => {
-                556.0
-            }
+            'b' | 'd' | 'g' | 'h' | 'k' | 'n' | 'p' | 'q' | 'u' | 'v' | 'x' | 'y' | 'z' => 556.0,
             'm' | 'w' => 778.0,
-            'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'K' | 'N' | 'P' | 'R' | 'S'
-            | 'T' | 'U' | 'V' | 'X' | 'Y' | 'Z' => 667.0,
+            'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'K' | 'N' | 'P' | 'R' | 'S' | 'T'
+            | 'U' | 'V' | 'X' | 'Y' | 'Z' => 667.0,
             'M' | 'O' | 'Q' | 'W' => 778.0,
             'J' | 'L' => 556.0,
             '0'..='9' => 556.0,
@@ -630,6 +749,52 @@ fn draw_qr_code(
     }
 
     let y_bottom = y_top - n as f32 * module_mm;
+    Ok(y_bottom)
+}
+
+fn draw_barcode_128(
+    layer: &PdfLayerReference,
+    data: &str,
+    y_top: f32,
+    bar_height_mm: f32,
+) -> Result<f32, String> {
+    let barcode_data = format!("\u{0106}{}", data); // Ć = Code128-C (pares numéricos)
+    let barcode =
+        Code128::new(&barcode_data).map_err(|e| format!("Erro ao gerar barcode: {}", e))?;
+    let encoded: Vec<u8> = barcode.encode();
+
+    let total_modules = encoded.len() as f32;
+    let module_width_mm = USABLE_WIDTH / total_modules;
+    let module_width_pt = module_width_mm * 72.0 / 25.4;
+
+    let y_bottom = y_top - bar_height_mm;
+
+    let mut i = 0usize;
+    while i < encoded.len() {
+        if encoded[i] == 0 {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < encoded.len() && encoded[i] == 1 {
+            i += 1;
+        }
+        let run_modules = (i - start) as f32;
+        let run_center_x_mm =
+            MARGIN_MM + start as f32 * module_width_mm + (run_modules * module_width_mm / 2.0);
+        let points = vec![
+            (Point::new(Mm(run_center_x_mm), Mm(y_top)), false),
+            (Point::new(Mm(run_center_x_mm), Mm(y_bottom)), false),
+        ];
+        let line = Line {
+            points,
+            is_closed: false,
+        };
+        layer.set_outline_color(Color::Greyscale(Greyscale::new(0.0, None)));
+        layer.set_outline_thickness(module_width_pt * run_modules);
+        layer.add_line(line);
+    }
+
     Ok(y_bottom)
 }
 

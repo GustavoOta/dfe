@@ -9,17 +9,24 @@
 
 ---
 
-## Funcionalidades
+## Índice
 
-| Funcionalidade | Descrição |
-|---|---|
-| **Emissão NF-e / NFC-e** | Autorização via SOAP para SEFAZ estadual (modelos 55 e 65) |
-| **Cancelamento** | Evento 110111 para NF-e e NFC-e |
-| **Manifestação do destinatário** | Ciência, confirmação, desconhecimento e operação não realizada |
-| **Distribuição de DF-e** | Consulta ao Ambiente Nacional por NSU ou chave de acesso |
-| **DANFE** | Geração de PDF em A4 e 80mm (NF-e e NFC-e) com suporte a logotipo |
-| **Validação XSD** | Schemas SEFAZ embutidos no binário — sem arquivos externos |
-| **Status do webservice** | Consulta de disponibilidade por UF e ambiente |
+- [Instalação](#instalação)
+- [Funcionalidades](#funcionalidades)
+- [Emissão NF-e / NFC-e](#emissão-nf-e--nfc-e)
+- [Cancelamento](#cancelamento)
+- [Manifestação do Destinatário](#manifestação-do-destinatário)
+- [Distribuição de DF-e](#distribuição-de-df-e)
+- [DANFE — Geração de PDF](#danfe--geração-de-pdf)
+- [ESC/POS — Impressoras Térmicas](#escpos--impressoras-térmicas)
+- [Status do Webservice](#status-do-webservice)
+- [Tratamento de Erros](#tratamento-de-erros)
+- [Tipos de ICMS suportados](#tipos-de-icms-suportados)
+- [Validação de CNPJ / CPF](#validação-de-cnpj--cpf)
+- [Testes](#testes)
+- [Notas importantes](#notas-importantes)
+- [Roadmap](#roadmap)
+- [Licença](#licença)
 
 ---
 
@@ -30,40 +37,70 @@
 dfe = "0.5.7"
 ```
 
-> **OpenSSL:** No Windows, a feature `vendored` é usada automaticamente — nenhuma instalação manual necessária.  
 > **Schemas XSD** (`PL_010b_NT2025_002_v1.21`) estão embutidos no binário via `include_bytes!`.
 
----
+### OpenSSL — compilação a partir do código-fonte (`vendored`)
 
-## Tratamento de erros
+Esta crate depende do `openssl` com `features = ["vendored"]`. Isso significa que o OpenSSL **não precisa estar instalado no sistema** — ele é baixado e compilado automaticamente durante o `cargo build`. A desvantagem é que a primeira compilação leva alguns minutos a mais.
 
-Todas as funções públicas retornam `Result<T, DfeError>`.
+Porém, o sistema de build do OpenSSL é escrito em Perl, então **o Perl deve estar instalado e acessível no `PATH`** antes de compilar. Sem ele, o build falhará com um erro parecido com:
 
-```rust
-use dfe::DfeError;
-
-match resultado {
-    Ok(r)                        => { /* ... */ }
-    Err(DfeError::Certificado(m)) => eprintln!("Problema no .pfx: {}", m),
-    Err(DfeError::Validacao(m))   => eprintln!("Dado inválido: {}", m),
-    Err(DfeError::Webservice(m))  => eprintln!("Falha SEFAZ: {}", m),
-    Err(e)                        => eprintln!("Erro: {}", e),
-}
+```
+Could not find perl
 ```
 
-| Variante | Quando ocorre |
-|---|---|
-| `Certificado` | Falha ao abrir o `.pfx` ou senha incorreta |
-| `Xml` | Erro de parsing ou serialização XML |
-| `Assinatura` | Falha na assinatura digital RSA-SHA1 |
-| `Webservice` | Erro HTTP ou resposta inesperada da SEFAZ |
-| `Validacao` | Campo obrigatório ausente ou fora das regras XSD |
-| `Configuracao` | Falha ao ler configuração ou credenciais |
-| `Io` | Erro de leitura/escrita em disco |
+#### Windows
+
+Instale o [Strawberry Perl](https://strawberryperl.com) (recomendado — inclui compilador C e ferramentas Unix necessárias):
+
+1. Baixe o instalador `.msi` em <https://strawberryperl.com>
+2. Execute o instalador (o PATH é atualizado automaticamente)
+3. Abra um novo terminal e confirme: `perl -v`
+4. Execute `cargo build` normalmente
+
+> O Strawberry Perl já vem com `dmake` e `gcc`, o que evita dependência do MSVC ou do Visual Studio Build Tools.
+
+#### Linux
+
+O Perl geralmente já está disponível. Verifique:
+
+```bash
+perl -v
+```
+
+Se não estiver instalado:
+
+```bash
+# Debian/Ubuntu
+sudo apt-get install perl
+
+# Fedora/RHEL
+sudo dnf install perl
+```
+
+#### macOS
+
+O Perl já vem pré-instalado com o macOS. Nenhuma ação necessária.
 
 ---
 
-## NFeBuilder — Emissão de NF-e / NFC-e
+## Funcionalidades
+
+| Funcionalidade | Descrição |
+|---|---|
+| **Emissão NF-e / NFC-e** | Autorização via SOAP para SEFAZ estadual (modelos 55 e 65) |
+| **Cancelamento** | Evento 110111 para NF-e e NFC-e |
+| **Manifestação do destinatário** | Ciência, confirmação, desconhecimento e operação não realizada |
+| **Distribuição de DF-e** | Consulta ao Ambiente Nacional por NSU ou chave de acesso |
+| **DANFE** | Geração de PDF em A4 e 80mm (NF-e e NFC-e) com suporte a logotipo |
+| **ESC/POS** | `EscPosBuilder` (layout livre) + `EscPosNFCeBuilder` (NFC-e pronto) |
+| **Validação XSD** | Schemas SEFAZ embutidos no binário — sem arquivos externos |
+| **Validação CNPJ/CPF** | Verificação de dígito verificador |
+| **Status do webservice** | Consulta de disponibilidade por UF e ambiente |
+
+---
+
+## Emissão NF-e / NFC-e
 
 ```rust
 use dfe::NFeBuilder;
@@ -84,7 +121,7 @@ let resposta = NFeBuilder::new()
     })
     .emitente(Emit {
         cnpj: Some("11111111111111".to_string()),
-        x_nome: Some("EMPRESA LTDA".to_string()),
+        x_nome: "EMPRESA LTDA".to_string(),
         ie: Some("111111111111".to_string()),
         crt: 1,             // 1 = Simples Nacional | 3 = Regime Normal
         ..Default::default()
@@ -103,16 +140,13 @@ let resposta = NFeBuilder::new()
         q_com: 2.0,
         v_un_com: 50.0,
         v_prod: 100.0,
-        u_trib: "UN".to_string(),
-        q_trib: 2.0,
-        v_un_trib: 50.0,
-        icms: Icms::sn102(0, "400".to_string()),      // CSOSN 400
+        icms: Icms::sn102(0, "400"),      // CSOSN 400
         pis: Pis::Nt { cst: "07".to_string() },
         cofins: Cofins::Nt { cst: "07".to_string() },
         ..Default::default()
     }])
     .total(Total::default())         // totais calculados automaticamente dos itens
-    .transporte(Transp { mod_frete: Some("9".to_string()), ..Default::default() })
+    .transporte(Transp { mod_frete: 9, ..Default::default() })
     .pagamento(Pag { ..Default::default() })
     .informacoes_adicionais(InfAdic {
         inf_cpl: Some("Pedido 123".to_string()),
@@ -122,8 +156,8 @@ let resposta = NFeBuilder::new()
     .emitir()
     .await?;
 
-println!("cStat:    {}", resposta.protocolo.inf_prot.c_stat);
-println!("xMotivo:  {}", resposta.protocolo.inf_prot.x_motivo);
+println!("cStat:     {}", resposta.protocolo.inf_prot.c_stat);
+println!("xMotivo:   {}", resposta.protocolo.inf_prot.x_motivo);
 println!("Protocolo: {}", resposta.protocolo.inf_prot.n_prot.unwrap_or_default());
 // resposta.xml → XML autorizado (nfeProc) completo
 ```
@@ -154,36 +188,15 @@ Os campos `v_bc`, `v_icms`, `v_prod`, `v_pis`, `v_cofins`, `v_desc` e `v_nf` sã
 |---|---|
 | `v_frete`, `v_seg`, `v_outro` | Frete, seguro e outras despesas |
 | `v_ii`, `v_ipi`, `v_ipi_devol` | Impostos específicos |
-| `v_bc_st`, `v_st` | Substituição Tributária |
+| `v_bc_st`, `v_st` | ST global (itens com ICMS10/30/70 auto-somam) |
 | `v_fcp`, `v_fcpst`, `v_fcpst_ret` | Fundo de Combate à Pobreza |
+| `v_fcpuf_dest`, `v_icms_uf_dest`, `v_icms_uf_remet` | DIFAL |
 
 Para uma venda simples sem extras: `Total::default()`.
 
-### Tipos de ICMS suportados
-
-| Variante | Regime | Construtor |
-|---|---|---|
-| `Icms00` | CST 00 — Tributada integralmente (CRT 3) | `Icms::icms00(orig, mod_bc, v_bc, p_icms, v_icms)` |
-| `Icms40` | CST 40/41/50 — Isenta/NT/Suspensa (CRT 3) | `Icms::icms40(orig, cst)` |
-| `Icms60` | CST 60 — ST cobrada anteriormente (CRT 3) | `Icms::icms60(orig)` |
-| `Icms90` | CST 90 — Outros (CRT 3) | `Icms::icms90(orig)` |
-| `Sn101` | CSOSN 101 — Com crédito (CRT 1) | `Icms::sn101(orig, p_cred_sn, v_cred_icmssn)` |
-| `Sn102` | CSOSN 102/103/300/400 — Sem crédito (CRT 1) | `Icms::sn102(orig, csosn)` |
-| `Sn500` | CSOSN 500 — ST anterior (CRT 1) | `Icms::sn500(orig)` |
-| `Sn900` | CSOSN 900 — Outros (CRT 1) | `Icms::sn900(orig)` |
-
-### Resposta da emissão
-
-```rust
-pub struct Response {
-    pub protocolo: TagInfProt,  // n_prot, c_stat, x_motivo, dh_recbto
-    pub xml: String,            // XML nfeProc autorizado — salvar em disco
-}
-```
-
 ---
 
-## CancelarBuilder — Cancelamento
+## Cancelamento
 
 ```rust
 use dfe::CancelarBuilder;
@@ -307,29 +320,9 @@ let r = DistribuicaoChaveAcesso::new()
 
 ---
 
-## NFeService — Status do Webservice
+## DANFE — Geração de PDF
 
-```rust
-use dfe::NFeService;
-
-let r = NFeService::new()
-    .cert_path("./cert.pfx")
-    .cert_pass("senha")
-    .uf("SP")
-    .environment(2)   // 1 = Produção | 2 = Homologação
-    .send()
-    .await?;
-
-println!("cStat: {}",   r.c_stat);    // "107" = Serviço em operação
-println!("xMotivo: {}", r.x_motivo);
-println!("URL: {}",     r.url);
-```
-
----
-
-## DanfeBuilder — Geração de DANFE
-
-Gera o DANFE em PDF a partir do XML autorizado (`nfeProc`). O modelo do documento (55 ou 65) é detectado automaticamente do campo `<mod>` no XML.
+Gera o DANFE em PDF a partir do XML autorizado (`nfeProc`). O modelo (55 ou 65) é detectado automaticamente do campo `<mod>` no XML.
 
 ```rust
 use dfe::DanfeBuilder;
@@ -392,15 +385,220 @@ let b64 = DanfeBuilder::new()
 | `"80mm"` | ✅ | ✅ (suporta `.qr_side()`) |
 | `"54mm"` | ❌ | ❌ |
 
-### Logotipo do emitente — `.logo(src)`
+---
 
-O logo é renderizado no topo da coluna do emitente, centralizado horizontalmente, com altura máxima de 18mm. A proporção é sempre mantida; a imagem nunca é ampliada além do tamanho original.
+## ESC/POS — Impressoras Térmicas
 
-| Formato de entrada | Exemplo |
+### EscPosBuilder — layout personalizado
+
+```rust
+use dfe::EscPosBuilder;
+
+let bytes = EscPosBuilder::new()
+    .paper_width(80)               // 80mm ou 58mm
+    .align_center()
+    .bold(true)
+    .text("EMPRESA LTDA\n")
+    .bold(false)
+    .align_left()
+    .text("CNPJ: 11.222.333/0001-81\n")
+    .divider()
+    .text(format!("{:<20} {:>10}\n", "PRODUTO EXEMPLO", "R$  50,00"))
+    .divider()
+    .align_right()
+    .bold(true)
+    .text("TOTAL  R$  50,00\n")
+    .bold(false)
+    .cut()
+    .build();                      // → Vec<u8>
+
+// Enviar para impressora
+std::fs::write("\\\\.\\COM3", &bytes)?;   // Windows
+std::fs::write("/dev/usb/lp0", &bytes)?; // Linux
+```
+
+| Método | Descrição |
 |---|---|
-| Caminho de arquivo | `"./logo.png"` / `"./logo.jpg"` |
-| Base64 puro | `"iVBORw0KGgo..."` |
-| Data URI | `"data:image/png;base64,iVBORw0KGgo..."` |
+| `.paper_width(mm)` | Largura do papel: `80` ou `58`. Padrão: `80` |
+| `.align_left()` / `.align_center()` / `.align_right()` | Alinhamento |
+| `.bold(bool)` | Negrito |
+| `.underline(bool)` | Sublinhado |
+| `.font_size(u8)` | Tamanho da fonte (1 = normal, 2 = duplo) |
+| `.text(str)` | Insere texto |
+| `.divider()` | Linha separadora proporcional à largura do papel |
+| `.barcode_128(str)` | Code 128 nativo ESC/POS |
+| `.qr_code(str, size)` | QR Code nativo ESC/POS |
+| `.image(bytes)` | Imagem rasterizada PNG/JPEG → bitmap 1-bit (GS v 0) |
+| `.feed(n)` | Avança `n` linhas |
+| `.cut()` | Corte total |
+| `.partial_cut()` | Corte parcial |
+| `.build()` | Retorna `Vec<u8>` |
+
+### EscPosNFCeBuilder — impressão de NFC-e
+
+```rust
+use dfe::EscPosNFCeBuilder;
+
+// QR Code centralizado (padrão)
+let bytes = EscPosNFCeBuilder::new()
+    .xml("caminho/nota.xml")   // ou string XML diretamente
+    .paper_width(80)           // padrão: 80mm; 58mm também suportado
+    .build()?;                 // → Result<Vec<u8>, DfeError>
+
+// QR Code à esquerda (compacto)
+let bytes = EscPosNFCeBuilder::new()
+    .xml(xml_string)
+    .qr_side()
+    .build()?;
+
+std::fs::write("\\\\.\\COM3", &bytes)?;
+```
+
+**Layout do cupom:**
+```
+         NOME DO EMITENTE
+  CNPJ: XX.XXX.XXX/XXXX-XX  IE: XXXXXXXX  SP
+  Rua Exemplo, 100 - Centro / Cidade/SP
+------------------------------------------------
+DOCUMENTO AUXILIAR DA NFC-E
+------------------------------------------------
+ #  DESCRICAO
+    QTD UN  R$ VL.UNIT           R$ TOTAL
+------------------------------------------------
+Qtd. Itens: N
+                              TOTAL  R$ XXX,XX
+------------------------------------------------
+FORMA DE PAGAMENTO                       VALOR
+Dinheiro                             R$ XXX,XX
+------------------------------------------------
+Consulte pela Chave de Acesso em
+www.nfce.fazenda.sp.gov.br/consulta
+CHAVE DE ACESSO
+3524 0600 0000 0000 ...
+[CODE 128]
+[QR CODE]
+------------------------------------------------
+PROTOCOLO DE AUTORIZACAO
+135XXXXXX - DD/MM/YYYY HH:MM:SS
+NF-e No 000000001  Serie 1  DD/MM/YYYY HH:MM:SS
+------------------------------------------------
+Valor Aproximado dos Tributos R$ X,XX (Fonte: IBPT)
+```
+
+---
+
+## Status do Webservice
+
+```rust
+use dfe::NFeService;
+
+let r = NFeService::new()
+    .cert_path("./cert.pfx")
+    .cert_pass("senha")
+    .uf("SP")
+    .environment(2)   // 1 = Produção | 2 = Homologação
+    .send()
+    .await?;
+
+println!("cStat: {}",   r.c_stat);    // "107" = Serviço em operação
+println!("xMotivo: {}", r.x_motivo);
+println!("URL: {}",     r.url);
+```
+
+---
+
+## Tratamento de Erros
+
+Todas as funções públicas retornam `Result<T, DfeError>`.
+
+```rust
+use dfe::DfeError;
+
+match resultado {
+    Ok(r)                        => { /* ... */ }
+    Err(DfeError::Certificado(m)) => eprintln!("Problema no .pfx: {}", m),
+    Err(DfeError::Validacao(m))   => eprintln!("Dado inválido: {}", m),
+    Err(DfeError::Webservice(m))  => eprintln!("Falha SEFAZ: {}", m),
+    Err(e)                        => eprintln!("Erro: {}", e),
+}
+```
+
+| Variante | Quando ocorre |
+|---|---|
+| `Certificado` | Falha ao abrir o `.pfx` ou senha incorreta |
+| `Xml` | Erro de parsing ou serialização XML |
+| `Assinatura` | Falha na assinatura digital RSA-SHA1 |
+| `Webservice` | Erro HTTP ou resposta inesperada da SEFAZ |
+| `Validacao` | Campo obrigatório ausente ou fora das regras XSD |
+| `Configuracao` | Falha ao ler configuração ou credenciais |
+| `Io` | Erro de leitura/escrita em disco |
+
+---
+
+## Tipos de ICMS suportados
+
+| Variante | CST/CSOSN | Regime | Construtor |
+|---|---|---|---|
+| `Icms00` | 00 | Normal CRT=3 | `Icms::icms00(orig, mod_bc, v_bc, p_icms, v_icms)` |
+| `Icms10` | 10 | Normal CRT=3 | `Icms::icms10(orig, mod_bc, v_bc, p_icms, v_icms, mod_bcst, p_mvast, v_bcst, p_icmsst, v_icmsst)` |
+| `Icms20` | 20 | Normal CRT=3 | `Icms::icms20(orig, mod_bc, p_red_bc, v_bc, p_icms, v_icms)` |
+| `Icms30` | 30 | Normal CRT=3 | `Icms::icms30(orig, mod_bcst, p_mvast, v_bcst, p_icmsst, v_icmsst)` |
+| `Icms40` | 40/41/50 | Normal CRT=3 | `Icms::icms40(orig, cst)` |
+| `Icms51` | 51 | Normal CRT=3 | `Icms::icms51(orig)` + campos via struct literal |
+| `Icms60` | 60 | Normal CRT=3 | `Icms::icms60(orig)` |
+| `Icms70` | 70 | Normal CRT=3 | `Icms::icms70(orig, mod_bc, v_bc, p_icms, v_icms, mod_bcst, p_mvast, v_bcst, p_icmsst, v_icmsst)` |
+| `Icms90` | 90 | Normal CRT=3 | `Icms::icms90(orig)` + campos opcionais via struct literal |
+| `Sn101` | CSOSN 101 | Simples CRT=1 | `Icms::sn101(orig, p_cred_sn, v_cred_icmssn)` |
+| `Sn102` | CSOSN 102/103/300/400 | Simples CRT=1 | `Icms::sn102(orig, csosn)` |
+| `Sn500` | CSOSN 500 | Simples CRT=1 | `Icms::sn500(orig)` |
+| `Sn900` | CSOSN 900 | Simples CRT=1 | `Icms::sn900(orig)` + campos opcionais via struct literal |
+
+### IPI por item
+
+```rust
+use dfe::tipos::Ipi;
+
+// CST 50 — saída tributada por alíquota ad valorem
+ipi: Some(Ipi::tributado("999", v_bc, p_ipi, v_ipi))
+
+// CST 53 — saída não tributada
+ipi: Some(Ipi::nao_tributado("999", "53"))
+```
+
+### PIS / COFINS
+
+```rust
+use dfe::tipos::{Pis, Cofins};
+
+// CST 01/02 — alíquota
+Pis::Aliq { cst, v_bc, p_pis, v_pis }
+
+// CST 03 — por quantidade
+Pis::Qtde { cst, q_bc_prod, v_aliq_prod, v_pis }
+
+// CST 04-09 — não tributado
+Pis::Nt { cst }
+
+// CST 05 — substituição tributária
+Pis::St { v_bc: Some(100.0), p_pis: Some(0.65), q_bc_prod: None, v_aliq_prod: None, v_pis: 0.65 }
+
+// CST 99 — outros (zeros automáticos)
+Pis::Outr
+```
+
+---
+
+## Validação de CNPJ / CPF
+
+```rust
+use dfe::{validate_cnpj, validate_cpf};
+
+assert!(validate_cnpj("11.222.333/0001-81"));
+assert!(validate_cnpj("11222333000181"));
+
+assert!(validate_cpf("529.982.247-25"));
+assert!(validate_cpf("52998224725"));
+```
 
 ---
 
@@ -419,9 +617,7 @@ Os testes estão em `src/bin/tests/` e cobrem:
 | XML Extractor | `test_xml_extractor.rs` | Parsing de `nfeProc` a partir de string e arquivo |
 | Integração | `mod.rs` | Status SEFAZ, emissão NF-e/NFC-e, cancelamento, DANFE¹ |
 
-¹ Os testes de integração (`test_emit_nfe`, `test_emit_nfce`, `test_cancelar_nfe`, `test_service_status`) requerem certificado `.pfx` válido e conectividade com a SEFAZ em homologação.
-
-Os testes de DANFE e XML não requerem certificado nem conexão.
+¹ Os testes de integração requerem certificado `.pfx` válido e conectividade com a SEFAZ em homologação.
 
 ---
 
@@ -429,146 +625,25 @@ Os testes de DANFE e XML não requerem certificado nem conexão.
 
 - Sempre teste em **homologação** (`tp_amb: 2`) antes de produção.
 - O certificado `.pfx` é lido do disco a cada operação — nunca cacheado em memória.
-- Os webservices cobertos são da **SEFAZ/SP** e do **Ambiente Nacional**. Para outras UFs, contribua adicionando URLs em `interno/ws.rs`.
 - Em `tp_amb = 2`, o campo `x_prod` do **primeiro item** é substituído automaticamente por `"NOTA FISCAL EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL"` (exigência SEFAZ).
+- Os webservices cobertos são da **SEFAZ/SP** e do **Ambiente Nacional**. Para outras UFs, contribua adicionando URLs em `interno/ws.rs`.
 
 ---
 
 ## Roadmap
 
-### Regras tributárias — implementações pendentes
-
-Atualmente o `NFeBuilder` suporta os principais grupos de ICMS, PIS e COFINS. Os itens abaixo estão planejados para as próximas versões:
-
-| Item | Status | Descrição |
-|---|:---:|---|
-| `ICMS10` — ST parcial | 🔜 | ICMS próprio + Substituição Tributária com MVA |
-| `ICMS20` — Redução de BC | 🔜 | Base de cálculo reduzida (CRT 3) |
-| `ICMS30` — Isenta + ST | 🔜 | Isenta/NT para o emitente com ST para o destinatário |
-| `ICMS51` — Diferimento | 🔜 | Diferimento total ou parcial |
-| `ICMS70` — BC reduzida + ST | 🔜 | Redução de BC combinada com Substituição Tributária |
-| `ICMS90` completo | 🔜 | Suporte a todos os campos opcionais (FCP, DIFAL) |
-| `Sn900` completo | 🔜 | CSOSN 900 com todos os campos opcionais |
-| **DIFAL / ICMS interestadual** | 🔜 | `v_icms_uf_dest`, `v_icms_uf_remet`, `v_fcpuf_dest` |
-| **IPI** por item | 🔜 | Campos `vIPI`, `pIPI`, `cEnq`, `cSelo` no `Det` |
-| **PIS/COFINS ST** | 🔜 | CST 05 — ST retida na cadeia |
-| **IBS / CBS** | 🔜 | Reforma tributária — campos opcionais já mapeados |
-| Validação de CNPJ/CPF | 🔜 | Verificação de dígito verificador antes da transmissão |
-| Contingência (EPEC / FS-DA) | 🔜 | Emissão offline com posterior transmissão |
-
----
-
-### ESC/POS — Suporte a impressoras térmicas
-
-Implementação planejada de um builder fluente para geração de comandos **ESC/POS** (Epson Standard Code for Printers), padrão universal de impressoras térmicas de cupom.
-
-#### API planejada — layout personalizado
-
-```rust
-use dfe::escpos::EscPosBuilder;
-
-// Layout customizável com comandos ESC/POS
-let bytes = EscPosBuilder::new()
-    .paper_width(80)               // 80mm ou 58mm
-    .align_center()
-    .bold(true)
-    .text("EMPRESA LTDA\n")
-    .bold(false)
-    .align_left()
-    .text("CNPJ: 11.222.333/0001-81\n")
-    .divider()                     // linha separadora "--------------------------------"
-    .text(format!("{:<20} {:>10}\n", "PRODUTO EXEMPLO", "R$  50,00"))
-    .divider()
-    .align_right()
-    .bold(true)
-    .text("TOTAL  R$  50,00\n")
-    .bold(false)
-    .cut()                         // corte do papel
-    .build();                      // → Vec<u8> para enviar à porta serial/USB
-
-// Enviar para impressora (porta serial ou USB)
-std::fs::write("/dev/usb/lp0", &bytes)?;          // Linux
-std::fs::write("\\\\.\\COM3", &bytes)?;            // Windows
-```
-
-#### Comandos planejados
-
-| Método | Descrição |
-|---|---|
-| `.paper_width(mm)` | Define largura do papel (80mm ou 58mm) |
-| `.align_left()` / `.align_center()` / `.align_right()` | Alinhamento do texto |
-| `.bold(bool)` | Negrito |
-| `.underline(bool)` | Sublinhado |
-| `.font_size(u8)` | Tamanho da fonte (1 = normal, 2 = duplo) |
-| `.text(str)` | Insere texto |
-| `.divider()` | Linha separadora proporcional à largura do papel |
-| `.barcode_128(str)` | Code 128 nativo ESC/POS |
-| `.qr_code(str, size)` | QR Code nativo ESC/POS |
-| `.image(bytes)` | Imagem rasterizada (logo) |
-| `.feed(n)` | Avança `n` linhas |
-| `.cut()` | Corte total do papel |
-| `.partial_cut()` | Corte parcial |
-| `.build()` | Retorna `Vec<u8>` com os comandos ESC/POS |
-
----
-
-### ESC/POS — Impressão de NFC-e (modelo 65)
-
-Impressão direta de cupom fiscal NFC-e em impressoras térmicas, sem geração de PDF.
-
-#### 80mm — planejado
-
-```rust
-use dfe::escpos::NfceEscPos;
-
-let bytes = NfceEscPos::new()
-    .xml("<nfeProc>...</nfeProc>")   // XML autorizado
-    .paper_width(80)
-    .logo("./logo.png")              // opcional
-    .build()
-    .await?;                         // → Vec<u8> prontos para envio
-
-std::fs::write("\\\\.\\COM3", &bytes)?;
-```
-
-#### 58mm — planejado
-
-```rust
-let bytes = NfceEscPos::new()
-    .xml("<nfeProc>...</nfeProc>")
-    .paper_width(58)
-    .build()
-    .await?;
-```
-
-#### Layout planejado do cupom NFC-e ESC/POS
-
-```
-         NOME DO EMITENTE
-  CNPJ: XX.XXX.XXX/XXXX-XX  IE: XXXXXXXX
-  End.: Rua Exemplo, 100 - Centro - SP
-─────────────────────────────────────────
-CUPOM FISCAL ELETRÔNICO - SAT/NFC-e
-─────────────────────────────────────────
- #  DESCRIÇÃO            QTD   VL UNIT  TOTAL
- 1  PRODUTO EXEMPLO      2,00    50,00 100,00
-─────────────────────────────────────────
-                    TOTAL R$      100,00
-DINHEIRO                          100,00
-─────────────────────────────────────────
-CHAVE: 3524 0509 4914 3500 ...
-[BARCODE 128]
-[QR CODE]
-─────────────────────────────────────────
-Protocolo: 135262060475222 27/05/2026
-Consulte em portalnfce.fazenda.sp.gov.br
-```
-
-| Formato | Status |
+| Item | Status |
 |---|:---:|
-| NFC-e ESC/POS 80mm | 🔜 planejado |
-| NFC-e ESC/POS 58mm | 🔜 planejado |
-| Layout customizável (`EscPosBuilder`) | 🔜 planejado |
+| `ICMS10/20/30/51/70` | ✅ |
+| `ICMS90` / `Sn900` completos | ✅ |
+| **DIFAL** (`v_icms_uf_dest`, `v_icms_uf_remet`) | ✅ |
+| **IPI** por item (`Det.ipi`) | ✅ |
+| **PIS/COFINS ST** (CST 05) | ✅ |
+| **IBS / CBS** (reforma tributária) | ✅ |
+| Validação de CNPJ/CPF | ✅ |
+| ESC/POS `EscPosBuilder` | ✅ |
+| ESC/POS `EscPosNFCeBuilder` | ✅ |
+| Contingência (EPEC / FS-DA) | 🔜 |
 
 ---
 

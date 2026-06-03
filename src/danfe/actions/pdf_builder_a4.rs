@@ -1017,7 +1017,14 @@ pub fn build_pdf_a4(
     let footer_y = prot_top - H_PROT / 2.0 - 0.5;
     let footer_msg = "Gerado com dfe crate \u{2022} https://crates.io/crates/dfe";
     let footer_w = estimate_text_width(footer_msg, FS_SM);
-    t(&layer, &font, M + (BODY_W - footer_w) / 2.0, footer_y, FS_SM, footer_msg);
+    t(
+        &layer,
+        &font,
+        M + (BODY_W - footer_w) / 2.0,
+        footer_y,
+        FS_SM,
+        footer_msg,
+    );
 
     let _ = y;
 
@@ -1039,8 +1046,7 @@ fn embed_logo(
     max_h: f32,
 ) -> Result<f32, String> {
     // Usa caminho absoluto para evitar ambiguidade com o re-export do printpdf
-    let img = ::image::load_from_memory(bytes)
-        .map_err(|e| format!("Logo inválido: {}", e))?;
+    let img = ::image::load_from_memory(bytes).map_err(|e| format!("Logo inválido: {}", e))?;
 
     let (img_w, img_h) = (img.width(), img.height());
     if img_w == 0 || img_h == 0 {
@@ -1264,7 +1270,6 @@ fn wrap_text_by_width(text: &str, max_w: f32, size: f32) -> Vec<String> {
             // Palavra é longa demais — quebra por caractere
             if !current.is_empty() {
                 lines.push(current);
-                current = String::new();
             }
             let mut buf = String::new();
             for ch in word.chars() {
