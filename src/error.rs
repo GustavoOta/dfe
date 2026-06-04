@@ -44,11 +44,6 @@ impl From<std::io::Error> for DfeError {
     }
 }
 
-impl From<openssl::error::ErrorStack> for DfeError {
-    fn from(e: openssl::error::ErrorStack) -> Self {
-        DfeError::Assinatura(e.to_string())
-    }
-}
 
 impl From<reqwest::Error> for DfeError {
     fn from(e: reqwest::Error) -> Self {

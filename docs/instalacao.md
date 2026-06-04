@@ -9,48 +9,17 @@ dfe = "0.5.8"
 
 ---
 
-## OpenSSL — compilação a partir do código-fonte (`vendored`)
+## Plataformas suportadas
 
-Esta crate depende do `openssl` com `features = ["vendored"]`. O OpenSSL **não precisa estar instalado no sistema** — ele é baixado e compilado automaticamente durante o `cargo build`. A primeira compilação leva alguns minutos a mais.
+### Windows ✅
 
-O sistema de build do OpenSSL é escrito em Perl, então **o Perl deve estar instalado e acessível no `PATH`** antes de compilar. Sem ele, o build falha com:
+As operações com certificado digital (abertura do `.pfx`, assinatura RSA-SHA1 e extração de dados) são realizadas via **Windows CryptoAPI (CAPI)** usando a crate `windows-sys`. Não há dependência de OpenSSL — o build é mais rápido e o binário não carrega nenhuma biblioteca criptográfica de terceiros.
 
-```
-Could not find perl
-```
+O CAPI suporta nativamente os algoritmos legados dos certificados ICP-Brasil (RC2-40-CBC, 3DES), independentemente da versão do Windows. O certificado **não precisa estar instalado** no repositório de certificados do sistema — ele é carregado em memória a partir do arquivo `.pfx` e descartado ao final de cada operação.
 
-### Windows
+### Linux / macOS 🔜
 
-Instale o [Strawberry Perl](https://strawberryperl.com) (recomendado — inclui compilador C e ferramentas Unix necessárias):
-
-1. Baixe o instalador `.msi` em <https://strawberryperl.com>
-2. Execute o instalador (o PATH é atualizado automaticamente)
-3. Abra um novo terminal e confirme: `perl -v`
-4. Execute `cargo build` normalmente
-
-> O Strawberry Perl já vem com `dmake` e `gcc`, o que evita dependência do MSVC ou do Visual Studio Build Tools.
-
-### Linux
-
-O Perl geralmente já está disponível. Verifique:
-
-```bash
-perl -v
-```
-
-Se não estiver instalado:
-
-```bash
-# Debian/Ubuntu
-sudo apt-get install perl
-
-# Fedora/RHEL
-sudo dnf install perl
-```
-
-### macOS
-
-O Perl já vem pré-instalado com o macOS. Nenhuma ação necessária.
+Ainda não suportado. As funções de certificado retornam erro em plataformas não-Windows. Ver [roadmap](notas-roadmap.md).
 
 ---
 

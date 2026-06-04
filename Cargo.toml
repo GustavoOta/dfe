@@ -34,7 +34,6 @@ chrono = "0.4.38"
 chrono-tz = "0.10.0"
 hex = "0.4.3"
 libxml = "=0.3.3"
-openssl = { version = "0.10.68", features = ["vendored"] }
 quick-xml = { version = "0.37.1", features = ["encoding", "serialize"] }
 rand = "0.8.5"
 regex = "1.11.1"

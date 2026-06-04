@@ -21,3 +21,4 @@
 | ESC/POS `EscPosBuilder` | ✅ |
 | ESC/POS `EscPosNFCeBuilder` | ✅ |
 | Contingência (EPEC / FS-DA) | 🔜 |
+| **Suporte Linux / macOS** — reimplementar assinatura e extração de certificado sem CAPI (OpenSSL com provider legacy do sistema ou biblioteca puro-Rust com suporte a 3DES) | 🔜 |

@@ -29,7 +29,7 @@
 
 | Seção | Descrição |
 |---|---|
-| [Instalação](docs/instalacao.md) | Dependências de build (OpenSSL, libxml2/vcpkg), linking estático no Windows |
+| [Instalação](docs/instalacao.md) | Plataformas suportadas, libxml2/vcpkg (linking estático no Windows) |
 | [Emissão NF-e / NFC-e](docs/emissao-nfe-nfce.md) | `NFeBuilder`, métodos, totais automáticos |
 | [Cancelamento](docs/cancelamento.md) | `CancelarBuilder` |
 | [Manifestação do Destinatário](docs/manifestacao.md) | Ciência, confirmação, desconhecimento, op. não realizada |
@@ -51,7 +51,7 @@
 dfe = "0.5.8"
 ```
 
-> **Windows:** antes de compilar, leia [docs/instalacao.md](docs/instalacao.md) — são necessários Strawberry Perl (OpenSSL) e vcpkg (libxml2 estático).
+> **Windows:** antes de compilar, leia [docs/instalacao.md](docs/instalacao.md) — é necessário configurar o vcpkg para linking estático do `libxml2`. OpenSSL não é mais uma dependência.
 
 ---
 

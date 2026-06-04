@@ -1,6 +1,5 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 use crate::error::{DfeError, Result};
-use openssl::x509::X509;
 use sha1::{Digest, Sha1};
 use std::fs::File;
 use std::io::Read;
@@ -49,17 +48,11 @@ impl RawPubKey {
         file.read_to_end(&mut der)?;
 
         // Windows CAPI: abre o PFX suportando RC2/3DES dos certificados ICP-Brasil
-        // X509::from_der não usa algoritmos legados — só lê ASN.1
+        // PEM = base64(DER), então encodificamos diretamente sem passar pelo OpenSSL
         let cert_der = pfx_capi_extract_cert_der(&der, password)
             .map_err(|e| DfeError::Certificado(format!("Erro ao extrair certificado: {}", e)))?;
 
-        let cert = X509::from_der(&cert_der)?;
-        let cert = cert.to_pem()?;
-        let cert = String::from_utf8(cert)?;
-        let cert = cert.replace("-----BEGIN CERTIFICATE-----", "");
-        let cert = cert.replace("-----END CERTIFICATE-----", "");
-        let cert = cert.replace("\n", "");
-        Ok(cert)
+        Ok(STANDARD.encode(&cert_der))
     }
 }
 
