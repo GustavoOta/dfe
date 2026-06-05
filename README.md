@@ -48,7 +48,7 @@
 
 ```toml
 [dependencies]
-dfe = "0.5.8"
+dfe = "0.5.9"
 ```
 
 > **Windows:** antes de compilar, leia [docs/instalacao.md](docs/instalacao.md) — é necessário configurar o vcpkg para linking estático do `libxml2`. OpenSSL não é mais uma dependência.

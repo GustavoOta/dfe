@@ -2,7 +2,7 @@ mod commands;
 pub mod nfce;
 pub use nfce::EscPosNFCeBuilder;
 
-use image::{io::Reader as ImageReader, DynamicImage, GenericImageView};
+use image::{io::Reader as ImageReader, DynamicImage, GenericImageView, GrayImage, Luma};
 use std::io::Cursor;
 
 /// Builder fluente para geração de comandos **ESC/POS** (Epson Standard Code for Printers).
@@ -33,6 +33,9 @@ use std::io::Cursor;
 pub struct EscPosBuilder {
     buffer: Vec<u8>,
     paper_width: u8,
+    /// Largura imprimível real em dots nativos da impressora.
+    /// 576 = padrão 80 mm / 203 DPI. Use [`printable_dots`](Self::printable_dots) para ajustar.
+    paper_dots: u32,
 }
 
 impl EscPosBuilder {
@@ -41,15 +44,38 @@ impl EscPosBuilder {
         let mut s = Self {
             buffer: Vec::new(),
             paper_width: 80,
+            paper_dots: 576,
         };
         s.buffer.extend_from_slice(commands::INIT);
+        s.buffer.extend_from_slice(&[0x1B, 0x74, 0x02]); // ESC t 2 = CP850
         s
     }
 
     /// Define a largura do papel em milímetros. Use `80` ou `58`. Padrão: `80`.
-    /// Afeta a largura de [`divider`](Self::divider).
+    /// Afeta a largura de [`divider`](Self::divider) e o padrão de [`paper_dots`](Self::printable_dots).
     pub fn paper_width(mut self, mm: u8) -> Self {
         self.paper_width = mm;
+        self.paper_dots = if mm >= 80 { 576 } else { 384 };
+        self
+    }
+
+    /// Define a resolução nativa da impressora em DPI.
+    ///
+    /// Calcula automaticamente `printable_dots` = largura imprimível × DPI / 25,4.
+    /// Use `203` para impressoras padrão ESC/POS · `300` para alta resolução.
+    /// Deve ser chamado **após** [`paper_width`](Self::paper_width).
+    pub fn printer_dpi(mut self, dpi: u32) -> Self {
+        let printable_mm: f32 = if self.paper_width >= 80 { 72.0 } else { 48.0 };
+        self.paper_dots = (printable_mm * dpi as f32 / 25.4).round() as u32;
+        self
+    }
+
+    /// Define a largura imprimível real da impressora em dots nativos.
+    ///
+    /// Alternativa manual a [`printer_dpi`](Self::printer_dpi).
+    /// Padrão: `576` (80 mm · 203 DPI). Para 300 DPI / 80 mm: `850`.
+    pub fn printable_dots(mut self, dots: u32) -> Self {
+        self.paper_dots = dots;
         self
     }
 
@@ -93,9 +119,34 @@ impl EscPosBuilder {
         self
     }
 
+    /// Escala somente a **altura** do caractere, mantendo a largura em 1×.
+    /// Útil para texto em destaque sem reduzir o número de colunas por linha.
+    /// 1 = normal · 2 = altura dupla · 3 = altura tripla (máx 8).
+    pub fn font_height(mut self, size: u8) -> Self {
+        let h = size.saturating_sub(1).min(7);
+        let byte = h << 4; // nibble superior = altura, nibble inferior = 0 (1× largura)
+        self.buffer.extend_from_slice(&[0x1D, 0x21, byte]);
+        self
+    }
+
+    /// Define o espaçamento entre linhas em pontos gráficos (`ESC 3 n`).
+    /// Valor padrão típico da impressora é ~30 pontos.
+    /// Use valores pequenos (2–8) ao redor de separadores para reduzir o espaço vertical.
+    pub fn line_spacing(mut self, dots: u8) -> Self {
+        self.buffer.extend_from_slice(&[0x1B, 0x33, dots]);
+        self
+    }
+
+    /// Restaura o espaçamento entre linhas ao padrão da impressora (`ESC 2`).
+    pub fn line_spacing_default(mut self) -> Self {
+        self.buffer.extend_from_slice(&[0x1B, 0x32]);
+        self
+    }
+
     /// Insere texto na posição atual. Use `\n` para quebra de linha.
+    /// O texto é convertido automaticamente para CP850, permitindo caracteres PT-BR.
     pub fn text(mut self, s: impl AsRef<str>) -> Self {
-        self.buffer.extend_from_slice(s.as_ref().as_bytes());
+        self.buffer.extend_from_slice(&encode_cp850(s.as_ref()));
         self
     }
 
@@ -109,24 +160,67 @@ impl EscPosBuilder {
         self
     }
 
+    /// Seleciona fonte B (`ESC M 1`), menor e mais condensada que a fonte A padrão.
+    /// Restaure com `font_b(false)` (`ESC M 0`).
+    pub fn font_b(mut self, on: bool) -> Self {
+        self.buffer.extend_from_slice(&[0x1B, 0x4D, if on { 1 } else { 0 }]);
+        self
+    }
+
     /// Avança n linhas (ESC d n)
     pub fn feed(mut self, lines: u8) -> Self {
         self.buffer.extend_from_slice(&[0x1B, 0x64, lines]);
         self
     }
 
-    /// Código de barras Code 128 nativo ESC/POS (GS k 73)
+    /// Código de barras Code 128 renderizado como **imagem raster** (`GS v 0`).
+    ///
+    /// Usa `barcoders` para calcular os módulos, constrói um `GrayImage` via crate `image`
+    /// e envia pelo mesmo pipeline de `rasterize()` usado por [`image`](Self::image).
+    ///
+    /// - Dados só-dígitos de comprimento par → Code 128C (2 dígitos/símbolo, máxima densidade)
+    /// - Outros dados → Code 128B (ASCII imprimível)
+    /// - Altura: 80 px · Largura de módulo: 2 px
     pub fn barcode_128(mut self, data: &str) -> Self {
-        let bytes = data.as_bytes();
-        self.buffer.extend_from_slice(&[0x1D, 0x6B, 0x49]);
-        self.buffer.push(bytes.len() as u8);
-        self.buffer.extend_from_slice(bytes);
+        use barcoders::sym::code128::Code128;
+
+        let is_numeric_even = data.chars().all(|c| c.is_ascii_digit()) && data.len() % 2 == 0;
+        // \u{0106} = Ć = Start-C (pares de dígitos) · \u{0105} = ą = Start-B (ASCII)
+        let code_data = if is_numeric_even {
+            format!("\u{0106}{data}")
+        } else {
+            format!("\u{0105}{data}")
+        };
+
+        let encoded = match Code128::new(&code_data) {
+            Ok(b) => b.encode(),
+            Err(_) => return self,
+        };
+
+        let module_width: u32 = 2;
+        let bar_height: u32 = 80;
+        let total_width: u32 = encoded.len() as u32 * module_width;
+
+        let mut img = GrayImage::new(total_width, bar_height);
+        for (idx, &bar) in encoded.iter().enumerate() {
+            let luma = if bar == 1 { 0u8 } else { 255u8 };
+            for dx in 0..module_width {
+                let x = idx as u32 * module_width + dx;
+                for y in 0..bar_height {
+                    img.put_pixel(x, y, Luma([luma]));
+                }
+            }
+        }
+
+        let raster = rasterize(&DynamicImage::ImageLuma8(img), self.paper_width);
+        self.buffer.extend_from_slice(&raster);
+        self.buffer.push(b'\n');
         self
     }
 
     /// QR Code nativo ESC/POS via sequência GS ( k
     pub fn qr_code(mut self, data: &str, size: u8) -> Self {
-        let model: u8 = 2; // model 2 (padrão QR)
+        let model: u8 = 50; // ESC/POS: 49=Model1, 50=Model2 (padrão), 51=MicroQR
         let size = size.clamp(1, 16);
         let data_bytes = data.as_bytes();
         let data_len = data_bytes.len() as u16 + 3;
@@ -165,6 +259,16 @@ impl EscPosBuilder {
         self
     }
 
+    /// Abre a gaveta de dinheiro (`ESC p`).
+    ///
+    /// `pin` seleciona o pino de acionamento: `2` (pino 2, padrão da maioria das gavetas)
+    /// ou `5` (pino 5). Qualquer outro valor usa o pino 2.
+    pub fn open_drawer(mut self, pin: u8) -> Self {
+        let cmd = if pin == 5 { commands::CASH_DRAWER_PIN5 } else { commands::CASH_DRAWER_PIN2 };
+        self.buffer.extend_from_slice(cmd);
+        self
+    }
+
     /// Corte total do papel (`GS V 0`).
     pub fn cut(mut self) -> Self {
         self.buffer.extend_from_slice(commands::CUT_FULL);
@@ -190,12 +294,142 @@ impl EscPosBuilder {
     pub fn build(self) -> Vec<u8> {
         self.buffer
     }
+
+    /// QR Code à esquerda e texto à direita como **imagem raster `GS v 0`**.
+    ///
+    /// Abordagem 100 % compatível com qualquer impressora ESC/POS.
+    /// O QR ocupa ~55 % de [`printable_dots`](Self::printable_dots) e é sempre quadrado.
+    /// O texto usa font8x8 em escala **2×** (cada pixel = bloco 2×2, ~2 mm por caractere).
+    /// Cada entrada é `(texto, negrito)` — linhas negrito são desenhadas duas vezes
+    /// com 1 px de deslocamento horizontal para simular espessura extra.
+    pub fn qr_with_text_right(mut self, qr_data: &str, lines: &[(String, bool)]) -> Self {
+        use font8x8::UnicodeFonts;
+        use qrcodegen::{QrCode, QrCodeEcc};
+
+        let qr = match QrCode::encode_text(qr_data, QrCodeEcc::Medium) {
+            Ok(q) => q,
+            Err(_) => return self,
+        };
+
+        let qr_modules = qr.size() as u32;
+        let quiet = 4u32;
+        let total_mod = qr_modules + quiet * 2;
+
+        let paper_dots = self.paper_dots;
+        let max_qr_w = paper_dots * 55 / 100;
+        let scale = (max_qr_w / total_mod).max(2);
+        let qr_px = total_mod * scale; // quadrado: qr_px × qr_px
+
+        const S: u32 = 2;              // font scale: cada pixel vira bloco S×S
+        const FONT_W: u32 = 8 * S;    // 16 px por caractere
+        const FONT_H: u32 = 8 * S;    // 16 px por caractere
+        const LINE_H: u32 = FONT_H + 4; // 20 px por linha
+
+        const GAP: u32 = 8;
+        let text_x = qr_px + GAP;
+        let img_h = qr_px.max(lines.len() as u32 * LINE_H).max(1);
+        let mut img = GrayImage::from_pixel(paper_dots, img_h, Luma([255u8]));
+
+        // ── QR Code (sempre quadrado) ─────────────────────────────────────────
+        for my in 0..qr_modules {
+            for mx in 0..qr_modules {
+                if qr.get_module(mx as i32, my as i32) {
+                    let px0 = (quiet + mx) * scale;
+                    let py0 = (quiet + my) * scale;
+                    for dy in 0..scale {
+                        for dx in 0..scale {
+                            let x = px0 + dx;
+                            let y = py0 + dy;
+                            if x < paper_dots && y < img_h {
+                                img.put_pixel(x, y, Luma([0u8]));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Texto à direita (font8x8, escala 2×) ─────────────────────────────
+        let draw_glyph = |img: &mut GrayImage, cx: u32, y0: u32, glyph: [u8; 8], offset_x: u32| {
+            for (row, &byte) in glyph.iter().enumerate() {
+                for sy in 0..S {
+                    let y = y0 + row as u32 * S + sy;
+                    if y >= img_h { break; }
+                    for bit in 0..8u32 {
+                        if byte & (1u8 << bit) != 0 {
+                            for sx in 0..S {
+                                let x = cx + offset_x + bit * S + sx;
+                                if x < paper_dots {
+                                    img.put_pixel(x, y, Luma([0u8]));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        for (li, (line, bold)) in lines.iter().enumerate() {
+            let y0 = li as u32 * LINE_H;
+            let mut cx = text_x;
+            for ch in line.chars() {
+                if cx + FONT_W > paper_dots { break; }
+                let glyph = font8x8::BASIC_FONTS
+                    .get(ch)
+                    .or_else(|| font8x8::LATIN_FONTS.get(ch))
+                    .unwrap_or([0u8; 8]);
+                draw_glyph(&mut img, cx, y0, glyph, 0);
+                if *bold {
+                    draw_glyph(&mut img, cx, y0, glyph, 1);
+                }
+                cx += FONT_W;
+            }
+        }
+
+        // rasterize() via DynamicImage garante orientação correta (caminho comprovado)
+        let raster = rasterize(&DynamicImage::ImageLuma8(img), self.paper_width);
+        self.buffer.extend_from_slice(&raster);
+
+        self
+    }
 }
 
 impl Default for EscPosBuilder {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Converte uma string UTF-8 para bytes CP850 (code page da impressora).
+/// Caracteres ASCII passam direto; os demais são mapeados para o equivalente CP850.
+fn encode_cp850(s: &str) -> Vec<u8> {
+    s.chars().map(|c| {
+        if c.is_ascii() { return c as u8; }
+        match c {
+            'Ç' => 0x80, 'ü' => 0x81, 'é' => 0x82, 'â' => 0x83,
+            'ä' => 0x84, 'à' => 0x85, 'å' => 0x86, 'ç' => 0x87,
+            'ê' => 0x88, 'ë' => 0x89, 'è' => 0x8A, 'ï' => 0x8B,
+            'î' => 0x8C, 'ì' => 0x8D, 'Ä' => 0x8E, 'Å' => 0x8F,
+            'É' => 0x90, 'æ' => 0x91, 'Æ' => 0x92, 'ô' => 0x93,
+            'ö' => 0x94, 'ò' => 0x95, 'û' => 0x96, 'ù' => 0x97,
+            'ÿ' => 0x98, 'Ö' => 0x99, 'Ü' => 0x9A, 'ø' => 0x9B,
+            '£' => 0x9C, 'Ø' => 0x9D, 'á' => 0xA0, 'í' => 0xA1,
+            'ó' => 0xA2, 'ú' => 0xA3, 'ñ' => 0xA4, 'Ñ' => 0xA5,
+            'ª' => 0xA6, 'º' => 0xA7, '¿' => 0xA8, '®' => 0xA9,
+            '½' => 0xAB, '¼' => 0xAC, '«' => 0xAE, '»' => 0xAF,
+            'Á' => 0xB5, 'Â' => 0xB6, 'À' => 0xB7, '©' => 0xB8,
+            '¢' => 0xBD, 'ã' => 0xC6, 'Ã' => 0xC7, 'ð' => 0xD0,
+            'Ð' => 0xD1, 'Ê' => 0xD2, 'Ë' => 0xD3, 'È' => 0xD4,
+            'Í' => 0xD6, 'Î' => 0xD7, 'Ï' => 0xD8, 'Ì' => 0xDE,
+            'Ó' => 0xE0, 'ß' => 0xE1, 'Ô' => 0xE2, 'Ò' => 0xE3,
+            'õ' => 0xE4, 'Õ' => 0xE5, 'µ' => 0xE6, 'Ú' => 0xE9,
+            'Û' => 0xEA, 'Ù' => 0xEB, 'ý' => 0xEC, 'Ý' => 0xED,
+            '°' => 0xF8, '±' => 0xF1, '¶' => 0xF4, '§' => 0xF5,
+            '÷' => 0xF6, '¸' => 0xF7, '¨' => 0xF9, '²' => 0xFD,
+            '³' => 0xFC, '¹' => 0xFB, '·' => 0xFA,
+            _ => b'?',
+        }
+    }).collect()
 }
 
 /// Converte uma imagem para o formato GS v 0 (bitmap 1-bit, MSB primeiro).
@@ -286,8 +520,8 @@ mod tests {
     fn barcode_128_encodes_data() {
         let data = "12345678";
         let bytes = EscPosBuilder::new().barcode_128(data).build();
-        // GS k 0x49 + len + data
-        let pos = bytes.windows(3).position(|w| w == [0x1D, 0x6B, 0x49]).unwrap();
-        assert_eq!(bytes[pos + 3], data.len() as u8);
+        // GS v 0 raster header
+        let pos = bytes.windows(4).position(|w| w == [0x1D, 0x76, 0x30, 0x00]).unwrap();
+        assert!(bytes.len() > pos + 8);
     }
 }
