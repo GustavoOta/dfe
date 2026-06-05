@@ -11,6 +11,10 @@ categories = ["api-bindings", "parsing"]
 homepage = "https://github.com/GustavoOta/dfe"
 repository = "https://github.com/GustavoOta/dfe"
 
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+rustdoc-args = ["--cfg", "docsrs"]
+
 exclude = [
     "dfe/manuais_sefaz/*",
     "dfe/shema/*",
@@ -30,26 +34,26 @@ debug = false
 
 [dependencies]
 base64 = "0.22.1"
+barcoders = "2.0.0"
 chrono = "0.4.38"
 chrono-tz = "0.10.0"
+flate2 = "1.0"
+font8x8 = "0.2"
 hex = "0.4.3"
+image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
 libxml = "=0.3.3"
+printpdf = "0.7.0"
 quick-xml = { version = "0.37.1", features = ["encoding", "serialize"] }
+qrcodegen = "1.8"
 rand = "0.8.5"
 regex = "1.11.1"
 reqwest = { version = "0.12.9", features = ["native-tls", "json", "gzip", "blocking"] }
 rust_decimal = "1.38.0"
-
-[target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_Graphics_Printing", "Win32_Graphics_Gdi"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = "1.0.133"
 sha1 = "0.10.6"
 sha2 = "0.10.8"
 tokio = { version = "1.41.1", features = ["full"] }
-printpdf = "0.7.0"
-image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
-barcoders = "2.0.0"
-flate2 = "1.0"
-qrcodegen = "1.8"
-font8x8 = "0.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_Graphics_Printing", "Win32_Graphics_Gdi"] }
