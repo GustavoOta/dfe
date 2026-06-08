@@ -11,7 +11,7 @@ const SPACING_DIVIDER: u8 = 4;
 ///
 /// Aceita XML como caminho de arquivo (`.xml`) ou string direta.
 /// Suporta papel 80 mm e 58 mm e dois posicionamentos de QR Code.
-/// Em ambientes Windows, o método [`print`](Self::print) envia os bytes
+/// Em ambientes Windows, o método `print` envia os bytes
 /// diretamente à impressora via job RAW sem diálogo.
 ///
 /// # Exemplo
@@ -103,7 +103,7 @@ impl EscPosNFCeBuilder {
     ///
     /// # Erros
     ///
-    /// Retorna [`DfeError`](crate::DfeError) se o XML for inválido, o arquivo não existir
+    /// Retorna [`DfeError`] se o XML for inválido, o arquivo não existir
     /// ou o documento não for NFC-e (modelo 65).
     pub fn build(self) -> Result<Vec<u8>> {
         let params = self.extract_params()?;
@@ -115,6 +115,7 @@ impl EscPosNFCeBuilder {
     /// Disponível apenas em **Windows** (`cfg(windows)`).
     /// Retorna erro se o nome da impressora não foi informado ou se o job falhar.
     #[cfg(target_os = "windows")]
+    #[cfg_attr(docsrs, doc(cfg(target_os = "windows")))]
     pub fn print(self) -> Result<()> {
         let printer = self.printer_name.clone();
         if printer.is_empty() {

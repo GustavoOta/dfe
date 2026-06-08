@@ -444,7 +444,7 @@ impl NFeBuilder {
     ///
     /// # Erros
     ///
-    /// Retorna [`DfeError`](crate::DfeError) se algum campo obrigatório estiver ausente,
+    /// Retorna [`DfeError`] se algum campo obrigatório estiver ausente,
     /// a assinatura falhar ou a SEFAZ retornar erro de transmissão.
     pub async fn emitir(self) -> Result<Response> {
         let cert_path  = self.cert_path.ok_or_else(|| DfeError::Configuracao("cert_path não informado".to_string()))?;
