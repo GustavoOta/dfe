@@ -33,6 +33,7 @@ std::fs::write("/dev/usb/lp0", &bytes)?; // Linux — USB
 | `.paper_width(mm)` | Largura do papel: `80` ou `58`. Padrão: `80` |
 | `.printer_dpi(dpi)` | DPI nativo da impressora (`203` padrão, `300` alta resolução) |
 | `.printable_dots(dots)` | Largura imprimível em dots (alternativa ao DPI) |
+| `.columns(n)` | Sobrescreve o número de colunas de texto. Padrão: 48 (80 mm) · 32 (58 mm). EPSON: 48 · Bematech MP-4200 TH: 42 |
 | `.align_left()` / `.align_center()` / `.align_right()` | Alinhamento |
 | `.bold(bool)` | Negrito (`ESC E`) |
 | `.underline(bool)` | Sublinhado (`ESC -`) |
@@ -179,6 +180,40 @@ EscPosNFCeBuilder::new()
 > O nome da impressora deve coincidir exatamente com o exibido em
 > **Painel de Controle → Dispositivos e Impressoras**.
 
+### Impressoras testadas
+
+| Impressora | Papel | Colunas | Observações |
+|---|---|---|---|
+| EPSON TM-T20X | 80 mm | 48 (padrão) | Funciona sem configuração adicional |
+| Bematech MP-4200 TH | 80 mm | 42 | Requer `.columns(42)` |
+
+### Compatibilidade de colunas por modelo de impressora
+
+Impressoras de 80 mm podem diferir no número de colunas imprimíveis.
+Use `.columns(n)` para ajustar quando o cupom tiver texto truncado ou ultrapassar a margem.
+
+| Impressora | Colunas (fonte A, 80 mm) |
+|---|---|
+| EPSON TM-T20X e similares | 48 (padrão) |
+| Bematech MP-4200 TH e similares | 42 |
+
+```rust
+// Bematech MP-4200 TH — 42 colunas
+EscPosNFCeBuilder::new()
+    .xml("nota.xml")
+    .paper_width(80)
+    .columns(42)
+    .printer_name("MP-4200 TH")
+    .print()?;
+
+// EPSON — padrão (48 colunas, .columns() desnecessário)
+EscPosNFCeBuilder::new()
+    .xml("nota.xml")
+    .paper_width(80)
+    .printer_name("EPSON TM-T20 Receipt")
+    .print()?;
+```
+
 ### Referência dos métodos
 
 | Método | Descrição |
@@ -187,6 +222,7 @@ EscPosNFCeBuilder::new()
 | `.paper_width(mm)` | Largura do papel: `80` ou `58`. Padrão: `80` |
 | `.printer_dpi(dpi)` | DPI da impressora para cálculo de escala do QR (`203` padrão, `300` alta resolução) |
 | `.printable_dots(dots)` | Largura imprimível em dots nativos (alternativa ao DPI) |
+| `.columns(n)` | Sobrescreve o número de colunas de texto. Padrão: 48 (80 mm) · 32 (58 mm). EPSON: 48 · Bematech MP-4200 TH: 42 |
 | `.qr_side()` | QR Code à esquerda com informações à direita (imagem raster) |
 | `.printer_name(name)` | Nome da impressora Windows para `.print()` |
 | `.build()` | Gera e retorna `Vec<u8>` |
