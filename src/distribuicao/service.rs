@@ -18,7 +18,8 @@ use std::path::PathBuf;
 
 use super::{
     CienciaOperacao, ConfirmacaoOperacao, Consulta, ConsultaChaveAcesso, ConsultaNSU,
-    DesconhecimentoOperacao, DistribuicaoResposta, ManifestacaoResposta, OperacaoNaoRealizada,
+    DesconhecimentoOperacao, DistribuicaoResposta, FlagDir, ManifestacaoResposta,
+    OperacaoNaoRealizada,
 };
 
 impl Consulta {
@@ -32,7 +33,7 @@ impl Consulta {
     }
 
     pub async fn enviar_soap12_xml(&self, xml: &str) -> Result<DistribuicaoResposta, String> {
-        if self.check_flag.unwrap_or(false) {
+        if self.flag_dir.is_some() {
             self.validar_flag_pendente()?;
         }
 
@@ -131,7 +132,7 @@ impl Consulta {
     }
 
     fn validar_flag_pendente(&self) -> Result<(), String> {
-        let flag_dir = self.flag_dir()?;
+        let flag_dir = self.resolve_flag_dir()?;
 
         if !flag_dir.exists() {
             fs::create_dir_all(&flag_dir).map_err(|e| {
@@ -167,11 +168,11 @@ impl Consulta {
         msg: &str,
         data: Option<&T>,
     ) -> Result<(), String> {
-        if self.check_flag.is_none() {
+        if self.flag_dir.is_none() {
             return Ok(());
         }
 
-        let flag_dir = self.flag_dir()?;
+        let flag_dir = self.resolve_flag_dir()?;
         fs::create_dir_all(&flag_dir).map_err(|e| {
             self.log_and_return_error(format!(
                 "Erro ao criar diretório de flag em {}: {}",
@@ -202,13 +203,18 @@ impl Consulta {
         Ok(())
     }
 
-    fn flag_dir(&self) -> Result<PathBuf, String> {
-        let exe_path = std::env::current_exe()
-            .map_err(|e| format!("Erro ao obter caminho do executável: {}", e))?;
-        let exe_dir = exe_path
-            .parent()
-            .ok_or_else(|| "Erro ao obter diretório do executável".to_string())?;
-        Ok(exe_dir.join("distribuicao-logs").join("flag"))
+    fn resolve_flag_dir(&self) -> Result<PathBuf, String> {
+        match &self.flag_dir {
+            Some(FlagDir::Custom(path)) => Ok(path.clone()),
+            _ => {
+                let exe_path = std::env::current_exe()
+                    .map_err(|e| format!("Erro ao obter caminho do executável: {}", e))?;
+                let exe_dir = exe_path
+                    .parent()
+                    .ok_or_else(|| "Erro ao obter diretório do executável".to_string())?;
+                Ok(exe_dir.join("distribuicao-logs").join("flag"))
+            }
+        }
     }
 
     fn salvar_log(&self, categoria: &str, extensao: &str, conteudo: &str) -> Result<(), String> {
@@ -321,7 +327,7 @@ impl ConsultaNSU {
             cnpj: self.cnpj.clone(),
             uf: self.uf,
             ambiente: self.ambiente,
-            check_flag: self.check_flag,
+            flag_dir: self.flag_dir.clone(),
         };
 
         consulta.enviar_soap12_xml(xml).await
@@ -350,7 +356,7 @@ impl ConsultaChaveAcesso {
             cnpj: self.cnpj.clone(),
             uf: self.uf,
             ambiente: self.ambiente,
-            check_flag: self.check_flag,
+            flag_dir: self.flag_dir.clone(),
         };
 
         consulta.enviar_soap12_xml(xml).await

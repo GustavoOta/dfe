@@ -36,6 +36,7 @@ pub struct EscPosBuilder {
     /// Largura imprimível real em dots nativos da impressora.
     /// 576 = padrão 80 mm / 203 DPI. Use [`printable_dots`](Self::printable_dots) para ajustar.
     paper_dots: u32,
+    cols: Option<usize>,
 }
 
 impl EscPosBuilder {
@@ -45,6 +46,7 @@ impl EscPosBuilder {
             buffer: Vec::new(),
             paper_width: 80,
             paper_dots: 576,
+            cols: None,
         };
         s.buffer.extend_from_slice(commands::INIT);
         s.buffer.extend_from_slice(&[0x1B, 0x74, 0x02]); // ESC t 2 = CP850
@@ -76,6 +78,16 @@ impl EscPosBuilder {
     /// Padrão: `576` (80 mm · 203 DPI). Para 300 DPI / 80 mm: `850`.
     pub fn printable_dots(mut self, dots: u32) -> Self {
         self.paper_dots = dots;
+        self
+    }
+
+    /// Sobrescreve o número de colunas de texto usado por [`divider`](Self::divider).
+    ///
+    /// Por padrão: 48 para papel 80 mm · 32 para 58 mm.
+    /// Use quando a impressora tem área imprimível diferente do padrão ESC/POS
+    /// (ex.: Bematech MP-4200 TH → 42 colunas).
+    pub fn columns(mut self, cols: usize) -> Self {
+        self.cols = Some(cols);
         self
     }
 
@@ -152,8 +164,9 @@ impl EscPosBuilder {
 
     /// Imprime uma linha separadora (`---…`) proporcional à largura do papel.
     /// 80 mm → 48 traços · 58 mm → 32 traços.
+    /// Pode ser sobrescrito com [`columns`](Self::columns).
     pub fn divider(mut self) -> Self {
-        let cols: usize = if self.paper_width >= 80 { 48 } else { 32 };
+        let cols = self.cols.unwrap_or_else(|| if self.paper_width >= 80 { 48 } else { 32 });
         let mut line = "-".repeat(cols);
         line.push('\n');
         self.buffer.extend_from_slice(line.as_bytes());

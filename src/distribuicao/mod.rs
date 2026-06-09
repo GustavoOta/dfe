@@ -2,6 +2,7 @@ use base64::Engine;
 use flate2::read::GzDecoder;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::io::Read;
+use std::path::PathBuf;
 
 mod service;
 #[cfg(test)]
@@ -160,6 +161,15 @@ impl<'de> Deserialize<'de> for LoteDistDFeInt {
     }
 }
 
+/// Destino do arquivo `flag.json` gerado após cada consulta de distribuição.
+#[derive(Clone)]
+pub enum FlagDir {
+    /// Usa o caminho padrão: `{dir_do_executável}/distribuicao-logs/flag`.
+    Default,
+    /// Usa um diretório customizado fornecido pelo chamador.
+    Custom(PathBuf),
+}
+
 /// Builder para consulta de documentos fiscais no Ambiente Nacional (AN).
 /// Alias público: [`Distribuicao`].
 pub struct Consulta {
@@ -173,8 +183,8 @@ pub struct Consulta {
     pub uf: u8,
     /// Ambiente: `1` = Produção · `2` = Homologação.
     pub ambiente: u8,
-    /// Se `Some(true)`, verifica o arquivo de flag antes de enviar.
-    pub check_flag: Option<bool>,
+    /// Diretório do `flag.json`; `None` desativa o mecanismo de flag.
+    pub flag_dir: Option<FlagDir>,
 }
 
 /// Builder para consulta de documentos a partir de um NSU específico.
@@ -192,8 +202,8 @@ pub struct ConsultaNSU {
     pub ambiente: u8,
     /// NSU a partir do qual consultar (15 dígitos).
     pub nsu: String,
-    /// Se `Some(true)`, verifica o arquivo de flag antes de enviar.
-    pub check_flag: Option<bool>,
+    /// Diretório do `flag.json`; `None` desativa o mecanismo de flag.
+    pub flag_dir: Option<FlagDir>,
 }
 
 /// Builder para consulta de um documento pela chave de acesso.
@@ -211,8 +221,8 @@ pub struct ConsultaChaveAcesso {
     pub ambiente: u8,
     /// Chave de acesso da NF-e (44 dígitos).
     pub chave_acesso: String,
-    /// Se `Some(true)`, verifica o arquivo de flag antes de enviar.
-    pub check_flag: Option<bool>,
+    /// Diretório do `flag.json`; `None` desativa o mecanismo de flag.
+    pub flag_dir: Option<FlagDir>,
 }
 
 /// Manifestação **Ciência da Operação** (evento `210210`).
@@ -292,7 +302,7 @@ impl Consulta {
             cnpj: String::new(),
             uf: 0,
             ambiente: 0,
-            check_flag: None,
+            flag_dir: None,
         }
     }
 
@@ -326,9 +336,15 @@ impl Consulta {
         self
     }
 
-    /// Ativa verificação do arquivo de flag antes de enviar.
+    /// Ativa o mecanismo de flag com o caminho padrão (`{exe}/distribuicao-logs/flag`).
     pub fn check_flag(mut self) -> Self {
-        self.check_flag = Some(true);
+        self.flag_dir = Some(FlagDir::Default);
+        self
+    }
+
+    /// Ativa o mecanismo de flag com um diretório customizado.
+    pub fn check_flag_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.flag_dir = Some(FlagDir::Custom(path.into()));
         self
     }
 
@@ -363,7 +379,7 @@ impl ConsultaNSU {
             uf: 0,
             ambiente: 0,
             nsu: String::new(),
-            check_flag: None,
+            flag_dir: None,
         }
     }
 
@@ -398,7 +414,12 @@ impl ConsultaNSU {
     }
 
     pub fn check_flag(mut self) -> Self {
-        self.check_flag = Some(true);
+        self.flag_dir = Some(FlagDir::Default);
+        self
+    }
+
+    pub fn check_flag_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.flag_dir = Some(FlagDir::Custom(path.into()));
         self
     }
 
@@ -435,7 +456,7 @@ impl ConsultaChaveAcesso {
             uf: 0,
             ambiente: 0,
             chave_acesso: String::new(),
-            check_flag: None,
+            flag_dir: None,
         }
     }
 
@@ -470,7 +491,12 @@ impl ConsultaChaveAcesso {
     }
 
     pub fn check_flag(mut self) -> Self {
-        self.check_flag = Some(true);
+        self.flag_dir = Some(FlagDir::Default);
+        self
+    }
+
+    pub fn check_flag_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.flag_dir = Some(FlagDir::Custom(path.into()));
         self
     }
 

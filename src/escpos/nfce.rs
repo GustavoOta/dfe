@@ -41,6 +41,7 @@ pub struct EscPosNFCeBuilder {
     printer_name: String,
     paper_dots: Option<u32>,
     printer_dpi: Option<u32>,
+    cols: Option<usize>,
 }
 
 impl EscPosNFCeBuilder {
@@ -53,6 +54,7 @@ impl EscPosNFCeBuilder {
             printer_name: String::new(),
             paper_dots: None,
             printer_dpi: None,
+            cols: None,
         }
     }
 
@@ -96,6 +98,16 @@ impl EscPosNFCeBuilder {
     /// Alternativa a [`printer_dpi`](Self::printer_dpi). Para 300 DPI / 80 mm: `850`.
     pub fn printable_dots(mut self, dots: u32) -> Self {
         self.paper_dots = Some(dots);
+        self
+    }
+
+    /// Sobrescreve o número de colunas de texto.
+    ///
+    /// Padrão: 48 para papel 80 mm · 32 para 58 mm.
+    /// Use quando a impressora tem área imprimível menor que o padrão
+    /// (ex.: Bematech MP-4200 TH → 42 colunas).
+    pub fn columns(mut self, cols: usize) -> Self {
+        self.cols = Some(cols);
         self
     }
 
@@ -292,6 +304,7 @@ impl EscPosNFCeBuilder {
             qr_side: self.qr_side,
             paper_width: self.paper_width,
             paper_dots,
+            cols: self.cols,
         })
     }
 }
@@ -344,17 +357,21 @@ struct BuildParams {
     qr_side: bool,
     paper_width: u8,
     paper_dots: u32,
+    cols: Option<usize>,
 }
 
 // ── Builder do cupom ──────────────────────────────────────────────────────────
 
 fn build_receipt(p: BuildParams) -> Result<Vec<u8>> {
-    let cols: usize = if p.paper_width >= 80 { 48 } else { 32 };
+    let cols: usize = p.cols.unwrap_or_else(|| if p.paper_width >= 80 { 48 } else { 32 });
 
     let mut b = EscPosBuilder::new()
         .paper_width(p.paper_width)
         .printable_dots(p.paper_dots)
         .line_spacing(SPACING_NORMAL);
+    if let Some(c) = p.cols {
+        b = b.columns(c);
+    }
 
     // ── Homologação ───────────────────────────────────────────────────────────
     if p.tp_amb == "2" {
