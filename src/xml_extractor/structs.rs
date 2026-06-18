@@ -234,7 +234,21 @@ pub struct Imposto {
 pub struct ICMS {
     #[serde(rename = "ICMS00")]
     pub icms00: Option<ICMS00>,
-    // Outros tipos de ICMS podem ser adicionados aqui
+    #[serde(rename = "ICMSSN102")]
+    pub icms_sn102: Option<ICMSSNSimples>,
+    #[serde(rename = "ICMSSN400")]
+    pub icms_sn400: Option<ICMSSNSimples>,
+    #[serde(rename = "ICMSSN500")]
+    pub icms_sn500: Option<ICMSSNSimples>,
+    #[serde(rename = "ICMSSN900")]
+    pub icms_sn900: Option<ICMSSNSimples>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ICMSSNSimples {
+    pub orig: Option<String>,
+    #[serde(rename = "CSOSN")]
+    pub csosn: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -51,6 +51,7 @@ struct NFeInterno {
     pub inf_adic: Option<InfAdic>,
     pub active_ibs_cbs: Option<String>,
     pub desconto_rateio: Option<Decimal>,
+    pub referencias: Vec<String>,
 }
 
 /// Resposta da emissão de NF-e ou NFC-e retornada por [`NFeBuilder::emitir`].
@@ -91,16 +92,18 @@ pub struct TagInfProt {
     pub inf_prot: InfProt,
 }
 
-async fn emit_nfe(nfe: NFeInterno) -> Result<Response> {
-    let flag = FlagAutorizacao::start().await.map_err(DfeError::Validacao)?;
-    match flag {
-        FlagAutorizacaoEnum::Ready => {}
-        _ => return Err(DfeError::Validacao(format!(
-            "Flag de autorização inválida para emissão: [{:?}].", flag
-        ))),
-    }
+// XML assinado e validado + metadados necessários para o envio SEFAZ
+struct SignedNfe {
+    nfe_xml: String,
+    validated_xml: String,
+    cert_path: String,
+    cert_pass: String,
+    ide_mod: u32,
+    ide_tp_amb: u8,
+}
 
-    // Extrair campos necessários antes de mover nfe
+// Constrói e assina o XML da NF-e sem enviar à SEFAZ
+async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
     let cert_path = nfe.cert_path.clone();
     let cert_pass = nfe.cert_pass.clone();
     let ide_mod = nfe.ide.mod_;
@@ -108,6 +111,7 @@ async fn emit_nfe(nfe: NFeInterno) -> Result<Response> {
     let id_csc = nfe.id_csc.clone();
     let csc = nfe.csc.clone();
     let inf_adic = nfe.inf_adic.clone();
+    let referencias = nfe.referencias.clone();
 
     let codigo_numerico = ChaveAcesso::gerar_codigo_numerico(nfe.ide.c_nf.clone());
     let doc = match (nfe.emit.cnpj.as_ref(), nfe.emit.cpf.as_ref()) {
@@ -160,6 +164,20 @@ async fn emit_nfe(nfe: NFeInterno) -> Result<Response> {
         ide_process.dh_emi = Some(dh_emi);
     }
 
+    // Serializa <ide> e injeta tags <NFref> antes de </ide> quando houver referências
+    let nf_refs_xml: String = referencias
+        .iter()
+        .map(|ch| format!("<NFref><refNFe>{}</refNFe></NFref>", ch))
+        .collect();
+    let ide_xml = {
+        let base = to_string(&ide_process).unwrap_or_default();
+        if nf_refs_xml.is_empty() {
+            base
+        } else {
+            base.replace("</ide>", &format!("{}</ide>", nf_refs_xml))
+        }
+    };
+
     let emit_process = EmitProcess {
         cnpj: nfe.emit.cnpj.clone(),
         cpf: nfe.emit.cpf.clone(),
@@ -207,7 +225,7 @@ async fn emit_nfe(nfe: NFeInterno) -> Result<Response> {
     let xml = format!(
         "<infNFe xmlns=\"http://www.portalfiscal.inf.br/nfe\" Id=\"NFe{}\" versao=\"4.00\">{}{}{}{}{}{}{}{}{}",
         chave_acesso,
-        to_string(&ide_process).unwrap_or_default(),
+        ide_xml,
         to_string(&emit_process).unwrap_or_default(),
         dest_string, det_string,
         to_string(&total_process_result).unwrap_or_default(),
@@ -237,7 +255,7 @@ async fn emit_nfe(nfe: NFeInterno) -> Result<Response> {
 
     let signature_base64 = Sign::xml_string(&signed_info, &cert_path, &cert_pass).await?;
     let signature_nodes = signed_info + "<SignatureValue>" + &signature_base64 + "</SignatureValue>";
-    let signed_xml = "<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\">".to_string()
+    let signature_xml = "<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\">".to_string()
         + &signature_nodes
         + "<KeyInfo><X509Data><X509Certificate>" + &x509_cert
         + "</X509Certificate></X509Data></KeyInfo></Signature>";
@@ -264,31 +282,45 @@ async fn emit_nfe(nfe: NFeInterno) -> Result<Response> {
         ));
     }
 
-    let xml = "<NFe xmlns=\"http://www.portalfiscal.inf.br/nfe\">".to_string()
-        + &xml + &qrcode + &signed_xml + "</NFe>";
+    let nfe_xml = "<NFe xmlns=\"http://www.portalfiscal.inf.br/nfe\">".to_string()
+        + &xml + &qrcode + &signature_xml + "</NFe>";
 
     let mut f = File::create("./nfe_request.xml").expect("nfe_request.xml");
-    f.write_all(xml.as_bytes()).expect("write");
+    f.write_all(nfe_xml.as_bytes()).expect("write");
 
-    let signed_xml = match is_xml_valid(&xml) {
+    let validated_xml = match is_xml_valid(&nfe_xml) {
         Ok(x) => x,
         Err(e) => return Err(DfeError::Validacao(format!("is_xml_valid: [{}]", e))),
     };
 
+    Ok(SignedNfe { nfe_xml, validated_xml, cert_path, cert_pass, ide_mod, ide_tp_amb })
+}
+
+async fn emit_nfe(nfe: NFeInterno) -> Result<Response> {
+    let flag = FlagAutorizacao::start().await.map_err(DfeError::Validacao)?;
+    match flag {
+        FlagAutorizacaoEnum::Ready => {}
+        _ => return Err(DfeError::Validacao(format!(
+            "Flag de autorização inválida para emissão: [{:?}].", flag
+        ))),
+    }
+
+    let signed = build_signed_xml(nfe).await?;
+
     let id_lote = 100;
-    let xml = format!(
+    let xml_envelope = format!(
         r#"<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4"><enviNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><idLote>{}</idLote><indSinc>1</indSinc>{}</enviNFe></nfeDadosMsg></soap12:Body></soap12:Envelope>"#,
-        id_lote, &xml
+        id_lote, &signed.nfe_xml
     );
 
-    let url = nfe_autorizacao(ide_tp_amb, "SP", ide_mod, false)?;
-    let cert = Cert::from_pfx(&cert_path, &cert_pass)?;
+    let url = nfe_autorizacao(signed.ide_tp_amb, "SP", signed.ide_mod, false)?;
+    let cert = Cert::from_pfx(&signed.cert_path, &signed.cert_pass)?;
     let client = WebService::client(cert.identity)?;
 
-    let xml_with_declaration = if xml.starts_with("<?xml") {
-        xml.clone()
+    let xml_with_declaration = if xml_envelope.starts_with("<?xml") {
+        xml_envelope.clone()
     } else {
-        format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n{}", xml)
+        format!("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n{}", xml_envelope)
     };
 
     let mut f = File::create("./nfe_request_envelope.xml").expect("envelope");
@@ -304,7 +336,7 @@ async fn emit_nfe(nfe: NFeInterno) -> Result<Response> {
         .await?;
 
     if response.status().is_success() {
-        let result = xml_result(&response.text().await?, signed_xml)?;
+        let result = xml_result(&response.text().await?, signed.validated_xml)?;
         if result.protocolo.inf_prot.c_stat != 100 {
             return Ok(result);
         }
@@ -328,7 +360,7 @@ async fn emit_nfe(nfe: NFeInterno) -> Result<Response> {
     }
 }
 
-fn xml_result(response: &str, signed_xml: String) -> Result<Response> {
+fn xml_result(response: &str, validated_xml: String) -> Result<Response> {
     let re = Regex::new(r#"<protNFe versao="4.00">(.*?)</protNFe>"#)
         .map_err(|e| DfeError::Xml(format!("Erro regex: {}", e)))?;
     let prot_nfe = match re.captures(response).and_then(|c| c.get(0)) {
@@ -337,7 +369,7 @@ fn xml_result(response: &str, signed_xml: String) -> Result<Response> {
     };
     let tag_inf_prot: TagInfProt = quick_xml::de::from_str(prot_nfe)
         .map_err(|e| DfeError::Xml(format!("Erro desserializar protocolo: {} — {}", e, prot_nfe)))?;
-    Ok(Response { protocolo: tag_inf_prot, xml: signed_xml })
+    Ok(Response { protocolo: tag_inf_prot, xml: validated_xml })
 }
 
 fn qrcode_hash(chave_acesso: &str, versao_qr: &str, ambiente: &str, id_csc: &str, csc: &str) -> Result<String> {
@@ -353,6 +385,7 @@ fn qrcode_hash(chave_acesso: &str, versao_qr: &str, ambiente: &str, id_csc: &str
 ///
 /// Monte a nota chamando os métodos de configuração em qualquer ordem e finalize
 /// com [`NFeBuilder::emitir`], que valida, assina e transmite para a SEFAZ.
+/// Use [`NFeBuilder::gerar_xml`] para apenas gerar e validar o XML sem enviar à SEFAZ.
 ///
 /// # Exemplo
 ///
@@ -394,6 +427,7 @@ pub struct NFeBuilder {
     csc: Option<String>,
     active_ibs_cbs: Option<String>,
     desconto_rateio: Option<Decimal>,
+    referencias: Vec<String>,
 }
 
 impl NFeBuilder {
@@ -403,7 +437,7 @@ impl NFeBuilder {
             cert_path: None, cert_pass: None, ide: None, emitente: None,
             destinatario: None, itens: Vec::new(), total: None, transporte: None,
             pagamento: None, informacoes_adicionais: None, id_csc: None, csc: None,
-            active_ibs_cbs: None, desconto_rateio: None,
+            active_ibs_cbs: None, desconto_rateio: None, referencias: Vec::new(),
         }
     }
 
@@ -435,6 +469,38 @@ impl NFeBuilder {
     pub fn active_ibs_cbs(mut self, f: &str) -> Self { self.active_ibs_cbs = Some(f.to_string()); self }
     /// Desconto global rateado proporcionalmente nos itens.
     pub fn desconto_rateio(mut self, v: Decimal) -> Self { self.desconto_rateio = Some(v); self }
+    /// Adiciona uma chave de acesso referenciada (`<NFref><refNFe>`). Use para devolução (finNFe=4).
+    pub fn referencia(mut self, chave: &str) -> Self { self.referencias.push(chave.to_string()); self }
+
+    /// Gera e valida o XML da NF-e sem enviar à SEFAZ.
+    ///
+    /// Útil para validação prévia (ex.: NF-e de devolução antes da emissão).
+    /// Retorna o XML assinado e validado pelo XSD oficial.
+    pub async fn gerar_xml(self) -> crate::error::Result<String> {
+        let cert_path  = self.cert_path.ok_or_else(|| DfeError::Configuracao("cert_path não informado".to_string()))?;
+        let cert_pass  = self.cert_pass.ok_or_else(|| DfeError::Configuracao("cert_pass não informado".to_string()))?;
+        let ide        = self.ide.ok_or_else(|| DfeError::Validacao("ide não informado".to_string()))?;
+        let emitente   = self.emitente.ok_or_else(|| DfeError::Validacao("emitente não informado".to_string()))?;
+        let total      = self.total.ok_or_else(|| DfeError::Validacao("total não informado".to_string()))?;
+        let transporte = self.transporte.ok_or_else(|| DfeError::Validacao("transporte não informado".to_string()))?;
+        let pagamento  = self.pagamento.ok_or_else(|| DfeError::Validacao("pagamento não informado".to_string()))?;
+
+        if self.itens.is_empty() {
+            return Err(DfeError::Validacao("pelo menos um item (det) deve ser informado".to_string()));
+        }
+
+        let signed = build_signed_xml(NFeInterno {
+            cert_path, cert_pass, id_csc: self.id_csc, csc: self.csc,
+            ide, emit: emitente, dest: self.destinatario,
+            det: self.itens, total, transp: transporte, pag: pagamento,
+            inf_adic: self.informacoes_adicionais,
+            active_ibs_cbs: self.active_ibs_cbs,
+            desconto_rateio: self.desconto_rateio,
+            referencias: self.referencias,
+        }).await?;
+
+        Ok(signed.validated_xml)
+    }
 
     /// Valida, assina e transmite a NF-e/NFC-e para a SEFAZ.
     ///
@@ -466,6 +532,7 @@ impl NFeBuilder {
             inf_adic: self.informacoes_adicionais,
             active_ibs_cbs: self.active_ibs_cbs,
             desconto_rateio: self.desconto_rateio,
+            referencias: self.referencias,
         }).await
     }
 }
