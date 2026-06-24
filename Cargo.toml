@@ -1,6 +1,6 @@
 [package]
 name = "dfe"
-version = "0.6.6"
+version = "0.6.7"
 edition = "2021"
 description = "DFE - Documentos Fiscais Eletrônicos Brasileiros"
 license = "MIT"
@@ -63,4 +63,4 @@ sha2 = "0.10.8"
 tokio = { version = "1.41.1", features = ["full"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_Graphics_Printing", "Win32_Graphics_Gdi"] }
+windows-sys = { version = "0.61", features = ["Win32_Security_Cryptography", "Win32_Foundation", "Win32_Graphics_Printing", "Win32_Graphics_Gdi", "Win32_System_Time"] }

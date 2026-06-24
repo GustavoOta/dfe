@@ -4,12 +4,16 @@ use libxml::schemas::{SchemaParserContext, SchemaValidationContext};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+// XSDs do leiaute NT2026.004 (PL_010d) — CNPJ e chave de acesso ALFANUMÉRICOS.
+// Os patterns novos são retrocompatíveis: [0-9A-Z]{12}[0-9]{2} aceita CNPJ numérico
+// e a chave [0-9]{6}[0-9A-Z]{12}[0-9]{26} aceita chave numérica.
+// A pasta anterior (../schemas, leiaute numérico) é mantida intacta para rollback.
 static XSD_FILES: &[(&str, &[u8])] = &[
-    ("nfe_v4.00.xsd",                 include_bytes!("../schemas/nfe_v4.00.xsd")),
-    ("tiposBasico_v4.00.xsd",         include_bytes!("../schemas/tiposBasico_v4.00.xsd")),
-    ("leiauteNFe_v4.00.xsd",          include_bytes!("../schemas/leiauteNFe_v4.00.xsd")),
-    ("xmldsig-core-schema_v1.01.xsd", include_bytes!("../schemas/xmldsig-core-schema_v1.01.xsd")),
-    ("DFeTiposBasicos_v1.00.xsd",     include_bytes!("../schemas/DFeTiposBasicos_v1.00.xsd")),
+    ("nfe_v4.00.xsd",                 include_bytes!("../schemas_nt2026_004/nfe_v4.00.xsd")),
+    ("tiposBasico_v4.00.xsd",         include_bytes!("../schemas_nt2026_004/tiposBasico_v4.00.xsd")),
+    ("leiauteNFe_v4.00.xsd",          include_bytes!("../schemas_nt2026_004/leiauteNFe_v4.00.xsd")),
+    ("xmldsig-core-schema_v1.01.xsd", include_bytes!("../schemas_nt2026_004/xmldsig-core-schema_v1.01.xsd")),
+    ("DFeTiposBasicos_v1.00.xsd",     include_bytes!("../schemas_nt2026_004/DFeTiposBasicos_v1.00.xsd")),
 ];
 
 static SCHEMA_DIR: OnceLock<std::result::Result<PathBuf, String>> = OnceLock::new();

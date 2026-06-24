@@ -476,19 +476,7 @@ fn format_brl(value: &str) -> String {
 }
 
 fn format_cnpj_cpf(doc: &str) -> String {
-    let d: String = doc.chars().filter(|c| c.is_ascii_digit()).collect();
-    match d.len() {
-        14 => format!(
-            "{}.{}.{}/{}-{}",
-            &d[0..2],
-            &d[2..5],
-            &d[5..8],
-            &d[8..12],
-            &d[12..14]
-        ),
-        11 => format!("{}.{}.{}-{}", &d[0..3], &d[3..6], &d[6..9], &d[9..11]),
-        _ => doc.to_string(),
-    }
+    crate::interno::cnpj_cpf::format_cnpj_cpf(doc)
 }
 
 fn format_datetime(dt: &str) -> String {
