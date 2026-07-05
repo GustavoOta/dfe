@@ -1,11 +1,5 @@
 use crate::interno::cert::Cert;
-use crate::manifestacao::{
-    nfe_ciencia_operacao, nfe_confirmacao_operacao, nfe_desconhecimento_operacao,
-    nfe_operacao_nao_realizada,
-};
-use crate::tipos::manifestacao::{
-    Manifestacao as NfeManifestacao, OperacaoNaoRealizada as NfeOperacaoNaoRealizada,
-};
+use crate::manifestacao::ManifestacaoBuilder;
 use base64::Engine;
 use chrono::Local;
 use flate2::read::GzDecoder;
@@ -228,7 +222,8 @@ impl Consulta {
             now.format("%3f"),
             extensao
         );
-        let cnpj_dir: String = self.cnpj.chars().filter(|c| c.is_ascii_digit()).collect();
+        // Preserva letras do CNPJ alfanumérico no nome do diretório de logs.
+        let cnpj_dir: String = crate::interno::cnpj_cpf::sanitize_cnpj(&self.cnpj);
         let ambiente_dir = self.ambiente_dir();
 
         let mut dir = PathBuf::from("./distribuicao-logs");
@@ -365,16 +360,12 @@ impl ConsultaChaveAcesso {
 
 impl CienciaOperacao {
     pub(crate) async fn executar_ciencia_operacao(&self) -> Result<ManifestacaoResposta, String> {
-        let payload = NfeManifestacao {
-            cert_path: self.cert_path.clone(),
-            cert_pass: self.cert_pass.clone(),
-            cnpj: self.cnpj.clone(),
-            tp_amb: self.ambiente,
-            mod_: Some(55),
-            chave: self.chave_acesso.clone(),
-        };
-
-        nfe_ciencia_operacao(payload)
+        ManifestacaoBuilder::new()
+            .cert(&self.cert_path, &self.cert_pass)
+            .cnpj(&self.cnpj)
+            .tp_amb(self.ambiente)
+            .chave(&self.chave_acesso)
+            .ciencia_operacao()
             .await
             .map_err(|e| e.to_string())
     }
@@ -384,16 +375,12 @@ impl ConfirmacaoOperacao {
     pub(crate) async fn executar_confirmacao_operacao(
         &self,
     ) -> Result<ManifestacaoResposta, String> {
-        let payload = NfeManifestacao {
-            cert_path: self.cert_path.clone(),
-            cert_pass: self.cert_pass.clone(),
-            cnpj: self.cnpj.clone(),
-            tp_amb: self.ambiente,
-            mod_: Some(55),
-            chave: self.chave_acesso.clone(),
-        };
-
-        nfe_confirmacao_operacao(payload)
+        ManifestacaoBuilder::new()
+            .cert(&self.cert_path, &self.cert_pass)
+            .cnpj(&self.cnpj)
+            .tp_amb(self.ambiente)
+            .chave(&self.chave_acesso)
+            .confirmacao_operacao()
             .await
             .map_err(|e| e.to_string())
     }
@@ -403,16 +390,12 @@ impl DesconhecimentoOperacao {
     pub(crate) async fn executar_desconhecimento_operacao(
         &self,
     ) -> Result<ManifestacaoResposta, String> {
-        let payload = NfeManifestacao {
-            cert_path: self.cert_path.clone(),
-            cert_pass: self.cert_pass.clone(),
-            cnpj: self.cnpj.clone(),
-            tp_amb: self.ambiente,
-            mod_: Some(55),
-            chave: self.chave_acesso.clone(),
-        };
-
-        nfe_desconhecimento_operacao(payload)
+        ManifestacaoBuilder::new()
+            .cert(&self.cert_path, &self.cert_pass)
+            .cnpj(&self.cnpj)
+            .tp_amb(self.ambiente)
+            .chave(&self.chave_acesso)
+            .desconhecimento_operacao()
             .await
             .map_err(|e| e.to_string())
     }
@@ -422,17 +405,12 @@ impl OperacaoNaoRealizada {
     pub(crate) async fn executar_operacao_nao_realizada(
         &self,
     ) -> Result<ManifestacaoResposta, String> {
-        let payload = NfeOperacaoNaoRealizada {
-            cert_path: self.cert_path.clone(),
-            cert_pass: self.cert_pass.clone(),
-            cnpj: self.cnpj.clone(),
-            tp_amb: self.ambiente,
-            mod_: Some(55),
-            chave: self.chave_acesso.clone(),
-            justificativa: self.justificativa.clone(),
-        };
-
-        nfe_operacao_nao_realizada(payload)
+        ManifestacaoBuilder::new()
+            .cert(&self.cert_path, &self.cert_pass)
+            .cnpj(&self.cnpj)
+            .tp_amb(self.ambiente)
+            .chave(&self.chave_acesso)
+            .operacao_nao_realizada(&self.justificativa)
             .await
             .map_err(|e| e.to_string())
     }

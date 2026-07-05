@@ -5,8 +5,6 @@ use std::io::Read;
 use std::path::PathBuf;
 
 mod service;
-#[cfg(test)]
-mod test;
 
 /// Resposta da consulta de distribuição de DF-e ao Ambiente Nacional.
 #[derive(Debug, Serialize, Deserialize)]

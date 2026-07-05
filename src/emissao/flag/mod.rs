@@ -1,8 +1,10 @@
-use std::fs::File;
-
 pub struct FlagAutorizacao;
 
+/// Estado do fluxo de autorização. Historicamente persistido em `flag_autorizacao.env`;
+/// hoje a emissão exige apenas o estado `Ready` (ver [`FlagAutorizacao::start`]). As demais
+/// variantes são mantidas para documentar o fluxo pretendido, mas não são construídas.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum FlagAutorizacaoEnum {
     Ready,
     XMLGerado,
@@ -13,55 +15,15 @@ pub enum FlagAutorizacaoEnum {
 }
 
 impl FlagAutorizacao {
+    /// Sinaliza que a emissão pode prosseguir, retornando sempre [`FlagAutorizacaoEnum::Ready`].
+    ///
+    /// Antes esta função lia/gravava `flag_autorizacao.env` no diretório de trabalho, mas
+    /// nada no fluxo jamais escrevia um valor diferente de `Ready` — a flag era, na prática,
+    /// uma constante. A **A1** do refactor removeu esse side-effect de CWD (que causava
+    /// corrida de dados no servidor multi-thread), preservando o comportamento observável:
+    /// a emissão só prossegue com `Ready`.
     pub async fn start() -> Result<FlagAutorizacaoEnum, String> {
-        match FlagAutorizacao::is_env_file() {
-            true => {
-                // leia o arquivo flag_autorizacao.env
-                let contents = std::fs::read_to_string("flag_autorizacao.env")
-                    .map_err(|e| format!("Erro ao ler o arquivo: {}", e))?;
-                for line in contents.lines() {
-                    if line.starts_with("FlagAutorizacao=") {
-                        let flag_value = line.trim_start_matches("FlagAutorizacao=");
-                        return match flag_value {
-                            "Ready" => Ok(FlagAutorizacaoEnum::Ready),
-                            "XMLGerado" => Ok(FlagAutorizacaoEnum::XMLGerado),
-                            "Requested" => Ok(FlagAutorizacaoEnum::Requested),
-                            "Autorizado" => Ok(FlagAutorizacaoEnum::Autorizado),
-                            "NaoAutorizado" => Ok(FlagAutorizacaoEnum::NaoAutorizado),
-                            "SemResposta" => Ok(FlagAutorizacaoEnum::SemResposta),
-                            other => Err(format!(
-                                "Valor desconhecido para FlagAutorizacao: {}",
-                                other
-                            )),
-                        };
-                    }
-                }
-                Err("FlagAutorizacao não encontrada no arquivo".to_string())
-            }
-            false => Err("Arquivo .env não encontrado".to_string()),
-        }
-    }
-    fn is_env_file() -> bool {
-        match File::open("flag_autorizacao.env") {
-            Ok(_) => true,
-            Err(_) => {
-                // Se o arquivo não existir, cria com a flag Ready
-                use std::io::Write;
-                match File::create("flag_autorizacao.env") {
-                    Ok(mut file) => {
-                        if let Err(e) = writeln!(file, "FlagAutorizacao=Ready") {
-                            eprintln!("Erro ao escrever no arquivo: {}", e);
-                            return false;
-                        }
-                        true
-                    }
-                    Err(e) => {
-                        eprintln!("Erro ao criar o arquivo: {}", e);
-                        false
-                    }
-                }
-            }
-        }
+        Ok(FlagAutorizacaoEnum::Ready)
     }
 }
 
@@ -70,33 +32,9 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_is_env_file() {
-        print!("Teste de verificação do arquivo flag_autorizacao.env\n");
-        let result = FlagAutorizacao::start().await;
-        match result {
-            Ok(flag) => match flag {
-                FlagAutorizacaoEnum::Ready => {
-                    print!("FlagAutorizacaoEnum::Ready\n");
-                }
-                FlagAutorizacaoEnum::XMLGerado => {
-                    print!("FlagAutorizacaoEnum::XMLGerado\n");
-                }
-                FlagAutorizacaoEnum::Requested => {
-                    print!("FlagAutorizacaoEnum::Requested\n");
-                }
-                FlagAutorizacaoEnum::Autorizado => {
-                    print!("FlagAutorizacaoEnum::Autorizado\n");
-                }
-                FlagAutorizacaoEnum::NaoAutorizado => {
-                    print!("FlagAutorizacaoEnum::NaoAutorizado\n");
-                }
-                FlagAutorizacaoEnum::SemResposta => {
-                    print!("FlagAutorizacaoEnum::SemResposta\n");
-                }
-            },
-            Err(e) => {
-                print!("Erro: {}\n", e);
-            }
-        }
+    async fn start_retorna_ready_sem_tocar_o_cwd() {
+        // A1: não deve criar `flag_autorizacao.env` nem qualquer outro arquivo no CWD.
+        let flag = FlagAutorizacao::start().await.expect("start deve ser Ok");
+        assert!(matches!(flag, FlagAutorizacaoEnum::Ready));
     }
 }

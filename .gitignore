@@ -1,26 +1,49 @@
 /target
 /vcpkg
 Cargo.lock
-nfe_request.xml
+
+# Segredos / certificados — NUNCA versionar
+*.pfx
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+.env
+*.env
+!env.example
 cert_pass.txt
+
+# Planejamento com LLM — NÃO versionar (docs de trabalho, não de produto)
+/planning/
+CLAUDE.md
+
+# Artefatos gerados na raiz (lixo do bug de side-effect no CWD — ver ARQUITETURA_REFACTOR.md §1.1)
+nfe_request.xml
 nfe_config.json
 tested_response_from_sefaz.xml
 xml_validation_error.xml
 inf_evento.xml
 cancelar_response.xml
 cancelar.xml
-inf_evento.xml
-.vscode
-distribuicao-logs/
-distribuicao.conf.ini
-.claude
-testes/
-CLAUDE.md
-danfe_output.pdf
-flag_autorizacao.env
 manifestacao_inf_evento.xml
 manifestacao_response.xml
 manifestacao.xml
+flag_autorizacao.env
+danfe_output.pdf
 test_nfce_output.pdf
 test_nfe_a4_output.pdf
 test_nfce_qr_side_output.pdf
+
+# Logs / config local de testes
+distribuicao-logs/
+distribuicao.conf.ini
+testes/
+
+# insta: snapshots pendentes (temporários). Os .snap de referência SÃO versionados.
+*.snap.new
+.INSTA*
+
+# Editor / ferramentas
+.vscode
+.claude

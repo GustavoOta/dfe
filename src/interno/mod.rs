@@ -1,3 +1,4 @@
+pub mod assinatura;
 pub mod cert;
 pub mod cnpj_cpf;
 pub mod chave_acesso;
@@ -6,6 +7,9 @@ pub mod cleaner;
 pub mod connection;
 pub mod dates;
 pub mod dest_xml;
+pub mod evento;
 pub mod extract;
+pub mod transporte;
+pub mod uf;
 pub mod validation;
 pub mod ws;

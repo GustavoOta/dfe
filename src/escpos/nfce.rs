@@ -1,4 +1,5 @@
 use crate::error::{DfeError, Result};
+use crate::interno::cnpj_cpf::sanitize_cnpj;
 use crate::xml_extractor::{XmlExtractor, XmlExtractorSignature};
 
 use super::EscPosBuilder;
@@ -503,9 +504,7 @@ fn build_receipt(p: BuildParams) -> Result<Vec<u8>> {
         let consumer_str_side = if p.dest_cpf_cnpj.is_empty() {
             "CONSUMIDOR NÃO IDENTIFICADO".to_string()
         } else {
-            let doc_digits: String =
-                p.dest_cpf_cnpj.chars().filter(|c| c.is_ascii_digit()).collect();
-            let doc_label = if doc_digits.len() == 14 { "CNPJ" } else { "CPF" };
+            let doc_label = doc_label_cnpj_cpf(&p.dest_cpf_cnpj);
             if p.dest_x_nome.trim().is_empty() {
                 format!("CONSUMIDOR - {}: {}", doc_label, format_cnpj_cpf(&p.dest_cpf_cnpj))
             } else {
@@ -564,9 +563,7 @@ fn build_receipt(p: BuildParams) -> Result<Vec<u8>> {
         let consumer_str = if p.dest_cpf_cnpj.is_empty() {
             "CONSUMIDOR NÃO IDENTIFICADO".to_string()
         } else {
-            let doc_digits: String =
-                p.dest_cpf_cnpj.chars().filter(|c| c.is_ascii_digit()).collect();
-            let doc_label = if doc_digits.len() == 14 { "CNPJ" } else { "CPF" };
+            let doc_label = doc_label_cnpj_cpf(&p.dest_cpf_cnpj);
             if p.dest_x_nome.trim().is_empty() {
                 format!("CONSUMIDOR - {}: {}", doc_label, format_cnpj_cpf(&p.dest_cpf_cnpj))
             } else {
@@ -694,6 +691,12 @@ fn format_cnpj_cpf(doc: &str) -> String {
     crate::interno::cnpj_cpf::format_cnpj_cpf(doc)
 }
 
+/// Rótulo do documento do consumidor: "CNPJ" para 14 posições alfanuméricas
+/// (preserva letras do CNPJ alfanumérico), "CPF" caso contrário (11 dígitos).
+fn doc_label_cnpj_cpf(doc: &str) -> &'static str {
+    if sanitize_cnpj(doc).len() == 14 { "CNPJ" } else { "CPF" }
+}
+
 fn format_decimal_br(value: &str) -> String {
     value.replace('.', ",")
 }
@@ -781,6 +784,17 @@ mod tests {
     fn format_cnpj_cpf_correct() {
         assert_eq!(format_cnpj_cpf("11222333000181"), "11.222.333/0001-81");
         assert_eq!(format_cnpj_cpf("12345678901"), "123.456.789-01");
+    }
+
+    #[test]
+    fn doc_label_distingue_cpf_cnpj_inclusive_alfanumerico() {
+        // CNPJ numérico (14) e CPF (11) — com e sem máscara.
+        assert_eq!(doc_label_cnpj_cpf("11222333000181"), "CNPJ");
+        assert_eq!(doc_label_cnpj_cpf("11.222.333/0001-81"), "CNPJ");
+        assert_eq!(doc_label_cnpj_cpf("12345678901"), "CPF");
+        // CNPJ alfanumérico (14 posições com letras) deve continuar sendo CNPJ.
+        assert_eq!(doc_label_cnpj_cpf("12ABC34501DE35"), "CNPJ");
+        assert_eq!(doc_label_cnpj_cpf("12.ABC.345/01DE-35"), "CNPJ");
     }
 
     #[test]

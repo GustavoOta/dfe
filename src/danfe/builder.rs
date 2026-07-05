@@ -7,22 +7,27 @@ use std::path::Path;
 ///
 /// # Exemplo
 ///
-/// ```rust
-/// use dfe::pdf::DanfeBuilder;
+/// ```no_run
+/// use dfe::DanfeBuilder;
 ///
+/// # async fn example() -> Result<(), String> {
+/// // Gerar o PDF e salvar em arquivo
 /// let output_as_file = DanfeBuilder::new()
-///     .xml_from_file("./nota.xml")
+///     .xml("./nota.xml")
 ///     .paper_size("80mm")
 ///     .as_file("./danfe.pdf")
 ///     .build()
-///     .await;
+///     .await?;
 ///
+/// // Ou obter o PDF em base64
 /// let output_as_base64 = DanfeBuilder::new()
-///     .xml_from_file("./nota.xml")
+///     .xml("./nota.xml")
 ///     .paper_size("a4")
 ///     .as_base64()
 ///     .build()
-///     .await;
+///     .await?;
+/// # Ok(())
+/// # }
 /// ```
 #[derive(Debug, Clone)]
 pub struct DanfeBuilder<'a> {

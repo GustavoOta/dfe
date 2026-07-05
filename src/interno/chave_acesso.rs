@@ -9,7 +9,7 @@ pub struct ChaveAcesso {
 }
 
 impl ChaveAcesso {
-    pub fn gerar_chave_acesso(props: ChaveAcessoProps) -> ChaveAcesso {
+    pub fn gerar_chave_acesso(props: ChaveAcessoProps) -> Result<ChaveAcesso> {
         let serie = format!("{:0>3}", props.serie);
         let numero = format!("{:0>9}", props.numero);
         // CNPJ alfanumérico: remove a máscara e normaliza em maiúsculas preservando
@@ -32,14 +32,9 @@ impl ChaveAcesso {
             props.codigo_numerico,
         );
 
-        let digito_verificador = ChaveAcesso::gerar_dv(&chave);
-        match digito_verificador {
-            Ok(dv) => {
-                chave.push_str(&dv.to_string());
-                ChaveAcesso { chave, dv }
-            }
-            Err(e) => panic!("Error generating DV: {}", e),
-        }
+        let dv = ChaveAcesso::gerar_dv(&chave)?;
+        chave.push_str(&dv.to_string());
+        Ok(ChaveAcesso { chave, dv })
     }
 
     pub fn gerar_dv(chave_sem_dv: &str) -> Result<u8> {
@@ -160,7 +155,8 @@ mod tests {
             numero: 504,
             tp_emis: 1,
             codigo_numerico: "00000000".to_string(),
-        });
+        })
+        .expect("gerar chave de acesso");
         assert_eq!(ch.chave.len(), 44);
         // posições 6-17 (12) = base do CNPJ alfanumérico
         assert_eq!(&ch.chave[6..18], "12ABC34501DE");

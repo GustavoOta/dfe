@@ -16,6 +16,8 @@
 //! |---|---|
 //! | [`emissao`] | Emissão de NF-e e NFC-e via [`NFeBuilder`] |
 //! | [`cancelar`] | Cancelamento via [`CancelarBuilder`] |
+//! | [`substituicao`] | Cancelamento por substituição de NFC-e (110112) via [`SubstituicaoBuilder`] |
+//! | [`carta_correcao`] | Carta de Correção Eletrônica (110110) via [`CartaCorrecaoBuilder`] |
 //! | [`danfe`] | Geração de DANFE em PDF via [`DanfeBuilder`] |
 //! | [`escpos`] | Impressão ESC/POS via [`EscPosBuilder`] e [`EscPosNFCeBuilder`] |
 //! | [`distribuicao`] | Distribuição de DF-e (Ambiente Nacional) |
@@ -72,25 +74,38 @@
 //! # }
 //! ```
 pub mod cancelar;
+pub mod carta_correcao;
+#[cfg(feature = "danfe")]
 pub mod danfe;
+#[cfg(feature = "distribuicao")]
 pub mod distribuicao;
 pub mod emissao;
 pub mod error;
+#[cfg(feature = "escpos")]
 pub mod escpos;
+#[cfg(feature = "distribuicao")]
 pub mod manifestacao;
 pub mod status;
+pub mod substituicao;
 pub mod tipos;
 pub mod xml_extractor;
 
 mod interno;
 
 pub use cancelar::CancelarBuilder;
+#[cfg(feature = "danfe")]
 pub use danfe::DanfeBuilder;
+#[cfg(feature = "escpos")]
 pub use escpos::EscPosBuilder;
+#[cfg(feature = "escpos")]
 pub use escpos::EscPosNFCeBuilder;
 pub use interno::cert::CertInfo;
 pub use interno::cnpj_cpf::{format_cnpj, sanitize_cnpj, validate_cnpj, validate_cpf};
 pub use interno::validation::is_xml_valid;
+#[cfg(feature = "distribuicao")]
+pub use manifestacao::ManifestacaoBuilder;
+pub use substituicao::SubstituicaoBuilder;
+pub use carta_correcao::CartaCorrecaoBuilder;
 pub use emissao::NFeBuilder;
 pub use emissao::Response as EmissaoResponse;
 pub use error::DfeError;

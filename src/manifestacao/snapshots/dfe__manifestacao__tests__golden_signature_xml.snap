@@ -1,0 +1,5 @@
+---
+source: src/manifestacao/mod.rs
+expression: out
+---
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo>FIXO</SignedInfo><SignatureValue>U2lnRml4bw==</SignatureValue><KeyInfo><X509Data><X509Certificate>Q2VydEZpeG8=</X509Certificate></X509Data></KeyInfo></Signature>

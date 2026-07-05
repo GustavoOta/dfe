@@ -1,0 +1,5 @@
+---
+source: src/interno/cleaner.rs
+expression: saida
+---
+<a><b x="1"/><c>texto</c></a>

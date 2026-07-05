@@ -1,27 +1,6 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct Manifestacao {
-    pub cert_path: String,
-    pub cert_pass: String,
-    pub cnpj: String,
-    pub tp_amb: u8,
-    pub mod_: Option<u32>,
-    pub chave: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct OperacaoNaoRealizada {
-    pub cert_path: String,
-    pub cert_pass: String,
-    pub cnpj: String,
-    pub tp_amb: u8,
-    pub mod_: Option<u32>,
-    pub chave: String,
-    pub justificativa: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Response {
     pub response: InfEvento,
     pub send_xml: String,

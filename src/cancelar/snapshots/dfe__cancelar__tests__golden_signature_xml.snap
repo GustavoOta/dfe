@@ -1,0 +1,5 @@
+---
+source: src/cancelar/mod.rs
+expression: out
+---
+<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo>CONTEUDO_FIXO</SignedInfo><SignatureValue>U2lnbmF0dXJlVmFsdWVGaXhv</SignatureValue><KeyInfo><X509Data><X509Certificate>Q2VydGlmaWNhZG9EZXJGaXhv</X509Certificate></X509Data></KeyInfo></Signature>

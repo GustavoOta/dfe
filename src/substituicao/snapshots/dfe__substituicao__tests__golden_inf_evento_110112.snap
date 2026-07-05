@@ -1,0 +1,5 @@
+---
+source: src/substituicao/mod.rs
+expression: out
+---
+<infEvento xmlns="http://www.portalfiscal.inf.br/nfe" Id="ID1101123500000000000000000065001000000000100000000101"><cOrgao>35</cOrgao><tpAmb>2</tpAmb><CNPJ>00000000000000</CNPJ><chNFe>35000000000000000000650010000000001000000001</chNFe><dhEvento>[DH]</dhEvento><tpEvento>110112</tpEvento><nSeqEvento>1</nSeqEvento><verEvento>1.00</verEvento><detEvento versao="1.00"><descEvento>Cancelamento por substituicao</descEvento><cOrgaoAutor>35</cOrgaoAutor><tpAutor>1</tpAutor><verAplic>TestApp-1.0</verAplic><nProt>135000000000001</nProt><xJust>Falha na conexao com a internet no momento da venda</xJust><chNFeRef>35000000000000000000650010000000009000000009</chNFeRef></detEvento></infEvento>

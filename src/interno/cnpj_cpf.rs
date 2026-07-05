@@ -53,6 +53,7 @@ pub fn format_cnpj(cnpj: &str) -> String {
 ///
 /// Mantém letras (CNPJ alfanumérico) e cai para o valor original quando o
 /// comprimento não corresponde a um CPF ou CNPJ válido.
+#[cfg(any(feature = "danfe", feature = "escpos"))]
 pub(crate) fn format_cnpj_cpf(doc: &str) -> String {
     let d = sanitize_cnpj(doc);
     match d.len() {
@@ -201,6 +202,12 @@ mod tests {
         assert_eq!(sanitize_cnpj("12.ABC.345/01DE-35"), "12ABC34501DE35");
         assert_eq!(format_cnpj("12ABC34501DE35"), "12.ABC.345/01DE-35");
         assert_eq!(format_cnpj("11222333000181"), "11.222.333/0001-81");
+    }
+
+    // `format_cnpj_cpf` só existe quando a camada de render (DANFE/ESC-POS) está ligada.
+    #[cfg(any(feature = "danfe", feature = "escpos"))]
+    #[test]
+    fn format_cnpj_cpf_documento() {
         assert_eq!(format_cnpj_cpf("12ABC34501DE35"), "12.ABC.345/01DE-35");
         assert_eq!(format_cnpj_cpf("52998224725"), "529.982.247-25");
     }

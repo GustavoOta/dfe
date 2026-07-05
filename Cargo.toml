@@ -39,19 +39,40 @@ x86_64-pc-windows-msvc = { triplet = "x64-windows-static", install = ["libxml2"]
 [profile.release]
 debug = false
 
+[features]
+# Opt-out: `default` liga tudo → consumidores atuais (gravisServer/gravis-pdv) não mudam.
+# Desligar `danfe`+`escpos` dropa a stack de renderização (printpdf/image/barcoders/qrcodegen/font8x8);
+# desligar `distribuicao` dropa flate2. Ver planning/ARQUITETURA_REFACTOR.md §A8.
+default = ["danfe", "escpos", "distribuicao"]
+# DANFE em PDF (NF-e A4/80mm, NFC-e 80mm).
+danfe = ["dep:printpdf", "dep:image", "dep:barcoders", "dep:qrcodegen"]
+# Impressão via ESC/POS (cupom).
+escpos = ["dep:font8x8", "dep:image", "dep:barcoders", "dep:qrcodegen"]
+# Distribuição de DF-e (AN) + manifestação do destinatário (fluxo inbound; gzip via flate2).
+distribuicao = ["dep:flate2"]
+# Liga a camada de testes que bate na SEFAZ (homologação). Fora do `cargo test` padrão.
+sefaz-live = []
+
+[dev-dependencies]
+# Golden/snapshot dos XMLs no refactor — só em `cargo test`, não vai no binário do consumidor.
+# feature `filters`: redação por regex de campos voláteis (dhEvento, idLote, SignatureValue).
+insta = { version = "1", features = ["filters"] }
+# Carrega .env nos testes gated (camada sefaz-live) — dev-only, como o insta.
+dotenvy = "0.15"
+
 [dependencies]
 base64 = "0.22.1"
-barcoders = "2.0.0"
+barcoders = { version = "2.0.0", optional = true }
 chrono = "0.4.38"
 chrono-tz = "0.10.0"
-flate2 = "1.0"
-font8x8 = "0.2"
+flate2 = { version = "1.0", optional = true }
+font8x8 = { version = "0.2", optional = true }
 hex = "0.4.3"
-image = { version = "0.24", default-features = false, features = ["png", "jpeg"] }
+image = { version = "0.24", default-features = false, features = ["png", "jpeg"], optional = true }
 libxml = "=0.3.3"
-printpdf = "0.7.0"
+printpdf = { version = "0.7.0", optional = true }
 quick-xml = { version = "0.37.1", features = ["encoding", "serialize"] }
-qrcodegen = "1.8"
+qrcodegen = { version = "1.8", optional = true }
 rand = "0.8.5"
 regex = "1.11.1"
 reqwest = { version = "0.12.9", features = ["native-tls", "json", "gzip", "blocking"] }

@@ -1,0 +1,340 @@
+---
+source: tests/xml_extractor.rs
+expression: proc
+---
+NFeProc {
+    versao: "4.00",
+    nfe: NFe {
+        inf_nfe: InfNFe {
+            id: Some(
+                "NFe35241100000000000191650010000000011000000001",
+            ),
+            versao: Some(
+                "4.00",
+            ),
+            ide: Ide {
+                c_uf: Some(
+                    "35",
+                ),
+                c_nf: Some(
+                    "00000000",
+                ),
+                nat_op: Some(
+                    "VENDA AO CONSUMIDOR",
+                ),
+                mod_: Some(
+                    "65",
+                ),
+                serie: Some(
+                    "1",
+                ),
+                n_nf: Some(
+                    "1",
+                ),
+                dh_emi: Some(
+                    "2024-11-18T14:01:12-03:00",
+                ),
+                dh_sai_ent: None,
+                tp_nf: Some(
+                    "1",
+                ),
+                id_dest: Some(
+                    "1",
+                ),
+                c_mun_fg: Some(
+                    "3550308",
+                ),
+                tp_imp: Some(
+                    "4",
+                ),
+                tp_emis: Some(
+                    "1",
+                ),
+                c_dv: Some(
+                    "1",
+                ),
+                tp_amb: Some(
+                    "2",
+                ),
+                fin_nfe: Some(
+                    "1",
+                ),
+                ind_final: Some(
+                    "1",
+                ),
+                ind_pres: Some(
+                    "1",
+                ),
+                proc_emi: Some(
+                    "0",
+                ),
+                ver_proc: Some(
+                    "1",
+                ),
+            },
+            emit: Emit {
+                cnpj: Some(
+                    "00000000000191",
+                ),
+                x_nome: Some(
+                    "EMPRESA FICTICIA LTDA",
+                ),
+                x_fant: None,
+                ender_emit: EnderEmit {
+                    x_lgr: Some(
+                        "RUA DAS FLORES",
+                    ),
+                    nro: Some(
+                        "100",
+                    ),
+                    x_bairro: Some(
+                        "CENTRO",
+                    ),
+                    c_mun: Some(
+                        "3550308",
+                    ),
+                    x_mun: Some(
+                        "Sao Paulo",
+                    ),
+                    uf: Some(
+                        "SP",
+                    ),
+                    cep: Some(
+                        "01001000",
+                    ),
+                    c_pais: Some(
+                        "1058",
+                    ),
+                    x_pais: Some(
+                        "BRASIL",
+                    ),
+                    fone: None,
+                },
+                ie: Some(
+                    "000000000000",
+                ),
+                crt: Some(
+                    "1",
+                ),
+            },
+            dest: None,
+            det: [
+                Det {
+                    n_item: Some(
+                        "1",
+                    ),
+                    prod: Prod {
+                        c_prod: Some(
+                            "1",
+                        ),
+                        c_ean: Some(
+                            "00000000",
+                        ),
+                        x_prod: Some(
+                            "PRODUTO TESTE UNITARIO 500ML",
+                        ),
+                        ncm: Some(
+                            "22030000",
+                        ),
+                        cfop: Some(
+                            "5405",
+                        ),
+                        u_com: Some(
+                            "UN",
+                        ),
+                        q_com: Some(
+                            "1.0000",
+                        ),
+                        v_un_com: Some(
+                            "10.00",
+                        ),
+                        v_prod: Some(
+                            "10.00",
+                        ),
+                        c_ean_trib: Some(
+                            "00000000",
+                        ),
+                        u_trib: Some(
+                            "UN",
+                        ),
+                        q_trib: Some(
+                            "1.0000",
+                        ),
+                        v_un_trib: Some(
+                            "10.00",
+                        ),
+                        ind_tot: Some(
+                            "1",
+                        ),
+                    },
+                    imposto: Imposto {
+                        v_tot_trib: Some(
+                            "0.00",
+                        ),
+                        icms: Some(
+                            ICMS {
+                                icms00: None,
+                                icms_sn102: None,
+                                icms_sn400: None,
+                                icms_sn500: Some(
+                                    ICMSSNSimples {
+                                        orig: Some(
+                                            "0",
+                                        ),
+                                        csosn: Some(
+                                            "500",
+                                        ),
+                                    },
+                                ),
+                                icms_sn900: None,
+                            },
+                        ),
+                        pis: Some(
+                            PIS {
+                                pis_aliq: None,
+                            },
+                        ),
+                        cofins: Some(
+                            COFINS {
+                                cofins_aliq: None,
+                            },
+                        ),
+                    },
+                },
+            ],
+            total: Total {
+                icms_tot: Some(
+                    ICMSTot {
+                        v_bc: Some(
+                            "0.00",
+                        ),
+                        v_icms: Some(
+                            "0.00",
+                        ),
+                        v_icms_deson: Some(
+                            "0.00",
+                        ),
+                        v_fcp_uf_dest: None,
+                        v_icms_uf_dest: None,
+                        v_icms_uf_remet: None,
+                        v_fcp: Some(
+                            "0.00",
+                        ),
+                        v_bc_st: Some(
+                            "0.00",
+                        ),
+                        v_st: Some(
+                            "0.00",
+                        ),
+                        v_fcp_st: Some(
+                            "0.00",
+                        ),
+                        v_fcp_st_ret: Some(
+                            "0.00",
+                        ),
+                        v_prod: Some(
+                            "10.00",
+                        ),
+                        v_frete: Some(
+                            "0.00",
+                        ),
+                        v_seg: Some(
+                            "0.00",
+                        ),
+                        v_desc: Some(
+                            "0.00",
+                        ),
+                        v_ii: Some(
+                            "0.00",
+                        ),
+                        v_ipi: Some(
+                            "0.00",
+                        ),
+                        v_ipi_devol: Some(
+                            "0.00",
+                        ),
+                        v_pis: Some(
+                            "0.00",
+                        ),
+                        v_cofins: Some(
+                            "0.00",
+                        ),
+                        v_outro: Some(
+                            "0.00",
+                        ),
+                        v_nf: Some(
+                            "10.00",
+                        ),
+                        v_tot_trib: None,
+                    },
+                ),
+            },
+            transp: Transp {
+                mod_frete: Some(
+                    "9",
+                ),
+            },
+            pag: Pag {
+                det_pag: [
+                    DetPag {
+                        ind_pag: Some(
+                            "1",
+                        ),
+                        t_pag: Some(
+                            "03",
+                        ),
+                        v_pag: Some(
+                            "10.00",
+                        ),
+                    },
+                ],
+                v_troco: Some(
+                    "0.00",
+                ),
+            },
+            inf_adic: InfAdic {
+                inf_cpl: None,
+            },
+        },
+        inf_nfe_supl: Some(
+            InfNFeSupl {
+                qr_code: Some(
+                    "https://www.nfce.fazenda.sp.gov.br/qrcode?p=35241100000000000191650010000000011000000001|2|2|1|AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                ),
+                url_chave: Some(
+                    "https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica",
+                ),
+            },
+        ),
+    },
+    prot_nfe: ProtNFe {
+        inf_prot: Some(
+            InfProt {
+                tp_amb: Some(
+                    "2",
+                ),
+                ver_aplic: Some(
+                    "SP_NFCE_PL_009_V400",
+                ),
+                ch_nfe: Some(
+                    "35241100000000000191650010000000011000000001",
+                ),
+                dh_recbto: Some(
+                    "2024-11-18T14:01:13-03:00",
+                ),
+                n_prot: Some(
+                    "000000000000000",
+                ),
+                dig_val: Some(
+                    "AAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                ),
+                c_stat: Some(
+                    "100",
+                ),
+                x_motivo: Some(
+                    "Autorizado o uso da NF-e",
+                ),
+            },
+        ),
+    },
+}

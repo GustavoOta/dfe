@@ -1,4 +1,4 @@
-use crate::error::{DfeError, Result};
+use crate::error::Result;
 use reqwest::Client;
 use reqwest::Identity;
 
@@ -6,18 +6,10 @@ use reqwest::Identity;
 pub struct WebService {}
 
 impl WebService {
+    /// Constrói um cliente reqwest com o certificado A1 na camada TLS (mTLS exigido pela SEFAZ).
+    /// Usado pelo [`crate::interno::transporte::MtlsTransport`].
     pub fn client(identity: Identity) -> Result<Client> {
         let client = Client::builder().identity(identity).build()?;
         Ok(client)
-    }
-
-    pub async fn send(client: Client, url: &str, body: String) -> Result<reqwest::Response> {
-        client
-            .post(url)
-            .header("Content-Type", "application/soap+xml; charset=utf-8")
-            .body(body)
-            .send()
-            .await
-            .map_err(|e| DfeError::Webservice(format!("Failed to send request: {}", e)))
     }
 }

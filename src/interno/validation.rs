@@ -65,13 +65,15 @@ mod tests {
 
     #[test]
     fn test_is_xml_invalid() {
-        let xml = std::fs::read_to_string("D:/Projetos/dfe-api/nfe_request.xml")
-            .expect("Arquivo XML de teste não encontrado ou não pôde ser lido");
-        let result = is_xml_valid(&xml);
-        if let Err(e) = result {
-            println!("Erro esperado: {:?}", e);
-        } else {
-            println!("XML válido: {:?}", result.unwrap());
-        }
+        // XML bem-formado, porém inválido contra o XSD nfe_v4.00: o `infNFe` não tem os
+        // elementos obrigatórios (ide/emit/det/total/transp/pag). `is_xml_valid` deve
+        // rejeitar com `DfeError::Validacao`. (Auto-contido — sem arquivo externo.)
+        let xml = r#"<?xml version="1.0" encoding="UTF-8"?><NFe xmlns="http://www.portalfiscal.inf.br/nfe"><infNFe versao="4.00" Id="NFe35000000000000000000550010000000011000000001"><ide/></infNFe></NFe>"#;
+        let result = is_xml_valid(xml);
+        assert!(
+            result.is_err(),
+            "esperava Err de validação XSD para XML inválido, veio: {:?}",
+            result
+        );
     }
 }

@@ -1,4 +1,10 @@
-#[cfg(test)]
+//! Camada 2 (hermética) — `DanfeBuilder` para NF-e A4 (modelo 55).
+//!
+//! Movido na Fase 0.2 de `src/bin/tests/test_danfe_nfe_a4.rs`. Entradas/saídas em arquivo
+//! usam a fixture versionada e o diretório temporário do SO (não dependem do CWD).
+
+#![cfg(feature = "danfe")]
+
 use dfe::DanfeBuilder;
 
 /// XML mínimo de NF-e (modelo 55) válido para testes de geração de DANFE A4.
@@ -239,11 +245,14 @@ async fn test_danfe_nfe_a4_modelo55_as_base64() {
 
 #[tokio::test]
 async fn test_danfe_nfe_a4_modelo55_salva_arquivo() {
-    // testar lendo a partir de arquivo xml em disco
-    let input_file = "../teste.xml";
-    std::fs::read_to_string(input_file).expect("arquivo de entrada XML para teste não encontrado");
+    // Grava o XML da constante num arquivo temporário para exercitar o caminho de leitura
+    // de arquivo do DanfeBuilder — self-contained, independente do CWD.
+    let input_pathbuf = std::env::temp_dir().join("dfe_test_nfe_a4_input.xml");
+    std::fs::write(&input_pathbuf, NFE_XML_55).expect("gravar XML de entrada temporário");
+    let input_file = input_pathbuf.to_str().expect("caminho temp válido");
 
-    let output_path = "./test_nfe_a4_output.pdf";
+    let output_pathbuf = std::env::temp_dir().join("dfe_test_nfe_a4_output.pdf");
+    let output_path = output_pathbuf.to_str().expect("caminho temp válido");
     let result = DanfeBuilder::new()
         .xml(input_file)
         .paper_size("a4")

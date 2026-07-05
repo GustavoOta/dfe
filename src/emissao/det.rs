@@ -15,11 +15,7 @@ pub fn det_process(
     let mut first_item = 0;
 
     // desconto por rateio nos itens *********************************************************
-    let desconto_rateado = if desconto_rateio.is_some() {
-        desconto_rateio.unwrap()
-    } else {
-        Decimal::new(0, 2)
-    };
+    let desconto_rateado = desconto_rateio.unwrap_or_else(|| Decimal::new(0, 2));
 
     let mut total_produtos = Decimal::new(0, 2);
     for d in &prod {

@@ -1,4 +1,15 @@
-#[cfg(test)]
+//! Camada 2 (hermética) — `DanfeBuilder` para NFC-e (modelo 65).
+//!
+//! Movido na Fase 0.2 de `src/bin/tests/test_danfe_nfce.rs`. Saídas em arquivo vão para o
+//! diretório temporário do SO (não poluem o CWD).
+//!
+//! **Golden (0.3):** o PDF **não** é determinístico byte a byte (embute IDs/timestamps) e
+//! não há parser de PDF nas dependências → aqui a cobertura é por **propriedade** (gera sem
+//! erro, prefixo `%PDF`/`JVBE`, tamanho > 0). O snapshot fiel do texto/layout fica melhor
+//! após A7 (quando o modelo de layout puder ser snapshotado antes de virar PDF) — ver §0.3.
+
+#![cfg(feature = "danfe")]
+
 use dfe::DanfeBuilder;
 
 /// XML mínimo de NFC-e (modelo 65) válido para testes de geração de DANFE.
@@ -544,7 +555,8 @@ async fn test_danfe_nfce_80mm_com_cpf_as_base64() {
 
 #[tokio::test]
 async fn test_danfe_nfce_80mm_salva_arquivo() {
-    let output_path = "./test_nfce_output.pdf";
+    let output_path = std::env::temp_dir().join("dfe_test_nfce_output.pdf");
+    let output_path = output_path.to_str().expect("caminho temp válido");
     let result = DanfeBuilder::new()
         .xml(NFCE_XML_MULTI_PAG)
         .paper_size("80mm")
@@ -635,7 +647,8 @@ async fn test_danfe_nfce_80mm_qr_side_as_base64() {
 
 #[tokio::test]
 async fn test_danfe_nfce_80mm_qr_side_salva_arquivo() {
-    let output_path = "./test_nfce_qr_side_output.pdf";
+    let output_path = std::env::temp_dir().join("dfe_test_nfce_qr_side_output.pdf");
+    let output_path = output_path.to_str().expect("caminho temp válido");
     let result = DanfeBuilder::new()
         .xml(NFCE_XML_MULTI_PAG)
         .paper_size("80mm")
