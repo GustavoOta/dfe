@@ -5,7 +5,7 @@ arquitetura, gotchas técnicos e convenções internas, ver o `CLAUDE.md`.
 
 Re-exports de conveniência em `lib.rs`:
 ```rust
-use dfe::{NFeBuilder, CancelarBuilder, DanfeBuilder, NFeService, DfeError};
+use dfe::{NFeBuilder, CancelarBuilder, SubstituicaoBuilder, CartaCorrecaoBuilder, DanfeBuilder, NFeService, DfeError};
 ```
 
 ## Features de compilação

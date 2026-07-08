@@ -5,8 +5,18 @@ use printpdf::*;
 
 const PAGE_W: f32 = 210.0;
 const PAGE_H: f32 = 297.0;
-const M: f32 = 2.0; // margin all sides
-const BODY_W: f32 = PAGE_W - 2.0 * M; // 206mm
+// Margem de segurança em todos os lados. A maioria das impressoras (laser/jato de
+// tinta) tem uma área não-imprimível de ~4-5mm nas bordas; com uma margem menor,
+// o conteúdo desenhado até a borda da caixa é fisicamente cortado na impressão
+// mesmo com o PDF correto.
+const M: f32 = 5.0; // margin all sides
+const BODY_W: f32 = PAGE_W - 2.0 * M; // 200mm
+// Largura útil para a qual as tabelas de colunas abaixo (subrow_cols, dest, transp,
+// items) foram originalmente desenhadas. `SCALE` reprojeta essas larguras absolutas
+// (que somam REF_BODY_W) para o BODY_W real, preservando as proporções do layout
+// caso M mude — sem isso, as tabelas ultrapassariam a borda direita da página.
+const REF_BODY_W: f32 = 206.0;
+const SCALE: f32 = BODY_W / REF_BODY_W;
 
 // Header column widths: 41% emitente | 17.5% crachá | remainder chave
 const COL_EMIT: f32 = 84.0;
@@ -389,14 +399,14 @@ pub fn build_pdf_a4(
 
     // ── Sub-row: CNPJ | IE | IEST | Data Emissão | Data Saída/Entrada ──
     {
-        // Column widths summing to BODY_W = 206
+        // Larguras de referência (somam REF_BODY_W = 206) reprojetadas por SCALE:
         // CNPJ:50 | IE:40 | IEST:40 | DtEmi:38 | DtEnt:38 = 206
         let subrow_cols: &[(&str, &str, f32)] = &[
-            ("CNPJ", &format_cnpj_cpf(emit_cnpj), 50.0),
-            ("I.E.", emit_ie, 40.0),
-            ("I.E. SUBS. TRIB.", emit_iest, 40.0),
-            ("DATA DE EMISSÃO", &format_date(dh_emi), 38.0),
-            ("DATA SAÍ./ENT.", &format_date(dh_sai_ent), 38.0),
+            ("CNPJ", &format_cnpj_cpf(emit_cnpj), 50.0 * SCALE),
+            ("I.E.", emit_ie, 40.0 * SCALE),
+            ("I.E. SUBS. TRIB.", emit_iest, 40.0 * SCALE),
+            ("DATA DE EMISSÃO", &format_date(dh_emi), 38.0 * SCALE),
+            ("DATA SAÍ./ENT.", &format_date(dh_sai_ent), 38.0 * SCALE),
         ];
 
         let lbl_y = subrow_top - FLBL;
@@ -432,13 +442,13 @@ pub fn build_pdf_a4(
     hline(&layer, M, dest_top - 3.5, BODY_W, 0.2);
 
     // Row 1: Nome | CNPJ/CPF | IE | Data Emissão
-    // Widths: 96 | 52 | 28 | 30 = 206
+    // Larguras de referência (somam REF_BODY_W=206): 96 | 52 | 28 | 30. Reprojetadas por SCALE.
     {
         let r1_top = dest_top - 3.5;
         let r1_bot = dest_top - 13.5; // 10mm for row 1
-        let x_cnpj = M + 96.0;
-        let x_ie = M + 148.0;
-        let x_dte = M + 178.0;
+        let x_cnpj = M + 96.0 * SCALE;
+        let x_ie = M + 148.0 * SCALE;
+        let x_dte = M + 178.0 * SCALE;
 
         t(
             &layer,
@@ -518,14 +528,14 @@ pub fn build_pdf_a4(
     }
 
     // Row 2: Endereço | Bairro | CEP | Município | UF | Fone/Fax
-    // Widths: 58 | 32 | 22 | 36 | 7 | 51 = 206
+    // Larguras de referência (somam REF_BODY_W=206): 58|32|22|36|7|51. Reprojetadas por SCALE.
     {
         let r2_top = dest_top - 13.5;
-        let x_bairro = M + 58.0;
-        let x_cep = M + 90.0;
-        let x_mun = M + 112.0;
-        let x_uf = M + 148.0;
-        let x_fone = M + 155.0;
+        let x_bairro = M + 58.0 * SCALE;
+        let x_cep = M + 90.0 * SCALE;
+        let x_mun = M + 112.0 * SCALE;
+        let x_uf = M + 148.0 * SCALE;
+        let x_fone = M + 155.0 * SCALE;
         let h_r2 = r2_top - dest_bot;
 
         t(&layer, &font, M + 0.8, r2_top - FLBL, FS_LBL, "ENDEREÇO");
@@ -688,15 +698,15 @@ pub fn build_pdf_a4(
     hline(&layer, M, transp_top - 3.5, BODY_W, 0.2);
 
     // Row 1: Razão Social | CNPJ/CPF | Frete | Placa | UF | Marca
-    // Widths: 68 | 40 | 30 | 17 | 7 | 44 = 206
+    // Larguras de referência (somam REF_BODY_W=206): 68|40|30|17|7|44. Reprojetadas por SCALE.
     {
         let r1_top = transp_top - 3.5;
         let r1_bot = transp_top - 13.5;
-        let x_tc = M + 68.0;
-        let x_tf = M + 108.0;
-        let x_tp = M + 138.0;
-        let x_tu = M + 155.0;
-        let x_tm = M + 162.0;
+        let x_tc = M + 68.0 * SCALE;
+        let x_tf = M + 108.0 * SCALE;
+        let x_tp = M + 138.0 * SCALE;
+        let x_tu = M + 155.0 * SCALE;
+        let x_tm = M + 162.0 * SCALE;
         let h_r1 = r1_top - r1_bot;
 
         t(
@@ -779,13 +789,13 @@ pub fn build_pdf_a4(
     }
 
     // Row 2: Quantidade | Espécie | Nº/Marca Vol. | Peso Bruto | Peso Líquido
-    // Widths: 38 | 38 | 52 | 38 | 40 = 206
+    // Larguras de referência (somam REF_BODY_W=206): 38|38|52|38|40. Reprojetadas por SCALE.
     {
         let r2_top = transp_top - 13.5;
-        let x_e = M + 38.0;
-        let x_l = M + 76.0;
-        let x_pb = M + 128.0;
-        let x_pl = M + 166.0;
+        let x_e = M + 38.0 * SCALE;
+        let x_l = M + 76.0 * SCALE;
+        let x_pb = M + 128.0 * SCALE;
+        let x_pl = M + 166.0 * SCALE;
         let h_r2 = r2_top - transp_bot;
 
         t(&layer, &font, M + 0.8, r2_top - FLBL, FS_LBL, "QUANTIDADE");
@@ -867,22 +877,22 @@ pub fn build_pdf_a4(
     hline(&layer, M, col_hdr_sep_y, BODY_W, 0.3);
 
     // Columns: # | Código | Descrição | NCM | CFOP | UN | Desc | IPI% | Vl IPI | ICMS% | Vl ICMS | Qtde | Vl Unit | Vl Total
-    // Widths sum = 206
+    // Larguras de referência somam REF_BODY_W = 206; reprojetadas por SCALE.
     let cols: &[(&str, f32)] = &[
-        ("#", 6.0),
-        ("CÓDIGO", 14.0),
-        ("DESCRIÇÃO DO PRODUTO", 58.0),
-        ("NCM/SH", 12.0),
-        ("CFOP", 8.0),
-        ("UN", 7.0),
-        ("DESCONTO", 13.0),
-        ("IPI %", 9.0),
-        ("VL IPI", 13.0),
-        ("ICMS %", 9.0),
-        ("VL ICMS", 13.0),
-        ("QUANT.", 14.0),
-        ("VL UNIT.", 14.0),
-        ("VL TOTAL", 16.0),
+        ("#", 6.0 * SCALE),
+        ("CÓDIGO", 14.0 * SCALE),
+        ("DESCRIÇÃO DO PRODUTO", 58.0 * SCALE),
+        ("NCM/SH", 12.0 * SCALE),
+        ("CFOP", 8.0 * SCALE),
+        ("UN", 7.0 * SCALE),
+        ("DESCONTO", 13.0 * SCALE),
+        ("IPI %", 9.0 * SCALE),
+        ("VL IPI", 13.0 * SCALE),
+        ("ICMS %", 9.0 * SCALE),
+        ("VL ICMS", 13.0 * SCALE),
+        ("QUANT.", 14.0 * SCALE),
+        ("VL UNIT.", 14.0 * SCALE),
+        ("VL TOTAL", 16.0 * SCALE),
     ];
 
     // Column headers: texto alinhado à esquerda para colunas de texto,
@@ -1222,9 +1232,27 @@ fn text_right_in(
     text: &str,
     col_w: f32,
 ) {
-    let tw = estimate_text_width(text, size);
+    let max_w = col_w - 0.3;
+    let fs = fit_font_size(text, size, max_w);
+    let tw = estimate_text_width(text, fs);
     let x = (x_left + col_w - tw).max(x_left + 0.3);
-    layer.use_text(text, size, Mm(x), Mm(y), font);
+    layer.use_text(text, fs, Mm(x), Mm(y), font);
+}
+
+/// Encolhe proporcionalmente o tamanho da fonte até o texto caber em `max_w` (mm).
+/// Sem isso, valores monetários grandes (ex.: VL TOTAL de NF-e de alto valor) vazam
+/// para além da coluna e, no pior caso, para além da própria borda direita da página.
+/// `size` é retornado sem alteração se já couber. Piso de 3.5pt evita texto ilegível
+/// em casos patológicos onde nem o encolhimento resolve totalmente o excesso.
+fn fit_font_size(text: &str, size: f32, max_w: f32) -> f32 {
+    if max_w <= 0.0 {
+        return size;
+    }
+    let tw = estimate_text_width(text, size);
+    if tw <= max_w {
+        return size;
+    }
+    (size * (max_w / tw)).max(3.5)
 }
 
 fn text_wrap_clipped(
@@ -1303,7 +1331,8 @@ fn estimate_text_width(text: &str, font_size: f32) -> f32 {
             ' ' => 278.0,
             'i' | 'l' | ':' | ';' | ',' | '.' | '\'' | '!' | '|' => 278.0,
             'f' | 'j' | 't' | 'r' => 333.0,
-            'I' | '[' | ']' | '(' | ')' | '/' | '-' => 278.0,
+            'I' | '[' | ']' | '/' => 278.0,
+            '(' | ')' | '-' => 333.0,
             'a' | 'c' | 'e' | 'o' | 's' | 'b' | 'd' | 'g' | 'h' | 'k' | 'n' | 'p' | 'q' | 'u'
             | 'v' | 'x' | 'y' | 'z' => 556.0,
             'm' | 'w' => 778.0,
@@ -1392,4 +1421,93 @@ fn format_date(dt: &str) -> String {
         }
     }
     dt.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn margin_is_print_safe() {
+        // A maioria das impressoras (laser/jato de tinta) tem área não-imprimível
+        // de ~4-5mm nas bordas; margem menor que isso corta o conteúdo desenhado
+        // rente à borda da caixa, mesmo com o PDF matematicamente correto.
+        assert!(M >= 5.0, "margem M={M}mm é menor que o mínimo seguro de impressão");
+        assert_eq!(BODY_W, PAGE_W - 2.0 * M);
+    }
+
+    #[test]
+    fn scale_reprojects_reference_widths_onto_body_w() {
+        // As tabelas de largura de coluna (subrow_cols, dest, transp, items) foram
+        // desenhadas somando REF_BODY_W=206mm. SCALE precisa reprojetá-las
+        // exatamente sobre o BODY_W real — senão, ao aumentar M, essas tabelas
+        // ultrapassam a nova largura útil e vazam para além da borda direita.
+        assert!((SCALE * REF_BODY_W - BODY_W).abs() < 0.001);
+
+        // Exemplo real: tabela de colunas da tabela de itens (soma REF_BODY_W).
+        let ref_widths = [6.0, 14.0, 58.0, 12.0, 8.0, 7.0, 13.0, 9.0, 13.0, 9.0, 13.0, 14.0, 14.0, 16.0];
+        let sum_ref: f32 = ref_widths.iter().sum();
+        assert!((sum_ref - REF_BODY_W).abs() < 0.001);
+        let sum_scaled: f32 = ref_widths.iter().map(|w| w * SCALE).sum();
+        assert!(
+            sum_scaled <= BODY_W + 0.001,
+            "colunas escaladas ({sum_scaled}) ultrapassam BODY_W ({BODY_W})"
+        );
+    }
+
+    #[test]
+    fn fit_font_size_keeps_original_when_it_fits() {
+        let text = format_brl("999999.99"); // "999.999,99"
+        let col_w = 16.0; // largura real da coluna VL TOTAL
+        let max_w = col_w - 0.3;
+        assert_eq!(fit_font_size(&text, FS_SM, max_w), FS_SM);
+        assert!(estimate_text_width(&text, FS_SM) <= max_w);
+    }
+
+    #[test]
+    fn fit_font_size_shrinks_to_avoid_overflow_past_page_edge() {
+        // Reprodução do bug: NF-e de alto valor cujo total formatado não cabe
+        // na coluna VL TOTAL (16mm) e antes vazava para além da borda direita
+        // da página A4 (210mm).
+        let text = format_brl("1234567899.99"); // "1.234.567.899,99"
+        let col_w = 16.0;
+        let max_w = col_w - 0.3;
+
+        let fs = fit_font_size(&text, FS_SM, max_w);
+        assert!(fs < FS_SM, "deveria encolher a fonte quando o texto não cabe");
+
+        let tw = estimate_text_width(&text, fs);
+        assert!(
+            tw <= max_w + 0.01,
+            "texto ainda excede a coluna: tw={tw} max_w={max_w}"
+        );
+
+        // Posição final calculada por text_right_in nunca deve ultrapassar
+        // o limite direito da coluna (x_left + col_w).
+        let x_left = 192.0; // posição real da coluna VL TOTAL no layout A4
+        let x = (x_left + col_w - tw).max(x_left + 0.3);
+        assert!(
+            x + tw <= x_left + col_w + 0.01,
+            "texto vaza para além da coluna/página: fim={} limite={}",
+            x + tw,
+            x_left + col_w
+        );
+    }
+
+    #[test]
+    fn fit_font_size_never_shrinks_below_readable_floor() {
+        let text = "9".repeat(100);
+        let fs = fit_font_size(&text, FS_SM, 5.0);
+        assert!(fs >= 3.5);
+    }
+
+    #[test]
+    fn hyphen_and_parens_use_correct_helvetica_width() {
+        // Helvetica AFM: '(' ')' '-' = 333 unidades, não 278.
+        let base = estimate_text_width("0", FS_SM); // dígito de referência (556)
+        let hyphen = estimate_text_width("-", FS_SM);
+        let paren = estimate_text_width("(", FS_SM);
+        assert!((hyphen / base - 333.0 / 556.0).abs() < 0.001);
+        assert!((paren / base - 333.0 / 556.0).abs() < 0.001);
+    }
 }
