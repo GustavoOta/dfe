@@ -17,11 +17,44 @@ mod types;
 mod xml;
 
 use crate::error::{DfeError, Result};
-use crate::tipos::{Dest, Det, Emit, Ide, InfAdic, Pag, Total, Transp};
+use crate::tipos::{Dest, Det, Emit, Entrega, Ide, InfAdic, Pag, Total, Transp};
 use rust_decimal::Decimal;
 
 use types::NFeInterno;
 pub use types::{InfProt, Response, TagInfProt};
+pub use service::transmitir_xml_assinado;
+
+// Validações de contingência (`tpEmis != 1`), comuns a `gerar_xml()` e `emitir()` — fail-fast,
+// sem I/O, mesmo padrão do `SubstituicaoBuilder` (ver `substituicao/mod.rs`).
+fn validar_contingencia(ide: &Ide) -> Result<()> {
+    // tpEmis=9 (contingência off-line) é exclusivo de NFC-e (NT 2025.001) — não existe pra NF-e mod. 55.
+    if ide.tp_emis == 9 && ide.mod_ != 65 {
+        return Err(DfeError::Validacao(
+            "tp_emis=9 (contingência off-line) só é válido para NFC-e (mod=65)".to_string(),
+        ));
+    }
+    if ide.tp_emis != 1 {
+        let dh_cont = ide.dh_cont.as_deref().unwrap_or("").trim();
+        if dh_cont.is_empty() {
+            return Err(DfeError::Validacao(
+                "dh_cont (dhCont) é obrigatório quando tp_emis != 1".to_string(),
+            ));
+        }
+        // XSD (leiauteNFe_v4.00.xsd): xJust 15-256 caracteres.
+        let x_just_len = ide.x_just.as_deref().unwrap_or("").trim().chars().count();
+        if x_just_len < 15 {
+            return Err(DfeError::Validacao(
+                "x_just (xJust) deve ter no mínimo 15 caracteres quando tp_emis != 1".to_string(),
+            ));
+        }
+        if x_just_len > 256 {
+            return Err(DfeError::Validacao(
+                "x_just (xJust) deve ter no máximo 256 caracteres quando tp_emis != 1".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
 
 // ─── Builder público ──────────────────────────────────────────────────────────
 /// Builder fluente para emissão de **NF-e** (modelo 55) e **NFC-e** (modelo 65).
@@ -70,6 +103,8 @@ pub struct NFeBuilder {
     csc: Option<String>,
     active_ibs_cbs: Option<String>,
     desconto_rateio: Option<Decimal>,
+    frete_rateio: Option<Decimal>,
+    entrega: Option<Entrega>,
     referencias: Vec<String>,
 }
 
@@ -80,7 +115,8 @@ impl NFeBuilder {
             cert_path: None, cert_pass: None, ide: None, emitente: None,
             destinatario: None, itens: Vec::new(), total: None, transporte: None,
             pagamento: None, informacoes_adicionais: None, id_csc: None, csc: None,
-            active_ibs_cbs: None, desconto_rateio: None, referencias: Vec::new(),
+            active_ibs_cbs: None, desconto_rateio: None, frete_rateio: None,
+            entrega: None, referencias: Vec::new(),
         }
     }
 
@@ -112,6 +148,15 @@ impl NFeBuilder {
     pub fn active_ibs_cbs(mut self, f: &str) -> Self { self.active_ibs_cbs = Some(f.to_string()); self }
     /// Desconto global rateado proporcionalmente nos itens.
     pub fn desconto_rateio(mut self, v: Decimal) -> Self { self.desconto_rateio = Some(v); self }
+
+    /// Frete total a ratear proporcionalmente ao `vProd` de cada item (emite `det/prod/vFrete`
+    /// e soma em `ICMSTot/vFrete`). Ausente/zero → nenhum `<vFrete>` por item (XML inalterado).
+    /// A BC do ICMS já deve vir com a parcela de frete embutida (a crate não recalcula BC).
+    pub fn frete_rateio(mut self, v: Decimal) -> Self { self.frete_rateio = Some(v); self }
+
+    /// Local de entrega (`<entrega>`) — endereço de entrega no delivery (`indPres = 4`).
+    /// Ausente → grupo não emitido (XML inalterado).
+    pub fn entrega(mut self, e: Entrega) -> Self { self.entrega = Some(e); self }
     /// Adiciona uma chave de acesso referenciada (`<NFref><refNFe>`). Use para devolução (finNFe=4).
     pub fn referencia(mut self, chave: &str) -> Self { self.referencias.push(chave.to_string()); self }
 
@@ -128,6 +173,8 @@ impl NFeBuilder {
         let transporte = self.transporte.ok_or_else(|| DfeError::Validacao("transporte não informado".to_string()))?;
         let pagamento  = self.pagamento.ok_or_else(|| DfeError::Validacao("pagamento não informado".to_string()))?;
 
+        validar_contingencia(&ide)?;
+
         if self.itens.is_empty() {
             return Err(DfeError::Validacao("pelo menos um item (det) deve ser informado".to_string()));
         }
@@ -139,6 +186,8 @@ impl NFeBuilder {
             inf_adic: self.informacoes_adicionais,
             active_ibs_cbs: self.active_ibs_cbs,
             desconto_rateio: self.desconto_rateio,
+            frete_rateio: self.frete_rateio,
+            entrega: self.entrega,
             referencias: self.referencias,
         }).await?;
 
@@ -164,6 +213,8 @@ impl NFeBuilder {
         let transporte = self.transporte.ok_or_else(|| DfeError::Validacao("transporte não informado".to_string()))?;
         let pagamento  = self.pagamento.ok_or_else(|| DfeError::Validacao("pagamento não informado".to_string()))?;
 
+        validar_contingencia(&ide)?;
+
         if self.itens.is_empty() {
             return Err(DfeError::Validacao("pelo menos um item (det) deve ser informado".to_string()));
         }
@@ -175,7 +226,64 @@ impl NFeBuilder {
             inf_adic: self.informacoes_adicionais,
             active_ibs_cbs: self.active_ibs_cbs,
             desconto_rateio: self.desconto_rateio,
+            frete_rateio: self.frete_rateio,
+            entrega: self.entrega,
             referencias: self.referencias,
         }).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ide_contingencia(mod_: u32, dh_cont: Option<&str>, x_just: Option<&str>) -> Ide {
+        Ide {
+            mod_,
+            tp_emis: 9,
+            dh_cont: dh_cont.map(str::to_string),
+            x_just: x_just.map(str::to_string),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn tp_emis_9_so_e_valido_para_nfce() {
+        let ide = ide_contingencia(55, Some("2026-07-08T10:00:00-03:00"), Some("Falha de comunicação com a SEFAZ"));
+        let err = validar_contingencia(&ide).unwrap_err();
+        assert!(matches!(err, DfeError::Validacao(m) if m.contains("NFC-e")));
+    }
+
+    #[test]
+    fn tp_emis_9_exige_dh_cont() {
+        let ide = ide_contingencia(65, None, Some("Falha de comunicação com a SEFAZ"));
+        let err = validar_contingencia(&ide).unwrap_err();
+        assert!(matches!(err, DfeError::Validacao(m) if m.contains("dh_cont")));
+    }
+
+    #[test]
+    fn tp_emis_9_exige_x_just_minimo_15_chars() {
+        let ide = ide_contingencia(65, Some("2026-07-08T10:00:00-03:00"), Some("curta demais"));
+        let err = validar_contingencia(&ide).unwrap_err();
+        assert!(matches!(err, DfeError::Validacao(m) if m.contains("mínimo")));
+    }
+
+    #[test]
+    fn tp_emis_9_rejeita_x_just_acima_de_256_chars() {
+        let ide = ide_contingencia(65, Some("2026-07-08T10:00:00-03:00"), Some(&"a".repeat(257)));
+        let err = validar_contingencia(&ide).unwrap_err();
+        assert!(matches!(err, DfeError::Validacao(m) if m.contains("máximo")));
+    }
+
+    #[test]
+    fn tp_emis_9_com_dh_cont_e_x_just_validos_passa() {
+        let ide = ide_contingencia(65, Some("2026-07-08T10:00:00-03:00"), Some("Falha de comunicação com a SEFAZ"));
+        assert!(validar_contingencia(&ide).is_ok());
+    }
+
+    #[test]
+    fn tp_emis_1_nao_exige_dh_cont_nem_x_just() {
+        let ide = Ide { tp_emis: 1, ..Default::default() };
+        assert!(validar_contingencia(&ide).is_ok());
     }
 }

@@ -360,6 +360,7 @@ impl DanfeBuilderActions {
         let serie = ide.serie.clone().unwrap_or_default();
         let n_nf = ide.n_nf.clone().unwrap_or_default();
         let dh_emi = ide.dh_emi.clone().unwrap_or_default();
+        let tp_emis = ide.tp_emis.clone().unwrap_or_default();
 
         // Destinatário
         let dest_cpf_cnpj = dest
@@ -454,6 +455,7 @@ impl DanfeBuilderActions {
             &items,
             &qr_code_url,
             qr_side,
+            &tp_emis,
         )
     }
 }

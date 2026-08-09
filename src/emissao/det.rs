@@ -9,6 +9,7 @@ pub fn det_process(
     _mod_: u32,
     tp_amb: u8,
     desconto_rateio: Option<Decimal>,
+    frete_rateio: Option<Decimal>,
     _active_ibscbs: Option<String>,
 ) -> Result<Vec<DetProcess>> {
     let mut det_process_values: Vec<DetProcess> = Vec::new();
@@ -54,7 +55,31 @@ pub fn det_process(
     ); */
     // fim do desconto por rateio nos itens **************************************************
 
-    for (d, desconto_item) in prod.iter().zip(descontos_itens.iter()) {
+    // frete por rateio nos itens (mesmo molde do desconto) **********************************
+    // SEFAZ exige ICMSTot/vFrete == Σ det/prod/vFrete. Rateamos o frete total proporcional
+    // ao vProd de cada item e ajustamos o último para a soma bater exatamente.
+    let frete_rateado = frete_rateio.unwrap_or_else(|| Decimal::new(0, 2));
+    let frete_percentual = if total_produtos > Decimal::new(0, 2) {
+        frete_rateado / total_produtos
+    } else {
+        Decimal::new(0, 2)
+    };
+    let mut fretes_itens: Vec<Decimal> = Vec::new();
+    for d in &prod {
+        let v_prod_decimal = Decimal::from_f64(d.v_prod).unwrap_or(Decimal::new(0, 2));
+        fretes_itens.push((v_prod_decimal * frete_percentual).round_dp(2));
+    }
+    let soma_fretes: Decimal = fretes_itens.iter().cloned().sum();
+    if soma_fretes != frete_rateado {
+        if let Some(last) = fretes_itens.last_mut() {
+            *last += frete_rateado - soma_fretes;
+        }
+    }
+    // fim do frete por rateio nos itens *****************************************************
+
+    for ((d, desconto_item), frete_item) in
+        prod.iter().zip(descontos_itens.iter()).zip(fretes_itens.iter())
+    {
         let mut x_prod = d.x_prod.clone();
         // SEFAZ exige texto fixo no primeiro item em homologação (mod 55 e 65)
         if first_item == 0 && tp_amb == 2 {
@@ -65,6 +90,13 @@ pub fn det_process(
         // pegar o valor do desconto do item
         let v_desc_value: Option<Decimal> = if *desconto_item > Decimal::new(0, 2) {
             Some(*desconto_item)
+        } else {
+            None
+        };
+
+        // frete rateado do item (None quando não há frete → não emite <vFrete>)
+        let v_frete_value: Option<Decimal> = if *frete_item > Decimal::new(0, 2) {
+            Some(*frete_item)
         } else {
             None
         };
@@ -85,6 +117,7 @@ pub fn det_process(
                 u_trib: d.u_trib.to_string(),
                 q_trib: format!("{:.3}", d.q_trib),
                 v_un_trib: format!("{:.2}", d.v_un_trib),
+                v_frete: v_frete_value,
                 v_desc: v_desc_value,
                 ind_tot: d.ind_tot.to_string(),
                 x_ped: d.x_ped.clone(),
@@ -132,6 +165,38 @@ fn ibs_cbs_process(ibs_cbs: Option<&IbsCbs>) -> Option<IBSCBSProcess> {
     })
 }
 
+/// Grupo do ICMS-ST retido anteriormente, compartilhado por CST 60 e CSOSN 500.
+///
+/// No XSD os quatro campos vivem dentro de um `xs:sequence minOccurs="0"` em que `vBCSTRet`,
+/// `pST` e `vICMSSTRet` são obrigatórios e `vICMSSubstituto` é opcional — ou seja, é tudo ou
+/// nada (NT 2011/004). Omitir o grupo em NF-e (modelo 55) gera a rejeição 938; em NFC-e
+/// (modelo 65) a SEFAZ não cobra.
+///
+/// Zero é tratado como "não informado": `pST` é `TDec_0302a04Opc`, que por definição não aceita
+/// valor zero, então um grupo zerado seria recusado de qualquer forma.
+fn grupo_st_retido(
+    v_bcst_ret: Option<f64>,
+    p_st: Option<f64>,
+    v_icms_substituto: Option<f64>,
+    v_icmsst_ret: Option<f64>,
+) -> (Option<String>, Option<String>, Option<String>, Option<String>) {
+    let bcst = v_bcst_ret.filter(|&v| v > 0.0);
+    let pst = p_st.filter(|&v| v > 0.0);
+    let subst = v_icms_substituto.filter(|&v| v > 0.0);
+    let icmsst = v_icmsst_ret.filter(|&v| v > 0.0);
+
+    if bcst.is_none() && pst.is_none() && icmsst.is_none() {
+        return (None, None, None, None);
+    }
+
+    (
+        Some(format!("{:.2}", bcst.unwrap_or(0.0))),
+        Some(format!("{:.2}", pst.unwrap_or(0.0))),
+        subst.map(|v| format!("{:.2}", v)),
+        Some(format!("{:.2}", icmsst.unwrap_or(0.0))),
+    )
+}
+
 fn select_icms_process(icms: &Icms) -> ICMSProcess {
     match icms {
         Icms::Icms00 { orig, mod_bc, v_bc, p_icms, v_icms } =>
@@ -177,22 +242,8 @@ fn select_icms_process(icms: &Icms) -> ICMSProcess {
             }),
 
         Icms::Icms60 { orig, v_bcst_ret, p_st, v_icms_substituto, v_icmsst_ret } => {
-            // xs:sequence minOccurs="0": todos presentes ou nenhum (NT 2011/004)
-            let bcst   = v_bcst_ret.filter(|&v| v > 0.0);
-            let pst    = p_st.filter(|&v| v > 0.0);
-            let subst  = v_icms_substituto.filter(|&v| v > 0.0);
-            let icmsst = v_icmsst_ret.filter(|&v| v > 0.0);
             let (v_bcst_ret, p_st, v_icms_substituto, v_icmsst_ret) =
-                if bcst.is_some() || pst.is_some() || icmsst.is_some() {
-                    (
-                        Some(format!("{:.2}", bcst.unwrap_or(0.0))),
-                        Some(format!("{:.2}", pst.unwrap_or(0.0))),
-                        subst.map(|v| format!("{:.2}", v)),
-                        Some(format!("{:.2}", icmsst.unwrap_or(0.0))),
-                    )
-                } else {
-                    (None, None, None, None)
-                };
+                grupo_st_retido(*v_bcst_ret, *p_st, *v_icms_substituto, *v_icmsst_ret);
             ICMSProcess::ICMS60(ICMS60 {
                 orig: *orig, cst: "60".to_string(),
                 v_bcst_ret, p_st, v_icms_substituto, v_icmsst_ret,
@@ -228,12 +279,14 @@ fn select_icms_process(icms: &Icms) -> ICMSProcess {
         Icms::Sn102 { orig, csosn } =>
             ICMSProcess::ICMSSN102(ICMSSN102 { orig: *orig, csosn: csosn.clone() }),
 
-        Icms::Sn500 { orig, v_bcst_ret, v_icmsst_ret } =>
+        Icms::Sn500 { orig, v_bcst_ret, p_st, v_icms_substituto, v_icmsst_ret } => {
+            let (vbcst_ret, p_st, v_icms_substituto, vicmsst_ret) =
+                grupo_st_retido(*v_bcst_ret, *p_st, *v_icms_substituto, *v_icmsst_ret);
             ICMSProcess::ICMSSN500(ICMSSN500 {
                 orig: *orig, csosn: "500".to_string(),
-                vbcst_ret: v_bcst_ret.map(|v| format!("{:.2}", v)),
-                vicmsst_ret: v_icmsst_ret.map(|v| format!("{:.2}", v)),
-            }),
+                vbcst_ret, p_st, v_icms_substituto, vicmsst_ret,
+            })
+        }
 
         Icms::Sn900 { orig, mod_bc, v_bc, p_red_bc, p_icms, v_icms, p_cred_sn, v_cred_icmssn,
                       mod_bcst, p_mvast, p_red_bcst, v_bcst, p_icmsst, v_icmsst } =>
@@ -331,6 +384,155 @@ fn select_cofins_process(cofins: &Cofins) -> COFINSProcess {
             }),
             ..Default::default()
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::total::total_process;
+    use super::det_process;
+    use crate::tipos::{Det, Total};
+    use rust_decimal::Decimal;
+
+    fn item(v_prod: f64) -> Det {
+        Det { v_prod, ..Default::default() }
+    }
+
+    fn d(s: &str) -> Decimal {
+        Decimal::from_str_exact(s).unwrap()
+    }
+
+    #[test]
+    fn frete_rateado_soma_bate_com_total_e_icmstot() {
+        // 100 + 200 + 300 = 600; frete 30 → 5 / 10 / 15 (proporcional ao vProd).
+        let prod = vec![item(100.0), item(200.0), item(300.0)];
+        let dets = det_process(prod, 65, 1, None, Some(d("30.00")), None).unwrap();
+
+        assert_eq!(dets[0].prod.v_frete, Some(d("5.00")));
+        assert_eq!(dets[1].prod.v_frete, Some(d("10.00")));
+        assert_eq!(dets[2].prod.v_frete, Some(d("15.00")));
+
+        let soma: Decimal = dets.iter().map(|x| x.prod.v_frete.unwrap_or(Decimal::ZERO)).sum();
+        assert_eq!(soma, d("30.00"));
+
+        // ICMSTot/vFrete == Σ det/prod/vFrete (Total sem frete global).
+        let tot = total_process(Total::default(), dets, 1, None).unwrap();
+        assert_eq!(tot.icms_tot.v_frete, "30.00");
+    }
+
+    #[test]
+    fn frete_rateado_ajusta_ultimo_item_no_arredondamento() {
+        // 10 + 10 + 10 = 30; frete 10 → 3.33 + 3.33 + 3.34 (último absorve a diferença) = 10.00.
+        let prod = vec![item(10.0), item(10.0), item(10.0)];
+        let dets = det_process(prod, 65, 1, None, Some(d("10.00")), None).unwrap();
+
+        let soma: Decimal = dets.iter().map(|x| x.prod.v_frete.unwrap_or(Decimal::ZERO)).sum();
+        assert_eq!(soma, d("10.00"), "a soma do frete rateado deve bater exatamente");
+        assert_eq!(dets[2].prod.v_frete, Some(d("3.34")));
+
+        let tot = total_process(Total::default(), dets, 1, None).unwrap();
+        assert_eq!(tot.icms_tot.v_frete, "10.00");
+    }
+
+    #[test]
+    fn sem_frete_rateado_e_aditivo() {
+        // Sem frete_rateio: nenhum <vFrete> por item; ICMSTot/vFrete usa o total global
+        // informado (comportamento anterior preservado → mudança aditiva).
+        let prod = vec![item(100.0), item(200.0)];
+        let dets = det_process(prod, 65, 1, None, None, None).unwrap();
+        assert!(dets.iter().all(|x| x.prod.v_frete.is_none()));
+
+        let total = Total { v_frete: 15.0, ..Default::default() };
+        let tot = total_process(total, dets, 1, None).unwrap();
+        assert_eq!(tot.icms_tot.v_frete, "15.00");
+    }
+
+    // ── Grupo do ICMS-ST retido anteriormente (CST 60 / CSOSN 500) ──────────────
+    // Rejeição 938 da SEFAZ: "Não informada vBCSTRet, pST, vICMSSubstituto e vICMSSTRet".
+    // Vale para NF-e (modelo 55); NFC-e (modelo 65) não cobra o grupo.
+
+    use super::{grupo_st_retido, select_icms_process};
+    use crate::emissao::det_process::entity::ICMSProcess;
+    use crate::tipos::Icms;
+
+    #[test]
+    fn grupo_st_retido_e_tudo_ou_nada() {
+        // Nenhum valor → grupo inteiro omitido (comportamento válido só em NFC-e).
+        assert_eq!(grupo_st_retido(None, None, None, None), (None, None, None, None));
+
+        // Qualquer valor presente → os três obrigatórios saem, vICMSSubstituto continua opcional.
+        let (bcst, pst, subst, icmsst) = grupo_st_retido(Some(100.0), Some(18.0), None, Some(18.0));
+        assert_eq!(bcst.as_deref(), Some("100.00"));
+        assert_eq!(pst.as_deref(), Some("18.00"));
+        assert_eq!(subst, None, "vICMSSubstituto é opcional dentro do grupo");
+        assert_eq!(icmsst.as_deref(), Some("18.00"));
+    }
+
+    #[test]
+    fn grupo_st_retido_trata_zero_como_ausente() {
+        // pST é TDec_0302a04Opc, que não aceita zero — um grupo zerado seria recusado.
+        assert_eq!(
+            grupo_st_retido(Some(0.0), Some(0.0), Some(0.0), Some(0.0)),
+            (None, None, None, None)
+        );
+    }
+
+    #[test]
+    fn sn500_serializa_grupo_st_na_ordem_do_xsd() {
+        let icms = Icms::Sn500 {
+            orig: 0,
+            v_bcst_ret: Some(231.0),
+            p_st: Some(18.0),
+            v_icms_substituto: None,
+            v_icmsst_ret: Some(41.58),
+        };
+        let ICMSProcess::ICMSSN500(sn500) = select_icms_process(&icms) else {
+            panic!("esperava ICMSSN500");
+        };
+        let xml = quick_xml::se::to_string(&sn500).unwrap();
+
+        for tag in ["<orig>", "<CSOSN>", "<vBCSTRet>", "<pST>", "<vICMSSTRet>"] {
+            assert!(xml.contains(tag), "faltou {} em {}", tag, xml);
+        }
+        assert!(!xml.contains("<vICMSSubstituto>"), "opcional não deve sair quando ausente");
+
+        // O XSD define uma xs:sequence — a ordem das tags é normativa.
+        let pos = |t: &str| xml.find(t).unwrap();
+        assert!(pos("<vBCSTRet>") < pos("<pST>"));
+        assert!(pos("<pST>") < pos("<vICMSSTRet>"));
+    }
+
+    #[test]
+    fn sn500_sem_valores_omite_o_grupo_inteiro() {
+        let ICMSProcess::ICMSSN500(sn500) = select_icms_process(&Icms::sn500(0)) else {
+            panic!("esperava ICMSSN500");
+        };
+        let xml = quick_xml::se::to_string(&sn500).unwrap();
+
+        assert!(xml.contains("<CSOSN>500</CSOSN>"));
+        for tag in ["<vBCSTRet>", "<pST>", "<vICMSSTRet>"] {
+            assert!(!xml.contains(tag), "{} não deveria sair em {}", tag, xml);
+        }
+    }
+
+    #[test]
+    fn icms60_mantem_o_mesmo_grupo_do_sn500() {
+        let icms = Icms::Icms60 {
+            orig: 0,
+            v_bcst_ret: Some(231.0),
+            p_st: Some(18.0),
+            v_icms_substituto: Some(10.0),
+            v_icmsst_ret: Some(41.58),
+        };
+        let ICMSProcess::ICMS60(icms60) = select_icms_process(&icms) else {
+            panic!("esperava ICMS60");
+        };
+        let xml = quick_xml::se::to_string(&icms60).unwrap();
+
+        assert!(xml.contains("<vBCSTRet>231.00</vBCSTRet>"));
+        assert!(xml.contains("<pST>18.00</pST>"));
+        assert!(xml.contains("<vICMSSubstituto>10.00</vICMSSubstituto>"));
+        assert!(xml.contains("<vICMSSTRet>41.58</vICMSSTRet>"));
     }
 }
 

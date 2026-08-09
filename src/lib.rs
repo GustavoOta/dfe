@@ -75,6 +75,7 @@
 //! ```
 pub mod cancelar;
 pub mod carta_correcao;
+pub mod consulta_situacao;
 #[cfg(feature = "danfe")]
 pub mod danfe;
 #[cfg(feature = "distribuicao")]
@@ -93,6 +94,7 @@ pub mod xml_extractor;
 mod interno;
 
 pub use cancelar::CancelarBuilder;
+pub use consulta_situacao::ConsultaSituacaoBuilder;
 #[cfg(feature = "danfe")]
 pub use danfe::DanfeBuilder;
 #[cfg(feature = "escpos")]
@@ -108,6 +110,7 @@ pub use substituicao::SubstituicaoBuilder;
 pub use carta_correcao::CartaCorrecaoBuilder;
 pub use emissao::NFeBuilder;
 pub use emissao::Response as EmissaoResponse;
+pub use emissao::transmitir_xml_assinado;
 pub use error::DfeError;
 pub use status::NFeService;
 pub use status::NFeServiceResponse;

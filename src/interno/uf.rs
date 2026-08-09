@@ -7,7 +7,8 @@
 use crate::error::{DfeError, Result};
 
 /// Tabela canônica `(código IBGE, sigla)` das 27 UFs.
-const UFS: &[(&str, &str)] = &[
+/// `pub(crate)` para que testes de roteamento iterem as 27 UFs sem duplicar a tabela.
+pub(crate) const UFS: &[(&str, &str)] = &[
     ("11", "RO"), ("12", "AC"), ("13", "AM"), ("14", "RR"), ("15", "PA"), ("16", "AP"),
     ("17", "TO"), ("21", "MA"), ("22", "PI"), ("23", "CE"), ("24", "RN"), ("25", "PB"),
     ("26", "PE"), ("27", "AL"), ("28", "SE"), ("29", "BA"), ("31", "MG"), ("32", "ES"),

@@ -135,8 +135,10 @@ impl EscPosBuilder {
     /// Útil para texto em destaque sem reduzir o número de colunas por linha.
     /// 1 = normal · 2 = altura dupla · 3 = altura tripla (máx 8).
     pub fn font_height(mut self, size: u8) -> Self {
-        let h = size.saturating_sub(1).min(7);
-        let byte = h << 4; // nibble superior = altura, nibble inferior = 0 (1× largura)
+        // `GS ! n`: nibble **inferior** = altura, nibble **superior** = largura.
+        // Inverter os dois não dá erro nem sai borrado: dobra a largura, a linha
+        // passa a ocupar o dobro de colunas e o fim dela cai no papel de baixo.
+        let byte = size.saturating_sub(1).min(7);
         self.buffer.extend_from_slice(&[0x1D, 0x21, byte]);
         self
     }
@@ -195,36 +197,36 @@ impl EscPosBuilder {
     /// - Outros dados → Code 128B (ASCII imprimível)
     /// - Altura: 80 px · Largura de módulo: 2 px
     pub fn barcode_128(mut self, data: &str) -> Self {
-        use barcoders::sym::code128::Code128;
-
-        let is_numeric_even = data.chars().all(|c| c.is_ascii_digit()) && data.len() % 2 == 0;
-        // \u{0106} = Ć = Start-C (pares de dígitos) · \u{0105} = ą = Start-B (ASCII)
-        let code_data = if is_numeric_even {
-            format!("\u{0106}{data}")
-        } else {
-            format!("\u{0105}{data}")
+        let encoded = match encode_code128(data) {
+            Some(e) => e,
+            None => return self,
         };
 
-        let encoded = match Code128::new(&code_data) {
-            Ok(b) => b.encode(),
-            Err(_) => return self,
+        let img = barcode_image(&encoded, 2, 80);
+        let raster = rasterize(&DynamicImage::ImageLuma8(img), self.paper_width);
+        self.buffer.extend_from_slice(&raster);
+        self.buffer.push(b'\n');
+        self
+    }
+
+    /// Código de barras **EAN-13** renderizado como imagem raster, no mesmo
+    /// pipeline de [`barcode_128`](Self::barcode_128).
+    ///
+    /// É o padrão dos produtos de varejo no Brasil, e um leitor de PDV lê EAN-13
+    /// bem mais rápido do que o mesmo número em Code 128.
+    ///
+    /// Aceita 12 dígitos (calcula o dígito verificador) ou 13 (confere o que veio).
+    /// Quando `data` não é um EAN-13 válido — código interno, campo em branco,
+    /// dígito verificador errado — **cai automaticamente em Code 128**, que aceita
+    /// qualquer conteúdo: melhor uma etiqueta legível em outro padrão do que uma
+    /// etiqueta sem código de barras nenhum.
+    pub fn barcode_ean13(mut self, data: &str) -> Self {
+        let encoded = match encode_ean13(data) {
+            Some(e) => e,
+            None => return self.barcode_128(data),
         };
 
-        let module_width: u32 = 2;
-        let bar_height: u32 = 80;
-        let total_width: u32 = encoded.len() as u32 * module_width;
-
-        let mut img = GrayImage::new(total_width, bar_height);
-        for (idx, &bar) in encoded.iter().enumerate() {
-            let luma = if bar == 1 { 0u8 } else { 255u8 };
-            for dx in 0..module_width {
-                let x = idx as u32 * module_width + dx;
-                for y in 0..bar_height {
-                    img.put_pixel(x, y, Luma([luma]));
-                }
-            }
-        }
-
+        let img = barcode_image(&encoded, 2, 80);
         let raster = rasterize(&DynamicImage::ImageLuma8(img), self.paper_width);
         self.buffer.extend_from_slice(&raster);
         self.buffer.push(b'\n');
@@ -405,6 +407,184 @@ impl EscPosBuilder {
 
         self
     }
+
+    /// Código de barras à **esquerda** e texto à **direita**, na mesma faixa,
+    /// como uma única imagem raster (`GS v 0`).
+    ///
+    /// Em ESC/POS, tanto `GS k` quanto `GS v 0` encerram a linha: nada é impresso
+    /// ao lado deles por comando de texto. Lado a lado só existe compondo **uma**
+    /// imagem — é o mesmo caminho de [`qr_with_text_right`](Self::qr_with_text_right).
+    ///
+    /// Pensado para etiqueta de gôndola (barras + preço), mas serve a qualquer par.
+    ///
+    /// - `data` vira EAN-13 e, se não for um EAN válido, Code 128 — como em
+    ///   [`barcode_ean13`](Self::barcode_ean13).
+    /// - O número legível sai em corpo pequeno sob as barras.
+    /// - O texto da direita é ampliado **até o maior corpo que couber** no espaço
+    ///   que sobrou, e centralizado na vertical: o mesmo código serve 80 e 58 mm.
+    /// - Cada entrada é `(texto, negrito)`.
+    /// - Se o código de barras não couber deixando espaço de texto utilizável,
+    ///   cai no empilhado (barras em cima, texto embaixo) em vez de espremer.
+    pub fn barcode_with_text_right(mut self, data: &str, lines: &[(String, bool)]) -> Self {
+        let encoded = match encode_ean13(data).or_else(|| encode_code128(data)) {
+            Some(e) => e,
+            None => return self,
+        };
+
+        let paper_dots = self.paper_dots;
+        let modules = encoded.len() as u32;
+
+        // Barras ocupam ~50 % do papel; o módulo nunca fica abaixo de 2 px, que é
+        // o mínimo para o leitor não perder a barra fina.
+        const GAP: u32 = 12;
+        const BAR_H: u32 = 90;
+        const LEGENDA_S: u32 = 2;
+
+        let module_width = (paper_dots * 50 / 100 / modules).max(2);
+        let bc_w = modules * module_width;
+        let texto_w = paper_dots.saturating_sub(bc_w + GAP);
+
+        // Sem largura para pelo menos ~6 caracteres legíveis, lado a lado piora a
+        // etiqueta em vez de melhorar: volta ao empilhado.
+        if texto_w < 6 * 8 * 2 {
+            self = self.barcode_ean13(data);
+            for (linha, _) in lines {
+                self = self.text(format!("{linha}\n"));
+            }
+            return self;
+        }
+
+        let bloco_barras = BAR_H + 4 + 8 * LEGENDA_S;
+
+        // Maior corpo que cabe: largura da maior linha e altura do bloco inteiro.
+        let mais_larga = lines.iter().map(|(l, _)| l.chars().count() as u32).max().unwrap_or(0);
+        let escala = (2..=8u32)
+            .rev()
+            .find(|s| mais_larga * 8 * s <= texto_w && lines.len() as u32 * (8 * s + 4) <= bloco_barras)
+            .unwrap_or(2);
+        let bloco_texto = lines.len() as u32 * (8 * escala + 4);
+
+        let img_h = bloco_barras.max(bloco_texto).max(1);
+        let mut img = GrayImage::from_pixel(paper_dots, img_h, Luma([255u8]));
+
+        // ── Barras + número legível, centralizados na vertical ────────────────
+        let bar_y = (img_h - bloco_barras) / 2;
+        for (idx, &bar) in encoded.iter().enumerate() {
+            if bar != 1 {
+                continue;
+            }
+            for dx in 0..module_width {
+                let x = idx as u32 * module_width + dx;
+                for y in bar_y..bar_y + BAR_H {
+                    img.put_pixel(x, y, Luma([0u8]));
+                }
+            }
+        }
+        let legenda = data.trim();
+        let legenda_x = bc_w.saturating_sub(text_width(legenda, LEGENDA_S)) / 2;
+        draw_text(&mut img, legenda_x, bar_y + BAR_H + 4, legenda, LEGENDA_S, false);
+
+        // ── Texto à direita, centralizado na vertical ─────────────────────────
+        let texto_x = bc_w + GAP;
+        let mut y = (img_h - bloco_texto.min(img_h)) / 2;
+        for (linha, bold) in lines {
+            draw_text(&mut img, texto_x, y, linha, escala, *bold);
+            y += 8 * escala + 4;
+        }
+
+        let raster = rasterize(&DynamicImage::ImageLuma8(img), self.paper_width);
+        self.buffer.extend_from_slice(&raster);
+        self.buffer.push(b'\n');
+        self
+    }
+}
+
+// ── Código de barras: codificação e desenho ──────────────────────────────────
+
+/// Módulos de um EAN-13 (aceita 12 dígitos e calcula o verificador, ou 13 e o
+/// confere). `None` quando `data` não é EAN-13 válido.
+fn encode_ean13(data: &str) -> Option<Vec<u8>> {
+    barcoders::sym::ean13::EAN13::new(data).ok().map(|b| b.encode())
+}
+
+/// Módulos de um Code 128. Dados só-dígitos de comprimento par vão em Code 128C
+/// (dobro da densidade); o resto em Code 128B.
+fn encode_code128(data: &str) -> Option<Vec<u8>> {
+    // Marcadores de conjunto exigidos pelo `barcoders`:
+    // \u{0106} = Ć = Start-C (pares de dígitos) · \u{0181} = Ɓ = Start-B (ASCII imprimível).
+    // Não confundir o Start-B com \u{0105} (ą): o crate rejeita e o código de
+    // barras sai vazio — era o que acontecia com qualquer dado não numérico.
+    let numerico_par = data.chars().all(|c| c.is_ascii_digit()) && data.len() % 2 == 0;
+    let marcado = if numerico_par {
+        format!("\u{0106}{data}")
+    } else {
+        format!("\u{0181}{data}")
+    };
+    barcoders::sym::code128::Code128::new(&marcado).ok().map(|b| b.encode())
+}
+
+/// Imagem só das barras, sem margem — usada quando o código ocupa a faixa inteira.
+fn barcode_image(encoded: &[u8], module_width: u32, height: u32) -> GrayImage {
+    let mut img = GrayImage::new(encoded.len() as u32 * module_width, height);
+    for (idx, &bar) in encoded.iter().enumerate() {
+        let luma = if bar == 1 { 0u8 } else { 255u8 };
+        for dx in 0..module_width {
+            for y in 0..height {
+                img.put_pixel(idx as u32 * module_width + dx, y, Luma([luma]));
+            }
+        }
+    }
+    img
+}
+
+// ── Texto desenhado em imagem (font8x8) ──────────────────────────────────────
+
+/// Largura em pixels que `texto` ocupa na escala dada.
+fn text_width(texto: &str, escala: u32) -> u32 {
+    texto.chars().count() as u32 * 8 * escala
+}
+
+/// Desenha `texto` na imagem a partir de (`x`, `y`), cada pixel da fonte virando
+/// um bloco `escala`×`escala`. Negrito = segunda passada com 1 px de deslocamento.
+/// O que passar da borda é descartado.
+fn draw_text(img: &mut GrayImage, x: u32, y: u32, texto: &str, escala: u32, bold: bool) {
+    use font8x8::UnicodeFonts;
+
+    let (w, h) = (img.width(), img.height());
+    let mut cx = x;
+    for ch in texto.chars() {
+        if cx + 8 * escala > w {
+            break;
+        }
+        let glyph = font8x8::BASIC_FONTS
+            .get(ch)
+            .or_else(|| font8x8::LATIN_FONTS.get(ch))
+            .unwrap_or([0u8; 8]);
+
+        for (row, &byte) in glyph.iter().enumerate() {
+            for sy in 0..escala {
+                let py = y + row as u32 * escala + sy;
+                if py >= h {
+                    break;
+                }
+                for bit in 0..8u32 {
+                    if byte & (1u8 << bit) == 0 {
+                        continue;
+                    }
+                    for sx in 0..escala {
+                        let px = cx + bit * escala + sx;
+                        if px < w {
+                            img.put_pixel(px, py, Luma([0u8]));
+                        }
+                        if bold && px + 1 < w {
+                            img.put_pixel(px + 1, py, Luma([0u8]));
+                        }
+                    }
+                }
+            }
+        }
+        cx += 8 * escala;
+    }
 }
 
 impl Default for EscPosBuilder {
@@ -491,6 +671,109 @@ fn rasterize(img: &DynamicImage, paper_width_mm: u8) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    /// Último `GS ! n` emitido — o `build()` prefixa init e code page.
+    fn escala(bytes: &[u8]) -> u8 {
+        let i = bytes
+            .windows(2)
+            .rposition(|w| w == [0x1D, 0x21])
+            .expect("nenhum GS ! no buffer");
+        bytes[i + 2]
+    }
+
+    /// Quantos cabeçalhos de imagem raster (`GS v 0`) o buffer tem.
+    fn faixas_raster(bytes: &[u8]) -> usize {
+        bytes.windows(4).filter(|w| *w == [0x1D, 0x76, 0x30, 0x00]).count()
+    }
+
+    #[test]
+    fn barcode_com_texto_a_direita_sai_numa_faixa_raster_unica() {
+        // Lado a lado só existe como uma imagem só: duas faixas significariam
+        // barras em cima e preço embaixo, que é justamente o que se quer evitar.
+        let bytes = EscPosBuilder::new()
+            .paper_width(80)
+            .barcode_with_text_right("7898357135512", &[("R$ 27,90".into(), true)])
+            .build();
+
+        assert_eq!(faixas_raster(&bytes), 1);
+        // O preço vira pixel: não pode sobrar como texto ESC/POS solto.
+        assert!(!String::from_utf8_lossy(&bytes).contains("R$ 27,90"));
+    }
+
+    #[test]
+    fn barcode_com_texto_a_direita_aceita_nao_ean() {
+        // Código interno cai em Code 128, como no barcode_ean13.
+        let bytes = EscPosBuilder::new()
+            .paper_width(80)
+            .barcode_with_text_right("ABC-123", &[("R$ 9,90".into(), true)])
+            .build();
+
+        assert_eq!(faixas_raster(&bytes), 1);
+    }
+
+    #[test]
+    fn barcode_largo_demais_volta_a_empilhar() {
+        // Dado longo: as barras tomam o papel inteiro e não sobra coluna de texto
+        // utilizável. Melhor empilhar do que espremer o preço em 3 caracteres.
+        let dados = "CODIGO-INTERNO-MUITO-LONGO-DE-PRODUTO-XYZ";
+        let bytes = EscPosBuilder::new()
+            .paper_width(80)
+            .barcode_with_text_right(dados, &[("R$ 27,90".into(), true)])
+            .build();
+
+        assert_eq!(faixas_raster(&bytes), 1, "as barras continuam saindo");
+        assert!(
+            String::from_utf8_lossy(&bytes).contains("R$ 27,90"),
+            "no empilhado o preço volta a ser texto ESC/POS"
+        );
+    }
+
+    #[test]
+    fn barcode_com_texto_cabe_tambem_em_58_mm() {
+        let bytes = EscPosBuilder::new()
+            .paper_width(58)
+            .barcode_with_text_right("7898357135512", &[("R$ 27,90".into(), true)])
+            .build();
+
+        assert_eq!(faixas_raster(&bytes), 1);
+        assert!(!String::from_utf8_lossy(&bytes).contains("R$ 27,90"));
+    }
+
+    #[test]
+    fn draw_text_amplia_o_desenho_com_a_escala() {
+        let escuros = |escala: u32| {
+            let mut img = GrayImage::from_pixel(300, 60, Luma([255u8]));
+            draw_text(&mut img, 0, 0, "88", escala, false);
+            img.pixels().filter(|p| p.0[0] < 128).count()
+        };
+
+        assert!(escuros(1) > 0, "escala 1 nao desenhou nada");
+        assert!(
+            escuros(2) > escuros(1) * 3,
+            "escala 2 deveria cobrir ~4x a area da escala 1"
+        );
+    }
+
+    #[test]
+    fn draw_text_nao_estoura_a_borda_da_imagem() {
+        let mut img = GrayImage::from_pixel(20, 20, Luma([255u8]));
+        draw_text(&mut img, 0, 0, "88888888", 2, true); // largura pedida >> imagem
+        assert_eq!(img.width(), 20);
+    }
+
+    #[test]
+    fn font_height_escala_so_a_altura() {
+        // GS ! n — nibble inferior = altura, superior = largura. Só a altura
+        // pode crescer: dobrar a largura corta pela metade as colunas da linha.
+        assert_eq!(escala(&EscPosBuilder::new().font_height(2).build()), 0x01);
+        assert_eq!(escala(&EscPosBuilder::new().font_height(3).build()), 0x02);
+        assert_eq!(escala(&EscPosBuilder::new().font_height(1).build()), 0x00);
+    }
+
+    #[test]
+    fn font_size_escala_altura_e_largura_juntas() {
+        assert_eq!(escala(&EscPosBuilder::new().font_size(2).build()), 0x11);
+    }
+
     #[test]
     fn build_returns_nonempty_bytes() {
         let bytes = EscPosBuilder::new()
@@ -536,5 +819,50 @@ mod tests {
         // GS v 0 raster header
         let pos = bytes.windows(4).position(|w| w == [0x1D, 0x76, 0x30, 0x00]).unwrap();
         assert!(bytes.len() > pos + 8);
+    }
+
+    #[test]
+    fn barcode_128_encodes_dados_alfanumericos() {
+        // Conjunto B (texto e dígitos em quantidade ímpar). Com o marcador de
+        // Start-B errado o crate rejeitava e o barcode saía vazio, sem erro.
+        for data in ["PROD-42", "ABC123", "12345"] {
+            let bytes = EscPosBuilder::new().barcode_128(data).build();
+            assert!(
+                bytes.windows(4).any(|w| w == [0x1D, 0x76, 0x30, 0x00]),
+                "code128 nao gerou raster para {data:?}"
+            );
+        }
+    }
+
+    /// Posição do cabeçalho raster `GS v 0`, presente em qualquer código de barras.
+    fn raster_header(bytes: &[u8]) -> Option<usize> {
+        bytes.windows(4).position(|w| w == [0x1D, 0x76, 0x30, 0x00])
+    }
+
+    #[test]
+    fn barcode_ean13_aceita_12_e_13_digitos() {
+        // 12 dígitos: o dígito verificador é calculado.
+        let doze = EscPosBuilder::new().barcode_ean13("789835713551").build();
+        // 13 dígitos com verificador correto.
+        let treze = EscPosBuilder::new().barcode_ean13("7898357135512").build();
+        assert!(raster_header(&doze).is_some());
+        assert!(raster_header(&treze).is_some());
+        assert_eq!(doze, treze, "o 13o digito e o verificador dos 12 primeiros");
+    }
+
+    #[test]
+    fn barcode_ean13_cai_em_code128_quando_nao_e_ean() {
+        // Código interno do PDV: não é EAN, mas a etiqueta não pode sair sem barras.
+        let interno = EscPosBuilder::new().barcode_ean13("PROD-42").build();
+        let code128 = EscPosBuilder::new().barcode_128("PROD-42").build();
+        assert!(raster_header(&interno).is_some());
+        assert_eq!(interno, code128);
+    }
+
+    #[test]
+    fn barcode_ean13_com_verificador_errado_cai_em_code128() {
+        let errado = EscPosBuilder::new().barcode_ean13("7898357135519").build();
+        let code128 = EscPosBuilder::new().barcode_128("7898357135519").build();
+        assert_eq!(errado, code128);
     }
 }

@@ -397,6 +397,12 @@ pub struct ICMSSN500 {
     pub csosn: String, // Código de Situação da Operação - Simples Nacional
     #[serde(rename = "vBCSTRet", skip_serializing_if = "Option::is_none")]
     pub vbcst_ret: Option<String>, // Valor da BC do ICMS ST retido
+    /// Alíquota suportada pelo consumidor final 3v2-4 (TDec_0302a04Opc — não aceita zero)
+    #[serde(rename = "pST", skip_serializing_if = "Option::is_none")]
+    pub p_st: Option<String>,
+    /// Valor do ICMS Próprio do Substituto cobrado em operação anterior 13v2 (opcional no grupo)
+    #[serde(rename = "vICMSSubstituto", skip_serializing_if = "Option::is_none")]
+    pub v_icms_substituto: Option<String>,
     #[serde(rename = "vICMSSTRet", skip_serializing_if = "Option::is_none")]
     pub vicmsst_ret: Option<String>, // Valor do ICMS ST retido
 }

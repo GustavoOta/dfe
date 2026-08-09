@@ -46,6 +46,10 @@ pub struct ProdProcess {
     pub q_trib: String,
     #[serde(rename = "vUnTrib")]
     pub v_un_trib: String,
+    // vFrete vem ANTES de vDesc na ordem do XSD (prod). Só emitido quando há frete rateado
+    // (skip_serializing_if) → item sem frete produz XML idêntico ao anterior (mudança aditiva).
+    #[serde(rename = "vFrete", skip_serializing_if = "Option::is_none")]
+    pub v_frete: Option<Decimal>,
     #[serde(rename = "vDesc", skip_serializing_if = "Option::is_none")]
     pub v_desc: Option<Decimal>,
     #[serde(rename = "indTot")]

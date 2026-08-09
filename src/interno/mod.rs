@@ -7,6 +7,7 @@ pub mod cleaner;
 pub mod connection;
 pub mod dates;
 pub mod dest_xml;
+pub mod entrega_xml;
 pub mod evento;
 pub mod extract;
 pub mod transporte;

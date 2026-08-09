@@ -55,6 +55,10 @@ pub fn nfe_recepcao_evento(ambiente: u8, uf: &str, modelo: u32, svn: bool) -> Re
     lookup("RecepcaoEvento", ambiente, uf, modelo, svn)
 }
 
+pub fn nfe_consulta_protocolo(ambiente: u8, uf: &str, modelo: u32, svn: bool) -> Result<&'static str> {
+    lookup("NfeConsultaProtocolo", ambiente, uf, modelo, svn)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,6 +117,26 @@ mod tests {
         assert_eq!(
             nfe_autorizacao(1, "MA", 55, false).unwrap(),
             "https://www.sefazvirtual.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx"
+        );
+    }
+
+    #[test]
+    fn consulta_protocolo_sp() {
+        assert_eq!(
+            nfe_consulta_protocolo(2, "SP", 55, false).unwrap(),
+            "https://homologacao.nfe.fazenda.sp.gov.br/ws/nfeconsultaprotocolo4.asmx"
+        );
+        assert_eq!(
+            nfe_consulta_protocolo(1, "SP", 65, false).unwrap(),
+            "https://nfce.fazenda.sp.gov.br/ws/NFeConsultaProtocolo4.asmx"
+        );
+    }
+
+    #[test]
+    fn consulta_protocolo_via_svrs_ac() {
+        assert_eq!(
+            nfe_consulta_protocolo(1, "AC", 55, false).unwrap(),
+            "https://nfe.svrs.rs.gov.br/ws/NfeConsulta/NfeConsulta4.asmx"
         );
     }
 

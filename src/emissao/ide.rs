@@ -137,4 +137,14 @@ pub struct IdeProcess {
     /// Ex: 1.0.0
     #[serde(rename = "verProc")]
     pub ver_proc: String,
+
+    /// Data e hora de entrada em contingência (AAAA-MM-DDThh:mm:ssTZD).
+    /// Informar apenas para tpEmis diferente de 1.
+    #[serde(rename = "dhCont", skip_serializing_if = "Option::is_none")]
+    pub dh_cont: Option<String>,
+
+    /// Justificativa da entrada em contingência (15–256 caracteres).
+    /// Informar apenas para tpEmis diferente de 1.
+    #[serde(rename = "xJust", skip_serializing_if = "Option::is_none")]
+    pub x_just: Option<String>,
 }

@@ -196,6 +196,7 @@ impl EscPosNFCeBuilder {
         let serie = ide.serie.clone().unwrap_or_default();
         let n_nf = ide.n_nf.clone().unwrap_or_default();
         let dh_emi = ide.dh_emi.clone().unwrap_or_default();
+        let tp_emis = ide.tp_emis.clone().unwrap_or_default();
 
         let dest = &inf.dest;
         let dest_cpf_cnpj = dest
@@ -287,6 +288,7 @@ impl EscPosNFCeBuilder {
             emit_x_bairro,
             emit_x_mun,
             tp_amb,
+            tp_emis,
             serie,
             n_nf,
             dh_emi,
@@ -340,6 +342,7 @@ struct BuildParams {
     emit_x_bairro: String,
     emit_x_mun: String,
     tp_amb: String,
+    tp_emis: String,
     serie: String,
     n_nf: String,
     dh_emi: String,
@@ -381,6 +384,17 @@ fn build_receipt(p: BuildParams) -> Result<Vec<u8>> {
             .bold(true)
             .text("AMBIENTE DE HOMOLOGAÇÃO\n")
             .text("SEM VALOR FISCAL\n")
+            .bold(false)
+            .line_spacing(SPACING_DIVIDER).divider().line_spacing(SPACING_NORMAL);
+    }
+
+    // ── Contingência off-line (tpEmis=9) ──────────────────────────────────────
+    if p.tp_emis == "9" {
+        b = b
+            .align_center()
+            .bold(true)
+            .text("NFC-e EMITIDA EM CONTINGÊNCIA\n")
+            .text("PENDENTE DE AUTORIZAÇÃO PELA SEFAZ\n")
             .bold(false)
             .line_spacing(SPACING_DIVIDER).divider().line_spacing(SPACING_NORMAL);
     }
@@ -822,5 +836,52 @@ mod tests {
         let xml = r#"<nfeProc><NFe><infNFe Id="NFe35000000000000000000550010000000011234567890"><ide><mod>55</mod></ide><emit><CNPJ>00000000000000</CNPJ><enderEmit/></emit><det/><total/><transp/><pag/><infAdic/></infNFe></NFe><protNFe/></nfeProc>"#;
         let result = EscPosNFCeBuilder::new().xml(xml).build();
         assert!(result.is_err());
+    }
+
+    fn base_params(tp_emis: &str) -> BuildParams {
+        BuildParams {
+            chave_acesso: "35000000000000000000650010000000001000000001".to_string(),
+            n_prot: String::new(),
+            dh_recbto: String::new(),
+            emit_x_nome: "EMPRESA TESTE".to_string(),
+            emit_cnpj: "11222333000181".to_string(),
+            emit_ie: "123456789".to_string(),
+            emit_uf: "SP".to_string(),
+            emit_x_lgr: "RUA TESTE".to_string(),
+            emit_nro: "100".to_string(),
+            emit_x_bairro: "CENTRO".to_string(),
+            emit_x_mun: "SAO PAULO".to_string(),
+            tp_amb: "1".to_string(),
+            tp_emis: tp_emis.to_string(),
+            serie: "1".to_string(),
+            n_nf: "1".to_string(),
+            dh_emi: "2026-07-08T10:00:00-03:00".to_string(),
+            dest_cpf_cnpj: String::new(),
+            dest_x_nome: String::new(),
+            v_nf: "10.00".to_string(),
+            v_desc: "0.00".to_string(),
+            v_prod_total: "10.00".to_string(),
+            v_tot_trib: "0.00".to_string(),
+            v_troco: "0.00".to_string(),
+            payments: vec![],
+            inf_cpl: String::new(),
+            items: vec![],
+            qr_code_url: "https://exemplo.teste/qrcode?p=x".to_string(),
+            url_chave: String::new(),
+            qr_side: false,
+            paper_width: 80,
+            paper_dots: 576,
+            cols: None,
+        }
+    }
+
+    #[test]
+    fn contingencia_tp_emis_9_gera_cupom_maior_com_aviso() {
+        // Mesmos dados, só tp_emis muda — o cupom de contingência deve crescer (banner extra),
+        // sem quebrar a geração normal (tp_emis=1).
+        let normal = build_receipt(base_params("1")).unwrap();
+        let contingencia = build_receipt(base_params("9")).unwrap();
+        assert!(!normal.is_empty());
+        assert!(contingencia.len() > normal.len());
     }
 }

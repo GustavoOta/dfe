@@ -162,6 +162,7 @@ pub fn total_process(
     let mut v_ipi_items   = 0.0_f64;
     let mut v_prod        = 0.0_f64;
     let mut v_desc        = Decimal::ZERO;
+    let mut v_frete_items = Decimal::ZERO;
     let mut v_pis         = 0.0_f64;
     let mut v_cofins      = 0.0_f64;
     let mut v_tot_trib    = 0.0_f64;
@@ -188,6 +189,7 @@ pub fn total_process(
         v_ipi_items    += ipi_v_ipi(&det.imposto.ipi);
         v_prod       += det.prod.v_prod.parse::<f64>().unwrap_or(0.0);
         v_desc       += det.prod.v_desc.unwrap_or(Decimal::ZERO);
+        v_frete_items += det.prod.v_frete.unwrap_or(Decimal::ZERO);
         v_pis        += pis_v_pis(&det.imposto.pis);
         v_cofins     += cofins_v_cofins(&det.imposto.cofins);
         v_tot_trib   += det.imposto.v_tot_trib.parse::<f64>().unwrap_or(0.0);
@@ -225,12 +227,17 @@ pub fn total_process(
     }
 
     let v_desc_f64 = v_desc.to_f64().unwrap_or(0.0);
+    // vFrete efetivo: quando há frete rateado por item (det/prod/vFrete), o total DEVE ser
+    // a soma dos itens (SEFAZ: ICMSTot/vFrete == Σ det/prod/vFrete). Sem rateio por item,
+    // mantém o `total.v_frete` global informado pelo chamador (comportamento anterior — aditivo).
+    let v_frete_items_f64 = v_frete_items.to_f64().unwrap_or(0.0);
+    let v_frete_efetivo = if v_frete_items_f64 > 0.0 { v_frete_items_f64 } else { total.v_frete };
     // v_bc_st e v_st: auto-calculado dos itens + valor global informado em Total
     let total_v_bc_st = v_bc_st_items + total.v_bc_st;
     let total_v_st    = v_st_items    + total.v_st;
     // v_ipi: auto-calculado dos itens + valor global informado em Total
     let total_v_ipi = v_ipi_items + total.v_ipi;
-    let v_nf = v_prod + total.v_frete + total.v_seg - v_desc_f64
+    let v_nf = v_prod + v_frete_efetivo + total.v_seg - v_desc_f64
                + total.v_outro + total.v_ii + total_v_ipi - total.v_ipi_devol;
 
     // Só envia IBSCBSTot se algum item tiver IBS/CBS — enviar zerado causa rejeição 1118
@@ -283,7 +290,7 @@ pub fn total_process(
         v_fcpst:        format!("{:.2}", total.v_fcpst),
         v_fcpst_ret:    format!("{:.2}", total.v_fcpst_ret),
         v_prod:         format!("{:.2}", v_prod),
-        v_frete:        format!("{:.2}", total.v_frete),
+        v_frete:        format!("{:.2}", v_frete_efetivo),
         v_seg:          format!("{:.2}", total.v_seg),
         v_desc:         format!("{:.2}", v_desc_f64),
         v_ii:           format!("{:.2}", total.v_ii),

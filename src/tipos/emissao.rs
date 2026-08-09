@@ -32,8 +32,12 @@ pub struct Ide {
     pub c_mun_fg: String,
     /// Tipo de impressão: `1` = DANFE NF-e normal · `4` = DANFE NFC-e.
     pub tp_imp: u8,
-    /// Forma de emissão: `1` = Normal · `5` = Contingência EPEC.
+    /// Forma de emissão: `1` = Normal · `5` = Contingência EPEC · `9` = Contingência off-line (NFC-e).
     pub tp_emis: u8,
+    /// Data/hora de entrada em contingência (ISO 8601). Obrigatório quando `tp_emis != 1`.
+    pub dh_cont: Option<String>,
+    /// Justificativa da entrada em contingência (15–256 caracteres). Obrigatório quando `tp_emis != 1`.
+    pub x_just: Option<String>,
     /// Ambiente: `1` = Produção · `2` = Homologação.
     pub tp_amb: u8,
     /// Finalidade: `1` = Normal · `2` = Complementar · `3` = Ajuste · `4` = Devolução.
@@ -65,6 +69,8 @@ impl Default for Ide {
             c_mun_fg: "3550308".to_string(),
             tp_imp: 1,
             tp_emis: 1,
+            dh_cont: None,
+            x_just: None,
             tp_amb: 2,
             fin_nfe: 1,
             ind_final: 1,
@@ -124,6 +130,56 @@ impl Default for Dest {
             isuf: None,
             im: None,
             email: None,
+        }
+    }
+}
+
+// ─── Entrega ──────────────────────────────────────────────────────────────────
+
+/// Local de entrega da mercadoria (`<entrega>`, grupo TLocal do XSD). Usado no delivery
+/// (`indPres = 4`, entrega a domicílio): carrega o endereço de entrega do destinatário.
+/// Ordem dos campos = ordem do XSD. O XSD exige CNPJ **ou** CPF e o endereço mínimo
+/// (`xLgr`/`nro`/`xBairro`/`cMun`/`xMun`/`UF`); a validação final (`is_xml_valid`) rejeita
+/// combinações inválidas. `cMun` é o código IBGE (7 dígitos) — resolvido pelo chamador.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Entrega {
+    pub cnpj: Option<String>,
+    pub cpf: Option<String>,
+    pub x_nome: Option<String>,
+    pub x_lgr: Option<String>,
+    pub nro: Option<String>,
+    pub x_cpl: Option<String>,
+    pub x_bairro: Option<String>,
+    pub c_mun: Option<String>,
+    pub x_mun: Option<String>,
+    pub uf: Option<String>,
+    pub cep: Option<String>,
+    pub c_pais: Option<String>,
+    pub x_pais: Option<String>,
+    pub fone: Option<String>,
+    pub email: Option<String>,
+    pub ie: Option<String>,
+}
+
+impl Default for Entrega {
+    fn default() -> Self {
+        Entrega {
+            cnpj: None,
+            cpf: None,
+            x_nome: None,
+            x_lgr: None,
+            nro: None,
+            x_cpl: None,
+            x_bairro: None,
+            c_mun: None,
+            x_mun: None,
+            uf: None,
+            cep: None,
+            c_pais: None,
+            x_pais: None,
+            fone: None,
+            email: None,
+            ie: None,
         }
     }
 }
@@ -297,7 +353,13 @@ pub enum Icms {
     /// CSOSN 102/103/300/400
     Sn102 { orig: u8, csosn: String },
     /// CSOSN 500 — ST retido anteriormente
-    Sn500 { orig: u8, v_bcst_ret: Option<f64>, v_icmsst_ret: Option<f64> },
+    Sn500 {
+        orig: u8,
+        v_bcst_ret: Option<f64>,
+        p_st: Option<f64>,
+        v_icms_substituto: Option<f64>,
+        v_icmsst_ret: Option<f64>,
+    },
     /// CSOSN 900 — outros; inclui campos opcionais de cálculo e ST
     Sn900 {
         orig: u8,
@@ -389,9 +451,10 @@ impl Icms {
         Icms::Sn102 { orig, csosn: csosn.to_string() }
     }
 
-    /// CSOSN 500 — ST retido anteriormente; campos ST opcionais
+    /// CSOSN 500 — ST retido anteriormente; grupo ST opcional (tudo ou nada, igual ao CST 60).
+    /// Em NF-e (modelo 55) a SEFAZ exige o grupo completo — omiti-lo gera a rejeição 938.
     pub fn sn500(orig: u8) -> Self {
-        Icms::Sn500 { orig, v_bcst_ret: None, v_icmsst_ret: None }
+        Icms::Sn500 { orig, v_bcst_ret: None, p_st: None, v_icms_substituto: None, v_icmsst_ret: None }
     }
 
     /// CSOSN 900 — outros; todos os campos são opcionais

@@ -1,7 +1,7 @@
 //! Structs de emissão: entrada interna de montagem, XML assinado intermediário e os tipos de
 //! resposta públicos (`Response`/`InfProt`/`TagInfProt`). Separado do `mod.rs` na fase A7 (§2.1).
 
-use crate::tipos::{Dest, Det, Emit, Ide, InfAdic, Pag, Total, Transp};
+use crate::tipos::{Dest, Det, Emit, Entrega, Ide, InfAdic, Pag, Total, Transp};
 use rust_decimal::Decimal;
 
 // Struct interna de montagem — não exposta como API pública.
@@ -20,6 +20,8 @@ pub(super) struct NFeInterno {
     pub inf_adic: Option<InfAdic>,
     pub active_ibs_cbs: Option<String>,
     pub desconto_rateio: Option<Decimal>,
+    pub frete_rateio: Option<Decimal>,
+    pub entrega: Option<Entrega>,
     pub referencias: Vec<String>,
 }
 

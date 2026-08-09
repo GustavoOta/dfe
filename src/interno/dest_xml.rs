@@ -113,3 +113,82 @@ fn x_nome_validate(x_nome: &str, ambiente: &u8) -> Result<String> {
     }
     Ok(x_nome.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tipos::{Dest, Ide};
+
+    /// `Ide` mínimo para o `DestTAG::build` — só `mod_` e `tp_amb` importam aqui.
+    fn ide(mod_: u32, tp_amb: u8) -> Ide {
+        Ide {
+            mod_,
+            tp_amb,
+            ..Default::default()
+        }
+    }
+
+    // ─── NF-e (modelo 55) ────────────────────────────────────────────────────
+
+    /// Destinatário **pessoa física (CPF)** não contribuinte: deve sair `<CPF>` e
+    /// `<indIEDest>9`, **sem** `<CNPJ>` e **sem** `<IE>`.
+    #[test]
+    fn dest55_cpf_gera_tag_cpf_sem_cnpj_nem_ie() {
+        let dest = Dest {
+            cpf: Some("52998224725".to_string()),
+            x_nome: Some("Fulano de Tal".to_string()),
+            ind_ie_dest: Some(9),
+            // IE preenchida "por engano" NÃO deve ser emitida p/ não contribuinte.
+            ie: Some("123456789".to_string()),
+            ..Default::default()
+        };
+        let xml = DestTAG::build(&Some(dest), &ide(55, 2)).unwrap();
+
+        assert!(xml.contains("<CPF>52998224725</CPF>"), "esperava <CPF>: {xml}");
+        assert!(!xml.contains("<CNPJ>"), "não deveria ter <CNPJ>: {xml}");
+        assert!(xml.contains("<indIEDest>9</indIEDest>"), "esperava indIEDest 9: {xml}");
+        assert!(!xml.contains("<IE>"), "não deveria emitir <IE> p/ indIEDest != 1: {xml}");
+    }
+
+    /// Regressão: destinatário **pessoa jurídica (CNPJ)** contribuinte de ICMS deve
+    /// continuar saindo com `<CNPJ>`, `<indIEDest>1` e `<IE>`.
+    #[test]
+    fn dest55_cnpj_contribuinte_mantem_cnpj_ie() {
+        let dest = Dest {
+            cnpj: Some("11222333000181".to_string()),
+            x_nome: Some("Empresa Ltda".to_string()),
+            ind_ie_dest: Some(1),
+            ie: Some("110042490114".to_string()),
+            ..Default::default()
+        };
+        let xml = DestTAG::build(&Some(dest), &ide(55, 2)).unwrap();
+
+        assert!(xml.contains("<CNPJ>11222333000181</CNPJ>"), "esperava <CNPJ>: {xml}");
+        assert!(!xml.contains("<CPF>"), "não deveria ter <CPF>: {xml}");
+        assert!(xml.contains("<indIEDest>1</indIEDest>"), "esperava indIEDest 1: {xml}");
+        assert!(xml.contains("<IE>110042490114</IE>"), "esperava <IE> p/ contribuinte: {xml}");
+    }
+
+    // ─── NFC-e (modelo 65) ───────────────────────────────────────────────────
+
+    /// NFC-e para **CPF**: deve sair `<CPF>`; em homologação (tp_amb 2) o `xNome`
+    /// é substituído pela frase padrão sem valor fiscal.
+    #[test]
+    fn dest65_cpf_gera_cpf_e_xnome_homologacao() {
+        let dest = Dest {
+            cpf: Some("52998224725".to_string()),
+            x_nome: Some("Consumidor Final".to_string()),
+            ind_ie_dest: Some(9),
+            ..Default::default()
+        };
+        let xml = DestTAG::build(&Some(dest), &ide(65, 2)).unwrap();
+
+        assert!(xml.contains("<CPF>52998224725</CPF>"), "esperava <CPF>: {xml}");
+        assert!(!xml.contains("<CNPJ>"), "não deveria ter <CNPJ>: {xml}");
+        assert!(
+            xml.contains("HOMOLOGACAO"),
+            "xNome deveria virar a frase de homologação: {xml}"
+        );
+        assert!(xml.contains("<indIEDest>9</indIEDest>"), "esperava indIEDest 9: {xml}");
+    }
+}

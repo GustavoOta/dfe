@@ -245,6 +245,36 @@ let r = NFeService::new()
 
 ---
 
+## Consulta de situação da NF-e/NFC-e — `ConsultaSituacaoBuilder`
+
+`consSitNFe` — consulta **não assinada** (só mTLS, como o status do serviço) que devolve a
+situação atual de uma nota pela chave de acesso: se está autorizada, se não consta na base da
+SEFAZ, e eventos já registrados contra ela (ex.: cancelamento).
+
+```rust
+use dfe::ConsultaSituacaoBuilder;
+
+let r = ConsultaSituacaoBuilder::new()
+    .cert("caminho.pfx", "senha")
+    .tp_amb(2)
+    .chave("35...") // 44 dígitos
+    .send()
+    .await?;
+
+r.response.c_stat;       // status da CONSULTA (ex.: "217" = não consta na base)
+r.response.prot_nfe;     // Option<ProtNFe> — presente só se a nota consta (autorizada/cancelada)
+r.response.proc_evento_nfe; // Vec<ProcEventoNFe> — eventos já registrados (ex.: cancelamento 110111)
+```
+
+Se `prot_nfe` estiver presente, `prot_nfe.inf_prot.c_stat` é o status da **nota** (`100` =
+autorizada, `101` = cancelada) e `.n_prot`/`.dh_recbto` trazem o protocolo/data de autorização.
+
+Uso previsto: recuperação de emissão órfã (app fechou/timeout antes da resposta chegar) —
+consultar a chave 1x, respeitando o rate-limit da SEFAZ (10 consultas/hora por chave, NT
+2014.002), para decidir se a nota foi autorizada antes de reenviar ou reemitir.
+
+---
+
 ## Distribuição (Ambiente Nacional)
 
 ```rust

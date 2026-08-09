@@ -51,6 +51,7 @@ pub fn build_pdf_nfce_80mm(
     items: &[PdfItem],
     qr_code_url: &str,
     qr_side: bool,
+    tp_emis: &str,
 ) -> Result<Vec<u8>, String> {
     // ── Emitente nome (wrap) ──────────────────────────────
     let emit_name_fallback = "EMITENTE NAO INFORMADO";
@@ -90,6 +91,12 @@ pub fn build_pdf_nfce_80mm(
     // ── Page height calculation ───────────────────────────
     let extra_emit_lines = emit_name_lines.len().saturating_sub(1) as f32;
     let homolog_h = if tp_amb == "2" {
+        LINE_HEIGHT * 2.0 + SECTION_GAP
+    } else {
+        0.0
+    };
+    // Contingência off-line (tpEmis=9): nota assinada localmente, ainda pendente de autorização.
+    let contingencia_h = if tp_emis == "9" {
         LINE_HEIGHT * 2.0 + SECTION_GAP
     } else {
         0.0
@@ -135,6 +142,7 @@ pub fn build_pdf_nfce_80mm(
         };
 
     let base_h = homolog_h
+        + contingencia_h
         + LINE_HEIGHT * 1.0       // subtitle only
         + SECTION_GAP
         + emit_h
@@ -178,6 +186,16 @@ pub fn build_pdf_nfce_80mm(
         write_center(&layer, &font_bold, 7.0, y, "AMBIENTE DE HOMOLOGACAO");
         y -= LINE_HEIGHT;
         write_center(&layer, &font_bold, 6.0, y, "SEM VALOR FISCAL");
+        y -= LINE_HEIGHT;
+        draw_line(&layer, y, 0.6);
+        y -= SECTION_GAP;
+    }
+
+    // ── Contingência off-line (tpEmis=9) ──────────────────
+    if tp_emis == "9" {
+        write_center(&layer, &font_bold, 7.0, y, "NFC-e EMITIDA EM CONTINGENCIA");
+        y -= LINE_HEIGHT;
+        write_center(&layer, &font_bold, 6.0, y, "PENDENTE DE AUTORIZACAO PELA SEFAZ");
         y -= LINE_HEIGHT;
         draw_line(&layer, y, 0.6);
         y -= SECTION_GAP;
@@ -904,4 +922,30 @@ fn format_datetime(dt: &str) -> String {
         }
     }
     dt.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const CHAVE: &str = "35000000000000000000650010000000001000000001";
+
+    fn build(tp_emis: &str) -> Vec<u8> {
+        build_pdf_nfce_80mm(
+            CHAVE, "", "", "EMPRESA TESTE", "11222333000181", "123456789", "SP",
+            "RUA TESTE", "100", "CENTRO", "SAO PAULO", "1", "1", "1",
+            "2026-07-08T10:00:00-03:00", "", "", "10.00", "0.00", "10.00", "0.00", "0.00",
+            &[], "", &[], "https://exemplo.teste/qrcode?p=x", false, tp_emis,
+        ).unwrap()
+    }
+
+    #[test]
+    fn contingencia_tp_emis_9_gera_pdf_maior_com_aviso() {
+        // Mesmos dados, só tp_emis muda — o PDF de contingência deve crescer (banner extra),
+        // sem quebrar a geração normal (tp_emis=1).
+        let normal = build("1");
+        let contingencia = build("9");
+        assert!(!normal.is_empty());
+        assert!(contingencia.len() > normal.len());
+    }
 }
