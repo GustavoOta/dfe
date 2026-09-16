@@ -104,6 +104,7 @@ pub struct NFeBuilder {
     active_ibs_cbs: Option<String>,
     desconto_rateio: Option<Decimal>,
     frete_rateio: Option<Decimal>,
+    outro_rateio: Option<Decimal>,
     entrega: Option<Entrega>,
     referencias: Vec<String>,
 }
@@ -115,7 +116,7 @@ impl NFeBuilder {
             cert_path: None, cert_pass: None, ide: None, emitente: None,
             destinatario: None, itens: Vec::new(), total: None, transporte: None,
             pagamento: None, informacoes_adicionais: None, id_csc: None, csc: None,
-            active_ibs_cbs: None, desconto_rateio: None, frete_rateio: None,
+            active_ibs_cbs: None, desconto_rateio: None, frete_rateio: None, outro_rateio: None,
             entrega: None, referencias: Vec::new(),
         }
     }
@@ -154,6 +155,12 @@ impl NFeBuilder {
     /// A BC do ICMS já deve vir com a parcela de frete embutida (a crate não recalcula BC).
     pub fn frete_rateio(mut self, v: Decimal) -> Self { self.frete_rateio = Some(v); self }
 
+    /// Acréscimo total (outras despesas acessórias) a ratear proporcionalmente ao `vProd` de
+    /// cada item: emite `det/prod/vOutro` e soma em `ICMSTot/vOutro` e no `vNF`.
+    /// Ausente/zero → nenhum `<vOutro>` por item (XML inalterado). Como no frete, a BC do
+    /// ICMS já deve vir com a parcela embutida — a crate não recalcula BC.
+    pub fn outro_rateio(mut self, v: Decimal) -> Self { self.outro_rateio = Some(v); self }
+
     /// Local de entrega (`<entrega>`) — endereço de entrega no delivery (`indPres = 4`).
     /// Ausente → grupo não emitido (XML inalterado).
     pub fn entrega(mut self, e: Entrega) -> Self { self.entrega = Some(e); self }
@@ -187,6 +194,7 @@ impl NFeBuilder {
             active_ibs_cbs: self.active_ibs_cbs,
             desconto_rateio: self.desconto_rateio,
             frete_rateio: self.frete_rateio,
+            outro_rateio: self.outro_rateio,
             entrega: self.entrega,
             referencias: self.referencias,
         }).await?;
@@ -227,6 +235,7 @@ impl NFeBuilder {
             active_ibs_cbs: self.active_ibs_cbs,
             desconto_rateio: self.desconto_rateio,
             frete_rateio: self.frete_rateio,
+            outro_rateio: self.outro_rateio,
             entrega: self.entrega,
             referencias: self.referencias,
         }).await

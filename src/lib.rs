@@ -101,6 +101,8 @@ pub use danfe::DanfeBuilder;
 pub use escpos::EscPosBuilder;
 #[cfg(feature = "escpos")]
 pub use escpos::EscPosNFCeBuilder;
+#[cfg(feature = "escpos")]
+pub use escpos::EscPosDanfeNFeBuilder;
 pub use interno::cert::CertInfo;
 pub use interno::cnpj_cpf::{format_cnpj, sanitize_cnpj, validate_cnpj, validate_cpf};
 pub use interno::validation::is_xml_valid;

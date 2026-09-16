@@ -1,6 +1,8 @@
 mod commands;
 pub mod nfce;
+pub mod nfe;
 pub use nfce::EscPosNFCeBuilder;
+pub use nfe::EscPosDanfeNFeBuilder;
 
 use image::{io::Reader as ImageReader, DynamicImage, GenericImageView, GrayImage, Luma};
 use std::io::Cursor;

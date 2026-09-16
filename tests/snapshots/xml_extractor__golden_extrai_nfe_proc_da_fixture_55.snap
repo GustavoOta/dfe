@@ -1,5 +1,6 @@
 ---
 source: tests/xml_extractor.rs
+assertion_line: 17
 expression: proc
 ---
 NFeProc {
@@ -337,6 +338,42 @@ NFeProc {
                         ),
                     },
                 ),
+                ibs_cbs_tot: Some(
+                    IBSCBSTot {
+                        v_bc_ibs_cbs: Some(
+                            "828.00",
+                        ),
+                        g_ibs: Some(
+                            GIBSTot {
+                                g_ibs_uf: Some(
+                                    GIBSUFTot {
+                                        v_ibs_uf: Some(
+                                            "0.83",
+                                        ),
+                                    },
+                                ),
+                                g_ibs_mun: Some(
+                                    GIBSMunTot {
+                                        v_ibs_mun: Some(
+                                            "0.00",
+                                        ),
+                                    },
+                                ),
+                                v_ibs: Some(
+                                    "0.83",
+                                ),
+                            },
+                        ),
+                        g_cbs: Some(
+                            GCBSTot {
+                                v_cbs: Some(
+                                    "7.45",
+                                ),
+                            },
+                        ),
+                    },
+                ),
+                is_tot: None,
             },
             transp: Transp {
                 mod_frete: Some(
@@ -360,6 +397,7 @@ NFeProc {
                 v_troco: None,
             },
             inf_adic: InfAdic {
+                inf_ad_fisco: None,
                 inf_cpl: Some(
                     "INFORMACOES COMPLEMENTARES DE TESTE",
                 ),

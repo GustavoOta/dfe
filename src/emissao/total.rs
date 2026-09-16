@@ -163,6 +163,7 @@ pub fn total_process(
     let mut v_prod        = 0.0_f64;
     let mut v_desc        = Decimal::ZERO;
     let mut v_frete_items = Decimal::ZERO;
+    let mut v_outro_items = Decimal::ZERO;
     let mut v_pis         = 0.0_f64;
     let mut v_cofins      = 0.0_f64;
     let mut v_tot_trib    = 0.0_f64;
@@ -190,6 +191,7 @@ pub fn total_process(
         v_prod       += det.prod.v_prod.parse::<f64>().unwrap_or(0.0);
         v_desc       += det.prod.v_desc.unwrap_or(Decimal::ZERO);
         v_frete_items += det.prod.v_frete.unwrap_or(Decimal::ZERO);
+        v_outro_items += det.prod.v_outro.unwrap_or(Decimal::ZERO);
         v_pis        += pis_v_pis(&det.imposto.pis);
         v_cofins     += cofins_v_cofins(&det.imposto.cofins);
         v_tot_trib   += det.imposto.v_tot_trib.parse::<f64>().unwrap_or(0.0);
@@ -237,8 +239,12 @@ pub fn total_process(
     let total_v_st    = v_st_items    + total.v_st;
     // v_ipi: auto-calculado dos itens + valor global informado em Total
     let total_v_ipi = v_ipi_items + total.v_ipi;
+    // vOutro efetivo: mesmo critério do frete — com acréscimo rateado por item
+    // (det/prod/vOutro) o total é a soma dos itens; sem rateio, vale o `total.v_outro` global.
+    let v_outro_items_f64 = v_outro_items.to_f64().unwrap_or(0.0);
+    let v_outro_efetivo = if v_outro_items_f64 > 0.0 { v_outro_items_f64 } else { total.v_outro };
     let v_nf = v_prod + v_frete_efetivo + total.v_seg - v_desc_f64
-               + total.v_outro + total.v_ii + total_v_ipi - total.v_ipi_devol;
+               + v_outro_efetivo + total.v_ii + total_v_ipi - total.v_ipi_devol;
 
     // Só envia IBSCBSTot se algum item tiver IBS/CBS — enviar zerado causa rejeição 1118
     let send_ibs_cbs = if v_bc_ibs_cbs_total > 0.0 {
@@ -298,7 +304,7 @@ pub fn total_process(
         v_ipi_devol:    format!("{:.2}", total.v_ipi_devol),
         v_pis:          format!("{:.2}", v_pis),
         v_cofins:       format!("{:.2}", v_cofins),
-        v_outro:        format!("{:.2}", total.v_outro),
+        v_outro:        format!("{:.2}", v_outro_efetivo),
         v_nf:           format!("{:.2}", v_nf),
         v_tot_trib:     format!("{:.2}", v_tot_trib),
     };

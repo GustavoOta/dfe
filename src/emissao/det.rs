@@ -10,6 +10,7 @@ pub fn det_process(
     tp_amb: u8,
     desconto_rateio: Option<Decimal>,
     frete_rateio: Option<Decimal>,
+    outro_rateio: Option<Decimal>,
     _active_ibscbs: Option<String>,
 ) -> Result<Vec<DetProcess>> {
     let mut det_process_values: Vec<DetProcess> = Vec::new();
@@ -77,8 +78,33 @@ pub fn det_process(
     }
     // fim do frete por rateio nos itens *****************************************************
 
-    for ((d, desconto_item), frete_item) in
-        prod.iter().zip(descontos_itens.iter()).zip(fretes_itens.iter())
+    // acréscimo por rateio nos itens (outras despesas acessórias → det/prod/vOutro) *********
+    // Mesmo molde do frete: SEFAZ exige ICMSTot/vOutro == Σ det/prod/vOutro. Rateado
+    // proporcional ao vProd, último item absorve a diferença de arredondamento.
+    let outro_rateado = outro_rateio.unwrap_or_else(|| Decimal::new(0, 2));
+    let outro_percentual = if total_produtos > Decimal::new(0, 2) {
+        outro_rateado / total_produtos
+    } else {
+        Decimal::new(0, 2)
+    };
+    let mut outros_itens: Vec<Decimal> = Vec::new();
+    for d in &prod {
+        let v_prod_decimal = Decimal::from_f64(d.v_prod).unwrap_or(Decimal::new(0, 2));
+        outros_itens.push((v_prod_decimal * outro_percentual).round_dp(2));
+    }
+    let soma_outros: Decimal = outros_itens.iter().cloned().sum();
+    if soma_outros != outro_rateado {
+        if let Some(last) = outros_itens.last_mut() {
+            *last += outro_rateado - soma_outros;
+        }
+    }
+    // fim do acréscimo por rateio nos itens *************************************************
+
+    for (((d, desconto_item), frete_item), outro_item) in prod
+        .iter()
+        .zip(descontos_itens.iter())
+        .zip(fretes_itens.iter())
+        .zip(outros_itens.iter())
     {
         let mut x_prod = d.x_prod.clone();
         // SEFAZ exige texto fixo no primeiro item em homologação (mod 55 e 65)
@@ -101,6 +127,13 @@ pub fn det_process(
             None
         };
 
+        // acréscimo rateado do item (None quando não há acréscimo → não emite <vOutro>)
+        let v_outro_value: Option<Decimal> = if *outro_item > Decimal::new(0, 2) {
+            Some(*outro_item)
+        } else {
+            None
+        };
+
         det_process_values.push(DetProcess {
             prod: ProdProcess {
                 c_prod: d.c_prod.to_string(),
@@ -119,6 +152,7 @@ pub fn det_process(
                 v_un_trib: format!("{:.2}", d.v_un_trib),
                 v_frete: v_frete_value,
                 v_desc: v_desc_value,
+                v_outro: v_outro_value,
                 ind_tot: d.ind_tot.to_string(),
                 x_ped: d.x_ped.clone(),
                 n_item_ped: d.n_item_ped.clone(),
@@ -406,7 +440,7 @@ mod tests {
     fn frete_rateado_soma_bate_com_total_e_icmstot() {
         // 100 + 200 + 300 = 600; frete 30 → 5 / 10 / 15 (proporcional ao vProd).
         let prod = vec![item(100.0), item(200.0), item(300.0)];
-        let dets = det_process(prod, 65, 1, None, Some(d("30.00")), None).unwrap();
+        let dets = det_process(prod, 65, 1, None, Some(d("30.00")), None, None).unwrap();
 
         assert_eq!(dets[0].prod.v_frete, Some(d("5.00")));
         assert_eq!(dets[1].prod.v_frete, Some(d("10.00")));
@@ -424,7 +458,7 @@ mod tests {
     fn frete_rateado_ajusta_ultimo_item_no_arredondamento() {
         // 10 + 10 + 10 = 30; frete 10 → 3.33 + 3.33 + 3.34 (último absorve a diferença) = 10.00.
         let prod = vec![item(10.0), item(10.0), item(10.0)];
-        let dets = det_process(prod, 65, 1, None, Some(d("10.00")), None).unwrap();
+        let dets = det_process(prod, 65, 1, None, Some(d("10.00")), None, None).unwrap();
 
         let soma: Decimal = dets.iter().map(|x| x.prod.v_frete.unwrap_or(Decimal::ZERO)).sum();
         assert_eq!(soma, d("10.00"), "a soma do frete rateado deve bater exatamente");
@@ -439,12 +473,79 @@ mod tests {
         // Sem frete_rateio: nenhum <vFrete> por item; ICMSTot/vFrete usa o total global
         // informado (comportamento anterior preservado → mudança aditiva).
         let prod = vec![item(100.0), item(200.0)];
-        let dets = det_process(prod, 65, 1, None, None, None).unwrap();
+        let dets = det_process(prod, 65, 1, None, None, None, None).unwrap();
         assert!(dets.iter().all(|x| x.prod.v_frete.is_none()));
 
         let total = Total { v_frete: 15.0, ..Default::default() };
         let tot = total_process(total, dets, 1, None).unwrap();
         assert_eq!(tot.icms_tot.v_frete, "15.00");
+    }
+
+    // ── Acréscimo rateado (det/prod/vOutro) ─────────────────────────────────────
+    // O PDV mandava `acrescimo_rateio` e o gravisServer descartava: o acréscimo combinado
+    // com o cliente não aparecia na nota. Agora vira vOutro por item e soma no vNF.
+
+    #[test]
+    fn outro_rateado_soma_bate_com_total_e_entra_no_vnf() {
+        // 100 + 200 + 300 = 600; acréscimo 30 → 5 / 10 / 15.
+        let prod = vec![item(100.0), item(200.0), item(300.0)];
+        let dets = det_process(prod, 55, 1, None, None, Some(d("30.00")), None).unwrap();
+
+        assert_eq!(dets[0].prod.v_outro, Some(d("5.00")));
+        assert_eq!(dets[1].prod.v_outro, Some(d("10.00")));
+        assert_eq!(dets[2].prod.v_outro, Some(d("15.00")));
+
+        let tot = total_process(Total::default(), dets, 1, None).unwrap();
+        assert_eq!(tot.icms_tot.v_outro, "30.00");
+        assert_eq!(tot.icms_tot.v_nf, "630.00");
+    }
+
+    #[test]
+    fn outro_rateado_ajusta_ultimo_item_no_arredondamento() {
+        let prod = vec![item(10.0), item(10.0), item(10.0)];
+        let dets = det_process(prod, 55, 1, None, None, Some(d("10.00")), None).unwrap();
+
+        let soma: Decimal = dets.iter().map(|x| x.prod.v_outro.unwrap_or(Decimal::ZERO)).sum();
+        assert_eq!(soma, d("10.00"), "a soma do acréscimo rateado deve bater exatamente");
+        assert_eq!(dets[2].prod.v_outro, Some(d("3.34")));
+    }
+
+    #[test]
+    fn desconto_e_acrescimo_juntos_fecham_o_vnf() {
+        // 100 + 100 = 200; desconto 30, acréscimo 10 → vNF = 180.
+        let prod = vec![item(100.0), item(100.0)];
+        let dets = det_process(prod, 55, 1, Some(d("30.00")), None, Some(d("10.00")), None).unwrap();
+
+        let tot = total_process(Total::default(), dets, 1, None).unwrap();
+        assert_eq!(tot.icms_tot.v_desc, "30.00");
+        assert_eq!(tot.icms_tot.v_outro, "10.00");
+        assert_eq!(tot.icms_tot.v_nf, "180.00");
+    }
+
+    #[test]
+    fn sem_outro_rateado_e_aditivo() {
+        // Sem outro_rateio: nenhum <vOutro> por item; ICMSTot/vOutro usa o global informado.
+        let prod = vec![item(100.0)];
+        let dets = det_process(prod, 55, 1, None, None, None, None).unwrap();
+        assert!(dets.iter().all(|x| x.prod.v_outro.is_none()));
+
+        let total = Total { v_outro: 7.0, ..Default::default() };
+        let tot = total_process(total, dets, 1, None).unwrap();
+        assert_eq!(tot.icms_tot.v_outro, "7.00");
+        assert_eq!(tot.icms_tot.v_nf, "107.00");
+    }
+
+    #[test]
+    fn voutro_sai_depois_do_vdesc_e_antes_do_indtot() {
+        // A ordem das tags de <prod> é normativa (xs:sequence do XSD).
+        let prod = vec![item(100.0)];
+        let dets = det_process(prod, 55, 1, Some(d("5.00")), None, Some(d("2.00")), None).unwrap();
+        let xml = quick_xml::se::to_string(&dets[0].prod).unwrap();
+
+        let pos = |t: &str| xml.find(t).unwrap_or_else(|| panic!("faltou {} em {}", t, xml));
+        assert!(pos("<vDesc>") < pos("<vOutro>"));
+        assert!(pos("<vOutro>") < pos("<indTot>"));
+        assert!(xml.contains("<vOutro>2.00</vOutro>"));
     }
 
     // ── Grupo do ICMS-ST retido anteriormente (CST 60 / CSOSN 500) ──────────────

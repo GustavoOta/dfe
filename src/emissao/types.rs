@@ -21,6 +21,7 @@ pub(super) struct NFeInterno {
     pub active_ibs_cbs: Option<String>,
     pub desconto_rateio: Option<Decimal>,
     pub frete_rateio: Option<Decimal>,
+    pub outro_rateio: Option<Decimal>,
     pub entrega: Option<Entrega>,
     pub referencias: Vec<String>,
 }

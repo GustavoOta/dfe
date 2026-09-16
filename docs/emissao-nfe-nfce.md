@@ -76,6 +76,7 @@ println!("Protocolo: {}", resposta.protocolo.inf_prot.n_prot.unwrap_or_default()
 | `.id_csc(str)` | — | ID do CSC — **obrigatório NFC-e** |
 | `.csc(str)` | — | Valor do CSC — **obrigatório NFC-e** |
 | `.desconto_rateio(Decimal)` | — | Desconto global rateado proporcionalmente nos itens |
+| `.outro_rateio(Decimal)` | — | Acréscimo (outras despesas acessórias) rateado nos itens: `det/prod/vOutro` + `ICMSTot/vOutro` + `vNF`. A BC do ICMS não é recalculada pela crate |
 | `.emitir()` | — | Valida, assina e transmite para a SEFAZ |
 
 ## Totais automáticos

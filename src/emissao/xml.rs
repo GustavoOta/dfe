@@ -131,7 +131,8 @@ pub(super) async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
 
     let dets = det_process(
         nfe.det.clone(), nfe.ide.mod_, nfe.ide.tp_amb,
-        nfe.desconto_rateio.clone(), nfe.frete_rateio.clone(), nfe.active_ibs_cbs.clone(),
+        nfe.desconto_rateio.clone(), nfe.frete_rateio.clone(), nfe.outro_rateio.clone(),
+        nfe.active_ibs_cbs.clone(),
     )?;
     let dets_total = dets.clone();
 

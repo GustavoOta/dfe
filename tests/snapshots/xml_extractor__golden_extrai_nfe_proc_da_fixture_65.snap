@@ -1,5 +1,6 @@
 ---
 source: tests/xml_extractor.rs
+assertion_line: 26
 expression: proc
 ---
 NFeProc {
@@ -268,6 +269,8 @@ NFeProc {
                         v_tot_trib: None,
                     },
                 ),
+                ibs_cbs_tot: None,
+                is_tot: None,
             },
             transp: Transp {
                 mod_frete: Some(
@@ -293,6 +296,7 @@ NFeProc {
                 ),
             },
             inf_adic: InfAdic {
+                inf_ad_fisco: None,
                 inf_cpl: None,
             },
         },

@@ -309,6 +309,58 @@ pub struct COFINSAliq {
 pub struct Total {
     #[serde(rename = "ICMSTot")]
     pub icms_tot: Option<ICMSTot>,
+    /// Totais de IBS e CBS (Reforma Tributária). Ausente em nota sem IBS/CBS — a
+    /// emissão omite o grupo zerado para não levar a rejeição 1118.
+    #[serde(rename = "IBSCBSTot", default)]
+    pub ibs_cbs_tot: Option<IBSCBSTot>,
+    /// Total do Imposto Seletivo.
+    #[serde(rename = "ISTot", default)]
+    pub is_tot: Option<ISTot>,
+}
+
+/// Leitura do grupo `IBSCBSTot` — só os valores que aparecem em documento auxiliar.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct IBSCBSTot {
+    #[serde(rename = "vBCIBSCBS")]
+    pub v_bc_ibs_cbs: Option<String>,
+    #[serde(rename = "gIBS")]
+    pub g_ibs: Option<GIBSTot>,
+    #[serde(rename = "gCBS")]
+    pub g_cbs: Option<GCBSTot>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GIBSTot {
+    #[serde(rename = "gIBSUF")]
+    pub g_ibs_uf: Option<GIBSUFTot>,
+    #[serde(rename = "gIBSMun")]
+    pub g_ibs_mun: Option<GIBSMunTot>,
+    #[serde(rename = "vIBS")]
+    pub v_ibs: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GIBSUFTot {
+    #[serde(rename = "vIBSUF")]
+    pub v_ibs_uf: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GIBSMunTot {
+    #[serde(rename = "vIBSMun")]
+    pub v_ibs_mun: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GCBSTot {
+    #[serde(rename = "vCBS")]
+    pub v_cbs: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ISTot {
+    #[serde(rename = "vIS")]
+    pub v_is: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -387,6 +439,9 @@ pub struct DetPag {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct InfAdic {
+    /// Informações adicionais de interesse do Fisco.
+    #[serde(rename = "infAdFisco")]
+    pub inf_ad_fisco: Option<String>,
     #[serde(rename = "infCpl")]
     pub inf_cpl: Option<String>,
 }

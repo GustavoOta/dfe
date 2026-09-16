@@ -52,6 +52,10 @@ pub struct ProdProcess {
     pub v_frete: Option<Decimal>,
     #[serde(rename = "vDesc", skip_serializing_if = "Option::is_none")]
     pub v_desc: Option<Decimal>,
+    // vOutro vem logo DEPOIS de vDesc e antes de indTot (ordem do XSD). Só emitido quando há
+    // acréscimo rateado → item sem acréscimo produz XML idêntico ao anterior (mudança aditiva).
+    #[serde(rename = "vOutro", skip_serializing_if = "Option::is_none")]
+    pub v_outro: Option<Decimal>,
     #[serde(rename = "indTot")]
     pub ind_tot: String,
     #[serde(rename = "xPed", skip_serializing_if = "Option::is_none")]

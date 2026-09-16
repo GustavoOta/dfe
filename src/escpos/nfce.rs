@@ -676,7 +676,7 @@ fn raw_print_windows(printer_name: &str, data: &[u8]) -> Result<()> {
 
 // ── Helpers de layout ─────────────────────────────────────────────────────────
 
-fn pad_lr(left: &str, right: &str, cols: usize) -> String {
+pub(super) fn pad_lr(left: &str, right: &str, cols: usize) -> String {
     let ll = left.chars().count();
     let rl = right.chars().count();
     if ll + rl >= cols {
@@ -687,7 +687,7 @@ fn pad_lr(left: &str, right: &str, cols: usize) -> String {
 
 // ── Helpers de formatação ─────────────────────────────────────────────────────
 
-fn format_brl(value: &str) -> String {
+pub(super) fn format_brl(value: &str) -> String {
     let v: f64 = value.replace(',', ".").parse().unwrap_or(0.0);
     let s = format!("{:.2}", v);
     let parts: Vec<&str> = s.split('.').collect();
@@ -701,21 +701,21 @@ fn format_brl(value: &str) -> String {
     format!("{},{}", with_dots, parts[1])
 }
 
-fn format_cnpj_cpf(doc: &str) -> String {
+pub(super) fn format_cnpj_cpf(doc: &str) -> String {
     crate::interno::cnpj_cpf::format_cnpj_cpf(doc)
 }
 
 /// Rótulo do documento do consumidor: "CNPJ" para 14 posições alfanuméricas
 /// (preserva letras do CNPJ alfanumérico), "CPF" caso contrário (11 dígitos).
-fn doc_label_cnpj_cpf(doc: &str) -> &'static str {
+pub(super) fn doc_label_cnpj_cpf(doc: &str) -> &'static str {
     if sanitize_cnpj(doc).len() == 14 { "CNPJ" } else { "CPF" }
 }
 
-fn format_decimal_br(value: &str) -> String {
+pub(super) fn format_decimal_br(value: &str) -> String {
     value.replace('.', ",")
 }
 
-fn format_datetime(dt: &str) -> String {
+pub(super) fn format_datetime(dt: &str) -> String {
     if dt.len() >= 19 {
         let parts: Vec<&str> = dt[..10].split('-').collect();
         if parts.len() == 3 {
@@ -737,14 +737,14 @@ fn split_datetime(dt: &str) -> (String, String) {
     (dt.to_string(), String::new())
 }
 
-fn format_chave_acesso(chave: &str) -> String {
+pub(super) fn format_chave_acesso(chave: &str) -> String {
     chave.chars().collect::<Vec<_>>().chunks(4)
         .map(|c| c.iter().collect::<String>())
         .collect::<Vec<_>>()
         .join(" ")
 }
 
-fn wrap_text(text: &str, max_chars: usize) -> Vec<String> {
+pub(super) fn wrap_text(text: &str, max_chars: usize) -> Vec<String> {
     let mut lines = Vec::new();
     let mut current = String::new();
     for word in text.split_whitespace() {
@@ -768,7 +768,7 @@ fn truncate_str(s: &str, max_chars: usize) -> String {
     format!("{}...", chars[..max_chars.saturating_sub(3)].iter().collect::<String>())
 }
 
-fn pag_type_name(t_pag: &str) -> &'static str {
+pub(super) fn pag_type_name(t_pag: &str) -> &'static str {
     match t_pag {
         "01" => "Dinheiro",        "02" => "Cheque",
         "03" => "Cartao de Credito","04" => "Cartao de Debito",

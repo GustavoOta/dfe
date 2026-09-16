@@ -16,7 +16,7 @@ toda a API (comportamento recomendado para o consumidor completo).
 | Feature | Liga | Deps extras |
 |---|---|---|
 | `danfe` (default) | DANFE em PDF (`DanfeBuilder`) | `printpdf`, `image`, `barcoders`, `qrcodegen` |
-| `escpos` (default) | Impressão ESC/POS (`EscPosBuilder`, `EscPosNFCeBuilder`) | `font8x8`, `image`, `barcoders`, `qrcodegen` |
+| `escpos` (default) | Impressão ESC/POS (`EscPosBuilder`, `EscPosNFCeBuilder`, `EscPosDanfeNFeBuilder`) | `font8x8`, `image`, `barcoders`, `qrcodegen` |
 | `distribuicao` (default) | Distribuição do AN + manifestação (`ManifestacaoBuilder`) | `flate2` |
 
 O **core** (emissão, cancelamento, substituição, CC-e, status, extração de XML, tipos) está **sempre
@@ -63,7 +63,8 @@ let resposta = NFeBuilder::new()
     .informacoes_adicionais(inf_adic) // opcional
     .id_csc("000001")                // NFC-e apenas — ID do CSC
     .csc("CODIGO_CSC")               // NFC-e apenas — código CSC
-    .desconto_rateio(valor)          // opcional — desconto rateado nos itens
+    .desconto_rateio(valor)          // opcional — desconto rateado nos itens (det/prod/vDesc)
+    .outro_rateio(valor)             // opcional — acréscimo rateado nos itens (det/prod/vOutro)
     .emitir()
     .await?;
 
@@ -364,3 +365,29 @@ O modelo é detectado automaticamente do campo `<mod>` no XML — não é necess
 | Data URI | `"data:image/png;base64,iVBORw0KGgo..."` |
 
 O logo é renderizado no topo da coluna do emitente, centralizado horizontalmente, com altura máxima de 18mm. A proporção original é sempre mantida; a imagem nunca é ampliada além do tamanho original. Formatos suportados: PNG e JPEG.
+
+## DANFE Simplificado Tipo 2 da NF-e (ESC/POS) — `EscPosDanfeNFeBuilder`
+
+DANFE 80 mm da **NF-e modelo 55** em impressora térmica, no leiaute do Ajuste SINIEF 13/2026 e
+da **NT 2026.003** (nove divisões, na ordem da norma). Recusa modelo 65 — NFC-e é o
+`EscPosNFCeBuilder`.
+
+```rust
+use dfe::EscPosDanfeNFeBuilder;
+
+let bytes = EscPosDanfeNFeBuilder::new()
+    .xml(xml_nfe_proc)   // string do nfeProc autorizado, ou caminho terminado em ".xml"
+    .paper_width(80)     // 80 ou 58; abaixo de 56 mm o build() recusa (mínimo da NT)
+    .columns(42)         // opcional: colunas do modelo da impressora
+    .build()?;           // Vec<u8> pronto para job RAW
+```
+
+- **Fidelidade ao XML:** a NT proíbe imprimir o que não está no XML. O **QR Code** (Divisão V)
+  só sai com `infNFeSupl/qrCode`, e o bloco **IBS/CBS/IS** (Divisão III-A) só com
+  `IBSCBSTot`/`ISTot`. Sem `urlChave`, a consulta aponta para o portal nacional da NF-e. O cupom
+  não leva o crédito "Gerado por dfe".
+- **Avisos:** homologação (`tpAmb=2`) → "SEM VALOR FISCAL" na Divisão VIII; contingência em que
+  o DANFE sai antes da autorização (`tpEmis` 2, 4, 5 ou 9) → aviso em dois locais. SVC (6/7) não
+  leva aviso.
+- **Limitação atual:** a emissão (`NFeBuilder`) só gera `infNFeSupl` para o modelo 65, então a
+  NF-e 55 emitida pela crate ainda sai sem QR.
