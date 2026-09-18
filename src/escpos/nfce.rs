@@ -176,13 +176,15 @@ impl EscPosNFCeBuilder {
         let dh_recbto = prot.as_ref().and_then(|p| p.dh_recbto.clone()).unwrap_or_default();
 
         let emit = &inf.emit;
-        let emit_x_nome = emit
-            .x_fant
-            .as_deref()
-            .filter(|v| !v.trim().is_empty())
-            .or_else(|| emit.x_nome.as_deref().filter(|v| !v.trim().is_empty()))
-            .unwrap_or_default()
-            .to_string();
+        let emit_x_nome = clamp_chars(
+            emit.x_fant
+                .as_deref()
+                .filter(|v| !v.trim().is_empty())
+                .or_else(|| emit.x_nome.as_deref().filter(|v| !v.trim().is_empty()))
+                .unwrap_or_default()
+                .to_string(),
+            XNOME_MAX_CHARS,
+        );
         let emit_cnpj = emit.cnpj.clone().unwrap_or_default();
         let emit_ie = emit.ie.clone().unwrap_or_default();
         let emit_uf = emit.ender_emit.uf.clone().unwrap_or_default();
@@ -203,7 +205,10 @@ impl EscPosNFCeBuilder {
             .as_ref()
             .and_then(|d| d.cnpj.clone().or_else(|| d.cpf.clone()))
             .unwrap_or_default();
-        let dest_x_nome = dest.as_ref().and_then(|d| d.x_nome.clone()).unwrap_or_default();
+        let dest_x_nome = clamp_chars(
+            dest.as_ref().and_then(|d| d.x_nome.clone()).unwrap_or_default(),
+            XNOME_MAX_CHARS,
+        );
 
         let icms_tot = inf.total.icms_tot.as_ref();
         let v_nf = icms_tot.and_then(|t| t.v_nf.clone()).unwrap_or_default();
@@ -514,23 +519,6 @@ fn build_receipt(p: BuildParams) -> Result<Vec<u8>> {
 
     // ── QR Code ───────────────────────────────────────────────────────────────
     if p.qr_side {
-        // Consumidor (calculado aqui para incluir na imagem combinada)
-        let consumer_str_side = if p.dest_cpf_cnpj.is_empty() {
-            "CONSUMIDOR NÃO IDENTIFICADO".to_string()
-        } else {
-            let doc_label = doc_label_cnpj_cpf(&p.dest_cpf_cnpj);
-            if p.dest_x_nome.trim().is_empty() {
-                format!("CONSUMIDOR - {}: {}", doc_label, format_cnpj_cpf(&p.dest_cpf_cnpj))
-            } else {
-                format!("{} - {}: {}", p.dest_x_nome, doc_label, format_cnpj_cpf(&p.dest_cpf_cnpj))
-            }
-        };
-
-        // Abordagem raster: QR ≈ 55 % de paper_dots, fonte bitmap 8 px/char escala 2× = 16 px/char
-        // text_col = paper_dots × 45 % − gap(8px); chars = text_col / 16
-        let text_col_px = (p.paper_dots * 45 / 100).saturating_sub(8);
-        let text_cols: usize = (text_col_px / 16).max(10) as usize;
-
         let mut right: Vec<(String, bool)> = Vec::new();
         if !p.n_prot.is_empty() {
             right.push(("Protocolo:".to_string(), false));
@@ -542,18 +530,16 @@ fn build_receipt(p: BuildParams) -> Result<Vec<u8>> {
         let (d, t) = split_datetime(&p.dh_emi);
         right.push((d, false));
         right.push((t, false));
-        if !p.dest_x_nome.trim().is_empty() {
-            right.push(("Cliente".to_string(), true));
-            for line in wrap_text(&p.dest_x_nome, text_cols) {
-                right.push((line, false));
-            }
-        } else {
-            for line in wrap_text(&consumer_str_side, text_cols) {
-                right.push((line, false));
-            }
+        // Razão social e documento vão para a faixa abaixo do QR, onde a largura inteira
+        // do papel os acomoda no corpo nominal — ao lado do código eles quebrariam em
+        // quatro linhas ou teriam de encolher. Sem destinatário não se gasta linha
+        // nenhuma embaixo: o aviso fica na própria coluna lateral.
+        let below = linhas_destinatario_abaixo(&p.dest_x_nome, &p.dest_cpf_cnpj);
+        if below.is_empty() {
+            right.push((CONSUMIDOR_NAO_IDENTIFICADO.to_string(), false));
         }
 
-        b = b.qr_with_text_right(&p.qr_code_url, &right);
+        b = b.qr_with_text_right_and_below(&p.qr_code_url, &right, &below);
     } else {
         b = b.align_center().qr_code(&p.qr_code_url, 5);
         b = b.line_spacing(SPACING_DIVIDER).divider().line_spacing(SPACING_NORMAL);
@@ -574,16 +560,8 @@ fn build_receipt(p: BuildParams) -> Result<Vec<u8>> {
 
     // ── Consumidor (apenas no layout centralizado; no qr_side já está na imagem) ──
     if !p.qr_side {
-        let consumer_str = if p.dest_cpf_cnpj.is_empty() {
-            "CONSUMIDOR NÃO IDENTIFICADO".to_string()
-        } else {
-            let doc_label = doc_label_cnpj_cpf(&p.dest_cpf_cnpj);
-            if p.dest_x_nome.trim().is_empty() {
-                format!("CONSUMIDOR - {}: {}", doc_label, format_cnpj_cpf(&p.dest_cpf_cnpj))
-            } else {
-                format!("{} - {}: {}", p.dest_x_nome, doc_label, format_cnpj_cpf(&p.dest_cpf_cnpj))
-            }
-        };
+        let consumer_str = linha_consumidor(&p.dest_x_nome, &p.dest_cpf_cnpj)
+            .unwrap_or_else(|| CONSUMIDOR_NAO_IDENTIFICADO.to_string());
         b = b.align_center();
         for line in wrap_text(&consumer_str, cols) {
             b = b.text(format!("{line}\n"));
@@ -744,22 +722,95 @@ pub(super) fn format_chave_acesso(chave: &str) -> String {
         .join(" ")
 }
 
+/// Quebra `text` em linhas de no máximo `max_chars` caracteres, partindo a palavra que
+/// sozinha não couber (ver [`wrap_hard`](super::wrap_hard)).
+///
+/// Texto vazio rende lista vazia — os chamadores emitem uma linha por elemento e não
+/// devem ganhar linha em branco por um campo ausente.
 pub(super) fn wrap_text(text: &str, max_chars: usize) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut current = String::new();
-    for word in text.split_whitespace() {
-        if current.is_empty() {
-            current = word.to_string();
-        } else if current.chars().count() + 1 + word.chars().count() <= max_chars {
-            current.push(' ');
-            current.push_str(word);
-        } else {
-            lines.push(current);
-            current = word.to_string();
-        }
+    if text.trim().is_empty() {
+        return Vec::new();
     }
-    if !current.is_empty() { lines.push(current); }
-    lines
+    super::wrap_hard(text, max_chars)
+}
+
+/// Teto de `xNome` no leiaute da NF-e/NFC-e: `leiauteNFe_v4.00.xsd` restringe
+/// `emit/xNome` e `dest/xNome` a `maxLength 60`.
+///
+/// Vale igualmente para os modelos **55 e 65** — eles compartilham o mesmo leiaute, em
+/// que o modelo é apenas o campo `ide/mod`. A SEFAZ rejeita por schema antes de
+/// autorizar, e o cupom só é montado a partir de um `nfeProc` (nota já autorizada):
+/// 60 é teto duro, não estimativa. Com ele o bloco do consumidor tem cota de pior caso
+/// conhecida — `ceil(60 / colunas)` linhas — e o layout lateral nunca precisa truncar.
+pub(super) const XNOME_MAX_CHARS: usize = 60;
+
+/// Texto exibido quando a NFC-e sai sem destinatário identificado.
+pub(super) const CONSUMIDOR_NAO_IDENTIFICADO: &str = "CONSUMIDOR NÃO IDENTIFICADO";
+
+/// Título da faixa do destinatário, abaixo do QR Code.
+///
+/// Sem acento de propósito: a faixa é desenhada com a font8x8, cuja cobertura de
+/// maiúscula acentuada rende glifo de caixa baixa — os outros rótulos do bloco
+/// (`Data emissao:`) seguem a mesma regra.
+pub(super) const TITULO_DESTINATARIO: &str = "Destinatario:";
+
+/// Faixa do destinatário que vai **abaixo** do QR Code no layout lateral.
+///
+/// Vazia quando a nota não traz destinatário — aí não se gasta linha nenhuma embaixo do
+/// código, e quem chama imprime [`CONSUMIDOR_NAO_IDENTIFICADO`] na coluna lateral.
+///
+/// Cada item é `(texto, negrito)`; o título sai em negrito, o conteúdo em corpo normal.
+pub(super) fn linhas_destinatario_abaixo(
+    dest_x_nome: &str,
+    dest_cpf_cnpj: &str,
+) -> Vec<(String, bool)> {
+    match linha_consumidor(dest_x_nome, dest_cpf_cnpj) {
+        Some(consumidor) => vec![
+            (TITULO_DESTINATARIO.to_string(), true),
+            (consumidor, false),
+        ],
+        None => Vec::new(),
+    }
+}
+
+/// Linha do consumidor no cupom — a mesma nos dois layouts, centralizado e lateral.
+///
+/// Devolve `None` quando a nota não traz destinatário; aí o cupom imprime
+/// [`CONSUMIDOR_NAO_IDENTIFICADO`].
+///
+/// Emite nome **e** documento. Os dois ramos antigos perdiam informação: o lateral só
+/// montava o documento quando não havia nome, e o centralizado descartava o nome quando
+/// não havia documento.
+pub(super) fn linha_consumidor(dest_x_nome: &str, dest_cpf_cnpj: &str) -> Option<String> {
+    let nome = dest_x_nome.trim();
+    let doc = dest_cpf_cnpj.trim();
+
+    match (nome.is_empty(), doc.is_empty()) {
+        (true, true) => None,
+        (false, true) => Some(nome.to_string()),
+        (true, false) => Some(format!(
+            "CONSUMIDOR - {}: {}",
+            doc_label_cnpj_cpf(doc),
+            format_cnpj_cpf(doc)
+        )),
+        (false, false) => Some(format!(
+            "{} - {}: {}",
+            nome,
+            doc_label_cnpj_cpf(doc),
+            format_cnpj_cpf(doc)
+        )),
+    }
+}
+
+/// Corta `s` no teto de caracteres, sem reticências.
+///
+/// Rede de segurança para XML fora do schema: nota autorizada não chega aqui acima do
+/// teto, então na prática isto nunca corta nada — só garante a cota de pior caso.
+fn clamp_chars(s: String, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        return s;
+    }
+    s.chars().take(max_chars).collect()
 }
 
 fn truncate_str(s: &str, max_chars: usize) -> String {
@@ -873,6 +924,144 @@ mod tests {
             paper_dots: 576,
             cols: None,
         }
+    }
+
+    #[test]
+    fn consumidor_traz_nome_e_documento_juntos() {
+        // Regressão: o layout lateral só montava o documento quando o nome estava vazio,
+        // então cliente identificado por razão social saía do cupom sem CPF/CNPJ.
+        assert_eq!(
+            linha_consumidor("Magazine Campos Eireli", "11222333000181").unwrap(),
+            "Magazine Campos Eireli - CNPJ: 11.222.333/0001-81"
+        );
+        assert_eq!(
+            linha_consumidor("FULANO DE TAL", "12345678901").unwrap(),
+            "FULANO DE TAL - CPF: 123.456.789-01"
+        );
+    }
+
+    #[test]
+    fn consumidor_cobre_os_quatro_casos() {
+        // Sem nada: não há linha de consumidor; quem chama imprime o aviso.
+        assert_eq!(linha_consumidor("", ""), None);
+        assert_eq!(linha_consumidor("  ", " "), None);
+
+        // Só documento: prefixo CONSUMIDOR, como no layout centralizado de sempre.
+        assert_eq!(
+            linha_consumidor("   ", "12345678901").unwrap(),
+            "CONSUMIDOR - CPF: 123.456.789-01"
+        );
+
+        // Regressão: só nome, sem documento, era descartado pelo layout centralizado.
+        assert_eq!(linha_consumidor("LOJA X", "").unwrap(), "LOJA X");
+    }
+
+    #[test]
+    fn consumidor_entrega_o_campo_inteiro_sem_pre_quebra() {
+        // A quebra é do builder, que conhece a largura real. O nome de 60 caracteres
+        // com o documento tem de chegar inteiro, numa string só.
+        let nome = "COMERCIO E DISTRIBUICAO DE ALIMENTOS DO VALE DO RIBEIRA LTDA";
+        assert_eq!(nome.chars().count(), XNOME_MAX_CHARS);
+
+        let linha = linha_consumidor(nome, "11222333000181").unwrap();
+        assert!(linha.starts_with(nome));
+        assert!(linha.ends_with("CNPJ: 11.222.333/0001-81"));
+    }
+
+    #[test]
+    fn faixa_do_destinatario_tem_titulo_em_negrito() {
+        let faixa = linhas_destinatario_abaixo("LOJA X", "11222333000181");
+        assert_eq!(faixa.len(), 2);
+        assert_eq!(faixa[0], ("Destinatario:".to_string(), true));
+        assert_eq!(faixa[1].0, "LOJA X - CNPJ: 11.222.333/0001-81");
+        assert!(!faixa[1].1, "o conteúdo sai em corpo normal");
+
+        // Sem destinatário não há faixa — nem o título.
+        assert!(linhas_destinatario_abaixo("", "").is_empty());
+        assert!(linhas_destinatario_abaixo("  ", " ").is_empty());
+    }
+
+    #[test]
+    fn sem_destinatario_o_qr_side_nao_gasta_linha_abaixo_do_codigo() {
+        // O aviso fica na coluna lateral; a faixa de baixo nem existe, então o cupom
+        // anônimo não pode ficar mais alto que o mínimo do QR.
+        let mut anonimo = base_params("1");
+        anonimo.qr_side = true;
+        let mut identificado = base_params("1");
+        identificado.qr_side = true;
+        identificado.dest_x_nome = "LOJA X".to_string();
+        identificado.dest_cpf_cnpj = "22333444000195".to_string();
+
+        let a = build_receipt(anonimo).unwrap();
+        let b = build_receipt(identificado).unwrap();
+
+        // Identificar o cliente acrescenta a faixa inferior — logo, mais bytes de raster.
+        assert!(b.len() > a.len(), "a faixa de baixo não apareceu");
+    }
+
+    #[test]
+    fn clamp_chars_garante_a_cota_mesmo_com_xml_fora_do_schema() {
+        // Nota autorizada nunca passa de 60 — mas XML torto não pode furar a cota.
+        let torto = "X".repeat(120);
+        assert_eq!(clamp_chars(torto, XNOME_MAX_CHARS).chars().count(), XNOME_MAX_CHARS);
+        // Dentro do teto, nada muda.
+        assert_eq!(clamp_chars("LOJA X".to_string(), XNOME_MAX_CHARS), "LOJA X");
+    }
+
+    #[test]
+    fn qr_side_com_cliente_identificado_desenha_o_bloco_e_nao_vaza_texto() {
+        // O bloco lateral vira pixel dentro da faixa raster: nome e documento não podem
+        // sobrar como texto ESC/POS solto. E identificar o cliente tem de mudar a imagem
+        // — era justamente o que não acontecia quando o documento era descartado.
+        let mut anonimo = base_params("1");
+        anonimo.qr_side = true;
+
+        let mut identificado = base_params("1");
+        identificado.qr_side = true;
+        identificado.dest_x_nome =
+            "COMERCIO E DISTRIBUICAO DE ALIMENTOS DO VALE DO RIBEIRA LTDA".to_string();
+        // CNPJ diferente do emitente (base_params), senão o cabeçalho do cupom
+        // — que imprime o do emitente como texto — falsearia o teste de vazamento.
+        identificado.dest_cpf_cnpj = "22333444000195".to_string();
+
+        // Mesmos dados, só o documento entra — a imagem tem de mudar mesmo assim.
+        let mut so_nome = base_params("1");
+        so_nome.qr_side = true;
+        so_nome.dest_x_nome.clone_from(&identificado.dest_x_nome);
+
+        let a = build_receipt(anonimo).unwrap();
+        let b = build_receipt(identificado).unwrap();
+        let c = build_receipt(so_nome).unwrap();
+
+        assert_ne!(a, b);
+        assert_ne!(c, b, "o CPF/CNPJ do cliente precisa aparecer no cupom");
+
+        let texto = String::from_utf8_lossy(&b);
+        assert!(!texto.contains("RIBEIRA LTDA"));
+        assert!(!texto.contains("22.333.444/0001-95"));
+    }
+
+    #[test]
+    fn qr_side_cabe_em_58_mm_sem_cortar_rotulo_nem_protocolo() {
+        // Em 58 mm a coluna lateral tem 10 a 12 caracteres: "NFC-e Serie/Num:" (16) e o
+        // protocolo (15) eram cortados em silêncio por não passarem pela quebra.
+        let mut p = base_params("1");
+        p.qr_side = true;
+        p.paper_width = 58;
+        p.paper_dots = 384;
+        p.n_prot = "135266376727096".to_string();
+        p.qr_code_url = "https://www.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx?p=35260924341498000114650010000103919114792106|2|1|1|a3f1c2d4e5b60718293a4b5c6d7e8f9012345678".to_string();
+
+        let cols = EscPosBuilder::new().paper_width(58).qr_text_cols(&p.qr_code_url);
+        assert!((10..=12).contains(&cols), "coluna de 58 mm deu {cols}");
+
+        // Rótulo e protocolo agora cabem porque são quebrados, não cortados.
+        assert!(super::super::wrap_hard("NFC-e Serie/Num:", cols)
+            .iter()
+            .all(|l| l.chars().count() <= cols));
+        assert!(super::super::wrap_hard(&p.n_prot, cols).join("") == p.n_prot);
+
+        assert!(!build_receipt(p).unwrap().is_empty());
     }
 
     #[test]
