@@ -126,7 +126,7 @@ e validação — está sempre disponível, independente das features.
 | [Distribuição de DF-e](docs/distribuicao.md) | Consulta por NSU e chave de acesso |
 | [DANFE](docs/danfe.md) | Geração de PDF A4 e 80mm |
 | [ESC/POS](docs/escpos.md) | `EscPosBuilder` e `EscPosNFCeBuilder` |
-| [Status do Webservice](docs/status-webservice.md) | Consulta de disponibilidade por UF |
+| [Status do Webservice](docs/status-webservice.md) | Disponibilidade por UF e modelo (NF-e 55 / NFC-e 65), códigos e limite de consulta |
 | [Tratamento de Erros](docs/erros.md) | `DfeError` — variantes e quando ocorrem |
 | [ICMS, PIS, COFINS](docs/icms-pis-cofins.md) | Tipos de ICMS, IPI, PIS/COFINS e validação CNPJ/CPF |
 | [Testes](docs/testes.md) | Suites disponíveis e requisitos |

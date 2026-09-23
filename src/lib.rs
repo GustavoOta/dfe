@@ -21,7 +21,7 @@
 //! | [`danfe`] | Geração de DANFE em PDF via [`DanfeBuilder`] |
 //! | [`escpos`] | Impressão ESC/POS via [`EscPosBuilder`] e [`EscPosNFCeBuilder`] |
 //! | [`distribuicao`] | Distribuição de DF-e (Ambiente Nacional) |
-//! | [`status`] | Status do webservice SEFAZ via [`NFeService`] |
+//! | [`status`] | Status do webservice SEFAZ (NF-e 55 / NFC-e 65) via [`NFeService`] |
 //! | [`manifestacao`] | Manifestação do destinatário |
 //! | [`xml_extractor`] | Extração de campos de XML autorizado |
 //! | [`tipos`] | Structs e enums de domínio (`Icms`, `Det`, `Ide`, …) |
@@ -82,6 +82,7 @@ pub mod danfe;
 pub mod distribuicao;
 pub mod emissao;
 pub mod error;
+pub mod inutilizacao;
 #[cfg(feature = "escpos")]
 pub mod escpos;
 #[cfg(feature = "distribuicao")]
@@ -111,6 +112,8 @@ pub use manifestacao::ManifestacaoBuilder;
 pub use substituicao::SubstituicaoBuilder;
 pub use carta_correcao::CartaCorrecaoBuilder;
 pub use emissao::NFeBuilder;
+pub use inutilizacao::InutilizacaoBuilder;
+pub use emissao::NFeAssinada;
 pub use emissao::Response as EmissaoResponse;
 pub use emissao::transmitir_xml_assinado;
 pub use error::DfeError;

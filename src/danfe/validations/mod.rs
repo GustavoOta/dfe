@@ -45,9 +45,10 @@ impl Validations {
     }
 
     fn convert_xml_to_struct(xml: &str) -> Result<NFeProc, String> {
+        // Aceita também a NFC-e em contingência off-line, ainda sem protocolo (tpEmis=9).
         let extractor = XmlExtractor::new();
         extractor
-            .nfe_proc_from_string(xml)
+            .nfe_proc_para_impressao(xml)
             .map_err(|e| format!("Erro ao converter XML para struct NFeProc: {}", e))
     }
 }

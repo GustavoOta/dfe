@@ -21,7 +21,7 @@ use crate::tipos::{Dest, Det, Emit, Entrega, Ide, InfAdic, Pag, Total, Transp};
 use rust_decimal::Decimal;
 
 use types::NFeInterno;
-pub use types::{InfProt, Response, TagInfProt};
+pub use types::{InfProt, NFeAssinada, Response, TagInfProt};
 pub use service::transmitir_xml_assinado;
 
 // Validações de contingência (`tpEmis != 1`), comuns a `gerar_xml()` e `emitir()` — fail-fast,
@@ -169,9 +169,31 @@ impl NFeBuilder {
 
     /// Gera e valida o XML da NF-e sem enviar à SEFAZ.
     ///
-    /// Útil para validação prévia (ex.: NF-e de devolução antes da emissão).
-    /// Retorna o XML assinado e validado pelo XSD oficial.
+    /// Útil para validação prévia (ex.: NF-e de devolução antes da emissão) e para a
+    /// contingência off-line da NFC-e (`tp_emis = 9`), em que a nota é assinada e impressa
+    /// localmente. Retorna o XML assinado e validado pelo XSD oficial.
+    ///
+    /// Quem também precisa da **chave de acesso** deve usar [`Self::assinar`], que devolve as
+    /// duas coisas sem reler o XML.
     pub async fn gerar_xml(self) -> crate::error::Result<String> {
+        Ok(self.assinar().await?.xml)
+    }
+
+    /// Monta, assina e valida a nota **sem transmitir**, devolvendo o XML e a chave de acesso.
+    ///
+    /// Serve para separar as duas metades da emissão: o que é local e determinístico (montar e
+    /// assinar) e o que depende da SEFAZ (transmitir). Saber a chave antes do envio é o que
+    /// permite, quando a transmissão falha por rede, registrar aquele número como pendente de
+    /// apuração em vez de reemitir às cegas — a nota pode ter chegado à SEFAZ mesmo sem
+    /// resposta. Transmita com [`NFeAssinada::transmitir`].
+    pub async fn assinar(self) -> Result<NFeAssinada> {
+        service::assinar_nfe(self.montar_interno()?).await
+    }
+
+    /// Valida os campos obrigatórios do builder e monta a struct interna consumida pela
+    /// montagem/assinatura. Compartilhada por [`Self::assinar`] e [`Self::emitir`] — antes o
+    /// mesmo bloco estava duplicado em `gerar_xml` e `emitir`.
+    fn montar_interno(self) -> Result<NFeInterno> {
         let cert_path  = self.cert_path.ok_or_else(|| DfeError::Configuracao("cert_path não informado".to_string()))?;
         let cert_pass  = self.cert_pass.ok_or_else(|| DfeError::Configuracao("cert_pass não informado".to_string()))?;
         let ide        = self.ide.ok_or_else(|| DfeError::Validacao("ide não informado".to_string()))?;
@@ -186,7 +208,7 @@ impl NFeBuilder {
             return Err(DfeError::Validacao("pelo menos um item (det) deve ser informado".to_string()));
         }
 
-        let signed = xml::build_signed_xml(NFeInterno {
+        Ok(NFeInterno {
             cert_path, cert_pass, id_csc: self.id_csc, csc: self.csc,
             ide, emit: emitente, dest: self.destinatario,
             det: self.itens, total, transp: transporte, pag: pagamento,
@@ -197,9 +219,7 @@ impl NFeBuilder {
             outro_rateio: self.outro_rateio,
             entrega: self.entrega,
             referencias: self.referencias,
-        }).await?;
-
-        Ok(signed.validated_xml)
+        })
     }
 
     /// Valida, assina e transmite a NF-e/NFC-e para a SEFAZ.
@@ -213,32 +233,19 @@ impl NFeBuilder {
     /// Retorna [`DfeError`] se algum campo obrigatório estiver ausente,
     /// a assinatura falhar ou a SEFAZ retornar erro de transmissão.
     pub async fn emitir(self) -> Result<Response> {
-        let cert_path  = self.cert_path.ok_or_else(|| DfeError::Configuracao("cert_path não informado".to_string()))?;
-        let cert_pass  = self.cert_pass.ok_or_else(|| DfeError::Configuracao("cert_pass não informado".to_string()))?;
-        let ide        = self.ide.ok_or_else(|| DfeError::Validacao("ide não informado".to_string()))?;
-        let emitente   = self.emitente.ok_or_else(|| DfeError::Validacao("emitente não informado".to_string()))?;
-        let total      = self.total.ok_or_else(|| DfeError::Validacao("total não informado".to_string()))?;
-        let transporte = self.transporte.ok_or_else(|| DfeError::Validacao("transporte não informado".to_string()))?;
-        let pagamento  = self.pagamento.ok_or_else(|| DfeError::Validacao("pagamento não informado".to_string()))?;
+        service::emit_nfe(self.montar_interno()?).await
+    }
+}
 
-        validar_contingencia(&ide)?;
-
-        if self.itens.is_empty() {
-            return Err(DfeError::Validacao("pelo menos um item (det) deve ser informado".to_string()));
-        }
-
-        service::emit_nfe(NFeInterno {
-            cert_path, cert_pass, id_csc: self.id_csc, csc: self.csc,
-            ide, emit: emitente, dest: self.destinatario,
-            det: self.itens, total, transp: transporte, pag: pagamento,
-            inf_adic: self.informacoes_adicionais,
-            active_ibs_cbs: self.active_ibs_cbs,
-            desconto_rateio: self.desconto_rateio,
-            frete_rateio: self.frete_rateio,
-            outro_rateio: self.outro_rateio,
-            entrega: self.entrega,
-            referencias: self.referencias,
-        }).await
+impl NFeAssinada {
+    /// Transmite à SEFAZ a nota já assinada por [`NFeBuilder::assinar`].
+    ///
+    /// Um erro aqui **não** significa que a nota foi recusada: pode ser rede/timeout, caso em
+    /// que a SEFAZ pode ter recebido e autorizado a nota mesmo assim. Nessa situação, use
+    /// [`crate::ConsultaSituacaoBuilder`] com a [`NFeAssinada::chave`] antes de decidir o que
+    /// fazer com o número. Rejeição fiscal, ao contrário, volta em `Ok` com o `cStat`.
+    pub async fn transmitir(&self) -> Result<Response> {
+        service::transmitir_assinada(self).await
     }
 }
 

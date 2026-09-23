@@ -71,9 +71,29 @@ pub struct TagInfProt {
     pub inf_prot: InfProt,
 }
 
+/// NF-e/NFC-e **montada, assinada e validada, ainda não transmitida** — o estado intermediário
+/// de [`super::NFeBuilder::assinar`].
+///
+/// Existe para que o consumidor conheça a **chave de acesso antes da ida à SEFAZ**. Quando a
+/// transmissão falha por rede (timeout, conexão recusada), não se sabe se a SEFAZ recebeu a
+/// nota; com a chave em mãos o consumidor pode registrar aquele número como pendente de
+/// apuração e depois decidir pela consulta de situação — em vez de reemitir às cegas com o
+/// mesmo número.
+pub struct NFeAssinada {
+    /// Chave de acesso de 44 dígitos, lida do `Id` do XML assinado.
+    pub chave: String,
+    /// XML da `<NFe>` assinado (é exatamente o que vai no envelope da transmissão).
+    pub xml: String,
+    pub(super) cert_path: String,
+    pub(super) cert_pass: String,
+    pub(super) ide_mod: u32,
+    pub(super) ide_tp_amb: u8,
+    pub(super) ide_c_uf: u16,
+}
+
 // XML assinado e validado + metadados necessários para o envio SEFAZ.
 pub(super) struct SignedNfe {
-    pub nfe_xml: String,
+    /// XML da `<NFe>` assinado e aprovado no XSD (`is_xml_valid` devolve a própria entrada).
     pub validated_xml: String,
     pub cert_path: String,
     pub cert_pass: String,

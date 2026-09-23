@@ -239,10 +239,21 @@ let r = NFeService::new()
     .cert_pass("senha")
     .uf("SP")
     .environment(2)
+    .modelo(65) // 65 = NFC-e · 55 = NF-e (padrão)
     .send()
     .await?;
 // r.c_stat, r.x_motivo, r.url
 ```
+
+`modelo` escolhe o webservice: em várias UFs (SP, por exemplo) a NFC-e roda em outro host e um pode
+cair sem o outro. Sem `.modelo(…)` consulta o da NF-e (55) — o comportamento de antes. Modelo fora
+de 55/65 é recusado na validação.
+
+A SEFAZ controla consumo indevido também neste serviço: o manual pede **no mínimo 3 minutos** entre
+consultas, e laço de consulta rende `cStat 656` com o CNPJ bloqueado por 1 hora. Quem monitora em
+segundo plano deve espaçar (o PDV usa 5 min) e preferir consultar depois de uma falha de comunicação.
+
+Guia completo (métodos, campos da resposta, tabela de `cStat`, erros): [`docs/status-webservice.md`](docs/status-webservice.md).
 
 ---
 
@@ -273,6 +284,59 @@ autorizada, `101` = cancelada) e `.n_prot`/`.dh_recbto` trazem o protocolo/data 
 Uso previsto: recuperação de emissão órfã (app fechou/timeout antes da resposta chegar) —
 consultar a chave 1x, respeitando o rate-limit da SEFAZ (10 consultas/hora por chave, NT
 2014.002), para decidir se a nota foi autorizada antes de reenviar ou reemitir.
+
+---
+
+## Inutilização de numeração — `InutilizacaoBuilder`
+
+`inutNFe` — declara à SEFAZ que uma faixa de números **não foi e não será usada**. É o desfecho
+de um número "pulado": quando a emissão falha na comunicação e a venda é concluída com o número
+seguinte, aquele número fica em aberto até ser inutilizado (ou até a nota aparecer autorizada na
+consulta de situação, caso em que o caminho é cancelar, não inutilizar).
+
+```rust
+use dfe::InutilizacaoBuilder;
+
+let r = InutilizacaoBuilder::new()
+    .cert("caminho.pfx", "senha")
+    .tp_amb(2)
+    .uf("SP")
+    .cnpj("11.222.333/0001-81") // aceita máscara e CNPJ alfanumérico
+    .mod_(65)                   // 55 = NF-e | 65 = NFC-e
+    .serie(1)
+    .faixa(325, 325)            // um número só = faixa(n, n)
+    .justificativa("Numeracao pulada por falha de comunicacao na emissao") // 15 a 255
+    .send()
+    .await?;
+
+r.response.c_stat;   // "102" = inutilização homologada (único sucesso)
+r.response.n_prot;   // Option<String> — protocolo, só quando homologada
+```
+
+`.ano("26")` é opcional (padrão: ano corrente, 2 dígitos). Rejeições comuns: a faixa já foi usada
+por uma nota autorizada, ou já existe pedido de inutilização para ela.
+
+---
+
+## Emissão em duas etapas — `NFeBuilder::assinar` + `NFeAssinada::transmitir`
+
+`emitir()` faz as duas metades de uma vez. Separá-las serve para **saber a chave de acesso antes
+do envio**: se a transmissão falhar por rede, não se sabe se a SEFAZ recebeu a nota, e com a
+chave em mãos dá para consultar a situação depois em vez de reemitir às cegas com o mesmo número.
+
+```rust
+let assinada = NFeBuilder::new() /* … */ .assinar().await?;
+assinada.chave; // 44 dígitos, lidos do Id do XML assinado
+assinada.xml;   // <NFe> assinada, exatamente o que vai no envelope
+
+match assinada.transmitir().await {
+    Ok(resp) => { /* cStat da SEFAZ — inclusive rejeição fiscal */ }
+    Err(e)   => { /* rede/timeout: a nota PODE ter sido autorizada — consulte a chave */ }
+}
+```
+
+`gerar_xml()` continua existindo e é atalho para `assinar().await?.xml` (usado pela contingência
+off-line da NFC-e, que assina e imprime sem transmitir).
 
 ---
 

@@ -148,10 +148,11 @@ impl EscPosNFCeBuilder {
             .ok_or_else(|| DfeError::Configuracao("XML não informado".to_string()))?;
 
         let extractor = XmlExtractor::new();
+        // Aceita também a NFC-e em contingência off-line, ainda sem protocolo (tpEmis=9).
         let nfe_proc = if src.trim_end().ends_with(".xml") {
-            extractor.nfe_proc_from_file(&src)?
+            extractor.nfe_proc_para_impressao_from_file(&src)?
         } else {
-            extractor.nfe_proc_from_string(&src)?
+            extractor.nfe_proc_para_impressao(&src)?
         };
 
         let inf = &nfe_proc.nfe.inf_nfe;
@@ -394,12 +395,20 @@ fn build_receipt(p: BuildParams) -> Result<Vec<u8>> {
     }
 
     // ── Contingência off-line (tpEmis=9) ──────────────────────────────────────
+    // O `tpEmis` faz parte da chave e continua 9 depois da autorização. Quem diz se a SEFAZ já
+    // autorizou é o protocolo: com ele, é a 2ª via da nota autorizada (o número e a data saem
+    // na linha do protocolo, mais abaixo) — imprimir "pendente" ali seria falso.
     if p.tp_emis == "9" {
+        let situacao = if p.n_prot.trim().is_empty() {
+            "PENDENTE DE AUTORIZAÇÃO PELA SEFAZ\n"
+        } else {
+            "AUTORIZADA PELA SEFAZ\n"
+        };
         b = b
             .align_center()
             .bold(true)
             .text("NFC-e EMITIDA EM CONTINGÊNCIA\n")
-            .text("PENDENTE DE AUTORIZAÇÃO PELA SEFAZ\n")
+            .text(situacao)
             .bold(false)
             .line_spacing(SPACING_DIVIDER).divider().line_spacing(SPACING_NORMAL);
     }
@@ -739,7 +748,8 @@ pub(super) fn wrap_text(text: &str, max_chars: usize) -> Vec<String> {
 ///
 /// Vale igualmente para os modelos **55 e 65** — eles compartilham o mesmo leiaute, em
 /// que o modelo é apenas o campo `ide/mod`. A SEFAZ rejeita por schema antes de
-/// autorizar, e o cupom só é montado a partir de um `nfeProc` (nota já autorizada):
+/// autorizar, e o cupom só é montado a partir de nota já validada por schema (`nfeProc`
+/// autorizado, ou a NFC-e em contingência off-line, assinada contra o mesmo leiaute):
 /// 60 é teto duro, não estimativa. Com ele o bloco do consumidor tem cota de pior caso
 /// conhecida — `ceil(60 / colunas)` linhas — e o layout lateral nunca precisa truncar.
 pub(super) const XNOME_MAX_CHARS: usize = 60;
@@ -1072,5 +1082,38 @@ mod tests {
         let contingencia = build_receipt(base_params("9")).unwrap();
         assert!(!normal.is_empty());
         assert!(contingencia.len() > normal.len());
+    }
+
+    fn texto(bytes: &[u8]) -> String {
+        String::from_utf8_lossy(bytes).into_owned()
+    }
+
+    #[test]
+    fn contingencia_sem_protocolo_sai_pendente() {
+        let t = texto(&build_receipt(base_params("9")).unwrap());
+        assert!(t.contains("EMITIDA EM CONTING"));
+        assert!(t.contains("PENDENTE DE AUTORIZ"));
+        assert!(!t.contains("AUTORIZADA PELA SEFAZ"));
+    }
+
+    // 2ª via depois da transmissão: o XML autorizado mantém tpEmis=9 e ganha o protocolo.
+    #[test]
+    fn contingencia_com_protocolo_sai_autorizada_e_nao_pendente() {
+        let mut p = base_params("9");
+        p.n_prot = "135260000000001".to_string();
+        p.dh_recbto = "2026-09-21T10:30:00-03:00".to_string();
+        let t = texto(&build_receipt(p).unwrap());
+        assert!(t.contains("EMITIDA EM CONTING"));
+        assert!(t.contains("AUTORIZADA PELA SEFAZ"));
+        assert!(!t.contains("PENDENTE DE AUTORIZ"), "2ª via autorizada não pode dizer pendente");
+        assert!(t.contains("135260000000001"), "protocolo deve sair no cupom");
+    }
+
+    #[test]
+    fn nota_normal_nao_tem_aviso_de_contingencia() {
+        let mut p = base_params("1");
+        p.n_prot = "135260000000001".to_string();
+        let t = texto(&build_receipt(p).unwrap());
+        assert!(!t.contains("CONTING"));
     }
 }

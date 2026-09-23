@@ -56,3 +56,22 @@ pub fn live_env() -> Option<LiveEnv> {
             .unwrap_or(2),
     })
 }
+
+/// NFC-e em contingência off-line **como o PDV imprime**: o `<NFe>` assinado, sem `nfeProc`
+/// nem `protNFe` (a SEFAZ ainda não autorizou) e com `tpEmis=9`. Derivada da fixture
+/// autorizada — a assinatura fica inválida, o que não importa para ler/imprimir.
+#[allow(dead_code)]
+pub fn nfce65_contingencia_sem_protocolo() -> String {
+    nfe_sem_protocolo_com_tp_emis("nfce65_autorizada.xml", "9")
+}
+
+/// `<NFe>` da fixture, sem o envelope `nfeProc`, com o `tpEmis` trocado.
+#[allow(dead_code)]
+pub fn nfe_sem_protocolo_com_tp_emis(fixture: &str, tp_emis: &str) -> String {
+    let xml = read_xml_fixture(fixture);
+    let inicio = xml.find("<NFe").expect("fixture sem <NFe>");
+    let fim = xml.find("</NFe>").expect("fixture sem </NFe>") + "</NFe>".len();
+    let nfe = &xml[inicio..fim];
+    assert!(nfe.contains("<tpEmis>1</tpEmis>"), "fixture deveria ter tpEmis=1");
+    nfe.replace("<tpEmis>1</tpEmis>", &format!("<tpEmis>{tp_emis}</tpEmis>"))
+}

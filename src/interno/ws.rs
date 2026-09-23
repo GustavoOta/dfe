@@ -59,6 +59,10 @@ pub fn nfe_consulta_protocolo(ambiente: u8, uf: &str, modelo: u32, svn: bool) ->
     lookup("NfeConsultaProtocolo", ambiente, uf, modelo, svn)
 }
 
+pub fn nfe_inutilizacao(ambiente: u8, uf: &str, modelo: u32, svn: bool) -> Result<&'static str> {
+    lookup("NfeInutilizacao", ambiente, uf, modelo, svn)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

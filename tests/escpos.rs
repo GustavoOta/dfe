@@ -37,3 +37,19 @@ fn golden_escpos_nfce_80mm() {
     assert!(!bytes.is_empty(), "ESC/POS deve gerar bytes não vazios");
     insta::assert_snapshot!(escape_escpos(&bytes));
 }
+
+/// Bug de campo (2026-09-21): o cupom da NFC-e em contingência (sem `nfeProc`) falhava com
+/// "missing field `@versao`". Tem de sair, e com o aviso de contingência.
+#[test]
+fn escpos_nfce_em_contingencia_sem_protocolo_imprime_com_aviso() {
+    let xml = common::nfce65_contingencia_sem_protocolo();
+    let bytes = EscPosNFCeBuilder::new()
+        .xml(xml)
+        .paper_width(80)
+        .build()
+        .expect("gerar ESC/POS da NFC-e em contingência");
+    // O acento sai na página de código da impressora: compara só o trecho ASCII.
+    let texto = String::from_utf8_lossy(&bytes);
+    assert!(texto.contains("EMITIDA EM CONTING"), "cupom sem o aviso de contingência");
+    assert!(texto.contains("PENDENTE DE AUTORIZ"), "cupom sem o aviso de pendência");
+}

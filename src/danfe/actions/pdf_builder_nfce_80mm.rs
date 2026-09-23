@@ -195,7 +195,7 @@ pub fn build_pdf_nfce_80mm(
     if tp_emis == "9" {
         write_center(&layer, &font_bold, 7.0, y, "NFC-e EMITIDA EM CONTINGENCIA");
         y -= LINE_HEIGHT;
-        write_center(&layer, &font_bold, 6.0, y, "PENDENTE DE AUTORIZACAO PELA SEFAZ");
+        write_center(&layer, &font_bold, 6.0, y, situacao_contingencia(n_prot));
         y -= LINE_HEIGHT;
         draw_line(&layer, y, 0.6);
         y -= SECTION_GAP;
@@ -924,6 +924,17 @@ fn format_datetime(dt: &str) -> String {
     dt.to_string()
 }
 
+/// Segunda linha do aviso de contingência. O `tpEmis` faz parte da chave e continua 9 depois
+/// da autorização; quem diz se a SEFAZ já autorizou é o protocolo. Com ele, é a 2ª via da nota
+/// autorizada (número e data saem no bloco do protocolo) — "pendente" ali seria falso.
+fn situacao_contingencia(n_prot: &str) -> &'static str {
+    if n_prot.trim().is_empty() {
+        "PENDENTE DE AUTORIZACAO PELA SEFAZ"
+    } else {
+        "AUTORIZADA PELA SEFAZ"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -947,5 +958,12 @@ mod tests {
         let contingencia = build("9");
         assert!(!normal.is_empty());
         assert!(contingencia.len() > normal.len());
+    }
+
+    #[test]
+    fn situacao_da_contingencia_depende_do_protocolo() {
+        assert_eq!(situacao_contingencia(""), "PENDENTE DE AUTORIZACAO PELA SEFAZ");
+        assert_eq!(situacao_contingencia("  "), "PENDENTE DE AUTORIZACAO PELA SEFAZ");
+        assert_eq!(situacao_contingencia("135260000000001"), "AUTORIZADA PELA SEFAZ");
     }
 }

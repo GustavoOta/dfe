@@ -12,6 +12,8 @@
 
 use dfe::DanfeBuilder;
 
+mod common;
+
 /// XML mínimo de NFC-e (modelo 65) válido para testes de geração de DANFE.
 /// Os dados são fictícios — apenas para exercitar o builder sem acesso à SEFAZ.
 const NFCE_XML_HOMOLOG: &str = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -669,4 +671,32 @@ async fn test_danfe_nfce_80mm_qr_side_salva_arquivo() {
             );
         }
     }
+}
+
+/// Bug de campo (2026-09-21): o DANFE da NFC-e em contingência (sem `nfeProc`) falhava com
+/// "Erro ao converter XML para struct NFeProc: missing field `@versao`".
+#[tokio::test]
+async fn test_danfe_nfce_80mm_contingencia_sem_protocolo_as_base64() {
+    let xml = common::nfce65_contingencia_sem_protocolo();
+    let b64 = DanfeBuilder::new()
+        .xml(&xml)
+        .paper_size("80mm")
+        .as_base64()
+        .build()
+        .await
+        .expect("gerar DANFE da NFC-e em contingência");
+    assert!(b64.starts_with("JVBE"), "saída deve ser PDF em base64");
+}
+
+/// A mesma nota sem protocolo e com `tpEmis=1` não é contingência: é nota não autorizada.
+#[tokio::test]
+async fn test_danfe_nfce_sem_protocolo_e_sem_contingencia_retorna_erro() {
+    let xml = common::nfe_sem_protocolo_com_tp_emis("nfce65_autorizada.xml", "1");
+    let result = DanfeBuilder::new()
+        .xml(&xml)
+        .paper_size("80mm")
+        .as_base64()
+        .build()
+        .await;
+    assert!(result.is_err());
 }

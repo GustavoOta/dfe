@@ -2,6 +2,7 @@ pub mod cancelar;
 pub mod config;
 pub mod consulta_situacao;
 pub mod emissao;
+pub mod inutilizacao;
 pub mod manifestacao;
 pub mod service_status;
 

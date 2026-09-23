@@ -1,0 +1,5 @@
+---
+source: src/inutilizacao/xml.rs
+expression: inf_inut_xml(&pedido()).unwrap()
+---
+<infInut xmlns="http://www.portalfiscal.inf.br/nfe" Id="ID35261122233300018165001000000325000000325"><tpAmb>2</tpAmb><xServ>INUTILIZAR</xServ><cUF>35</cUF><ano>26</ano><CNPJ>11222333000181</CNPJ><mod>65</mod><serie>1</serie><nNFIni>325</nNFIni><nNFFin>325</nNFFin><xJust>Numeracao pulada por falha de comunicacao na emissao</xJust></infInut>

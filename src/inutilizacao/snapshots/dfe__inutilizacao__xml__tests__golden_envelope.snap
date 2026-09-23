@@ -1,0 +1,5 @@
+---
+source: src/inutilizacao/xml.rs
+expression: "inut_nfe_envelope(\"<infInut>FIXO</infInut>\", \"<Signature>FIXA</Signature>\")"
+---
+<?xml version="1.0" encoding="UTF-8"?><soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"><soap12:Body><nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeInutilizacao4"><inutNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><infInut>FIXO</infInut><Signature>FIXA</Signature></inutNFe></nfeDadosMsg></soap12:Body></soap12:Envelope>

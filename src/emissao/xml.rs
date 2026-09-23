@@ -225,7 +225,7 @@ pub(super) async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
         Err(e) => return Err(DfeError::Validacao(format!("is_xml_valid: [{}]", e))),
     };
 
-    Ok(SignedNfe { nfe_xml, validated_xml, cert_path, cert_pass, ide_mod, ide_tp_amb, ide_c_uf })
+    Ok(SignedNfe { validated_xml, cert_path, cert_pass, ide_mod, ide_tp_amb, ide_c_uf })
 }
 
 pub(super) fn qrcode_hash(chave_acesso: &str, versao_qr: &str, ambiente: &str, id_csc: &str, csc: &str) -> Result<String> {

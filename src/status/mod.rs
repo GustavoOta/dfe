@@ -1,3 +1,13 @@
+//! Status do webservice SEFAZ (`consStatServ`, `NFeStatusServico4`).
+//!
+//! [`NFeService`] consulta se a SEFAZ da UF está no ar. NF-e (55) e NFC-e (65) têm webservices
+//! próprios — em várias UFs, hosts diferentes — e um pode cair sem o outro: use
+//! [`NFeService::modelo`] para escolher (padrão 55). Só `c_stat == "107"` é "em operação".
+//!
+//! A SEFAZ controla consumo indevido também aqui: no mínimo 3 min entre consultas, senão
+//! `cStat 656` e bloqueio do CNPJ por 1 h. A crate não limita — o controle é do consumidor.
+//! Guia: `docs/status-webservice.md`.
+
 mod endpoint;
 mod parser;
 mod service;
@@ -34,6 +44,7 @@ pub struct NFeServiceResponse {
 ///     .cert_pass("senha")
 ///     .uf("SP")
 ///     .environment(2)
+///     .modelo(65) // NFC-e; sem isto consulta o da NF-e (55)
 ///     .send()
 ///     .await?;
 ///
@@ -51,6 +62,8 @@ pub struct NFeService {
     pub uf: String,
     /// Ambiente: `1` = Produção · `2` = Homologação.
     pub environment: u8,
+    /// Modelo do documento: `55` = NF-e (padrão) · `65` = NFC-e. Escolhe o webservice.
+    pub modelo: u32,
 }
 
 impl NFeService {
@@ -61,6 +74,7 @@ impl NFeService {
             cert_pass: String::new(),
             uf: String::new(),
             environment: 0,
+            modelo: 55,
         }
     }
 
@@ -88,6 +102,12 @@ impl NFeService {
         self
     }
 
+    /// Modelo: `55` = NF-e (padrão) · `65` = NFC-e. Cada um tem o seu webservice de status.
+    pub fn modelo(mut self, modelo: u32) -> Self {
+        self.modelo = modelo;
+        self
+    }
+
     /// Valida os campos sem enviar a requisição. Retorna `Err` se algum campo obrigatório estiver vazio.
     pub fn build(self) -> Result<Self, String> {
         validation::validate_nfe_service(&self)?;
@@ -103,7 +123,7 @@ impl NFeService {
     pub async fn send(self) -> Result<NFeServiceResponse, String> {
         validation::validate_nfe_service(&self)?;
 
-        let url = endpoint::status_url(self.environment, &self.uf)?;
+        let url = endpoint::status_url(self.environment, &self.uf, self.modelo)?;
         let xml = xml::status_request_xml(self.environment, &self.uf)?;
         let body =
             service::send_status_request(&self.cert_path, &self.cert_pass, &url, &xml).await?;

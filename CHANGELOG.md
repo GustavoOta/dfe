@@ -5,6 +5,55 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 
 ## [Unreleased]
 
+### Status do serviço por modelo
+
+#### Added
+- **`NFeService::modelo(55 | 65)`**: a consulta de status passa a escolher o webservice do modelo.
+  Antes era sempre o da NF-e (55) — em UFs com host próprio da NFC-e (SP, por exemplo) o PDV decidia
+  a contingência da NFC-e olhando o serviço da NF-e. Padrão continua 55; outro modelo é recusado.
+
+### Impressão da NFC-e em contingência off-line
+
+#### Fixed
+- **`DanfeBuilder` e `EscPosNFCeBuilder` não imprimiam a NFC-e em contingência** (`tpEmis=9`):
+  a nota é um `<NFe>` assinado, sem `nfeProc`/`protNFe` (a SEFAZ ainda não autorizou), e a leitura
+  exigia `nfeProc` — `missing field @versao`. Achado no primeiro teste em campo (2026-09-21).
+
+#### Added
+- **`XmlExtractor::nfe_proc_para_impressao`** (e `_from_file`): lê o `nfeProc` como antes e, na
+  falta dele, aceita o `<NFe>` **só** se for mod 65 com `tpEmis=9`, devolvendo `prot_nfe.inf_prot =
+  None`. Outro `<NFe>` sem protocolo segue recusado. `nfe_proc_from_string` continua estrito.
+
+#### Changed
+- **Aviso de contingência consciente do protocolo** (`EscPosNFCeBuilder` e DANFE NFC-e 80mm):
+  com `tpEmis=9` e **sem** protocolo continua "PENDENTE DE AUTORIZAÇÃO PELA SEFAZ"; **com**
+  protocolo (2ª via depois da transmissão) sai "AUTORIZADA PELA SEFAZ". O `tpEmis` faz parte da
+  chave e continua 9 depois da autorização — antes, a reimpressão da nota já autorizada dizia
+  "pendente" ao lado do número do protocolo.
+
+### Inutilização de numeração + emissão em duas etapas
+
+#### Added
+- **`InutilizacaoBuilder`** (`inutNFe`, serviço `NFeInutilizacao4`): inutiliza uma faixa de
+  numeração de NF-e/NFC-e. Validação fail-fast (UF, CNPJ, modelo, faixa, justificativa 15–255,
+  ano de 2 dígitos) antes de qualquer I/O; endpoints já existiam no `webservices.json` para as 27
+  UFs. `cStat 102` é o único sucesso. Tipos em `tipos::inutilizacao`.
+- **`NFeBuilder::assinar() -> NFeAssinada`** e **`NFeAssinada::transmitir()`**: as duas metades da
+  emissão, separadas. `NFeAssinada` expõe `chave` e `xml`, o que permite ao consumidor registrar a
+  chave de uma tentativa **antes** de saber o resultado do envio — quando a transmissão falha por
+  rede, a nota pode ter sido autorizada mesmo assim, e a chave é o que permite conferir depois com
+  o `ConsultaSituacaoBuilder`.
+
+#### Changed
+- `emitir()` agora é a composição de `assinar()` + `transmitir()`, e `gerar_xml()` é atalho para
+  `assinar().await?.xml`. **Mesmo comportamento externo**, com uma diferença de ordem: a checagem
+  da flag de autorização passou a ocorrer depois da montagem/assinatura (antes era a primeira
+  coisa). Sem efeito prático — a flag hoje retorna sempre `Ready` e nada é gravado em disco antes
+  do envio.
+- O bloco de validação de campos obrigatórios do builder, que estava duplicado em `gerar_xml()` e
+  `emitir()`, virou um helper único (`montar_interno`).
+
+
 ### A8 — Feature-gating / modularização de dependências
 
 #### Changed (build — opt-out; **consumidores atuais não mudam**)
