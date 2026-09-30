@@ -70,3 +70,55 @@ pub struct EnderEmitProcess {
     #[serde(rename = "xPais")]
     pub x_pais: String,
 }
+
+/// Tamanho máximo de `xNome` e `xFant` do emitente no XSD da NF-e/NFC-e (60).
+pub(super) const EMIT_X_NOME_MAX: usize = 60;
+
+/// Razão social (`xNome`) ou nome fantasia (`xFant`) do emitente cortado nos 60
+/// caracteres que o XSD aceita.
+/// Conta caracteres (não bytes), então acento não quebra no meio.
+pub(super) fn limitar_x_nome(x_nome: &str) -> String {
+    x_nome
+        .trim()
+        .chars()
+        .take(EMIT_X_NOME_MAX)
+        .collect::<String>()
+        .trim_end()
+        .to_string()
+}
+
+#[cfg(test)]
+mod tests_limitar_x_nome {
+    use super::*;
+
+    #[test]
+    fn razao_social_de_62_caracteres_corta_nos_60() {
+        let nome = "A".repeat(62);
+        assert_eq!(limitar_x_nome(&nome).chars().count(), 60);
+    }
+
+    #[test]
+    fn razao_social_curta_fica_intacta() {
+        assert_eq!(limitar_x_nome("  Empresa Ltda "), "Empresa Ltda");
+    }
+
+    #[test]
+    fn corte_conta_caracteres_e_nao_bytes() {
+        let nome = "Ç".repeat(70);
+        assert_eq!(limitar_x_nome(&nome), "Ç".repeat(60));
+    }
+
+    #[test]
+    fn espaco_no_ponto_de_corte_nao_sobra_no_fim() {
+        let nome = format!("{} RESTO", "B".repeat(59));
+        assert_eq!(limitar_x_nome(&nome), "B".repeat(59));
+    }
+
+    #[test]
+    fn nome_fantasia_longo_corta_nos_60_e_ausente_segue_ausente() {
+        let fant = Some("F".repeat(75));
+        assert_eq!(fant.as_deref().map(limitar_x_nome), Some("F".repeat(60)));
+        let sem: Option<String> = None;
+        assert_eq!(sem.as_deref().map(limitar_x_nome), None);
+    }
+}

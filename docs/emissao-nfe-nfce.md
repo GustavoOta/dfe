@@ -81,14 +81,26 @@ println!("Protocolo: {}", resposta.protocolo.inf_prot.n_prot.unwrap_or_default()
 
 ## Totais automáticos
 
-Os campos `v_bc`, `v_icms`, `v_prod`, `v_pis`, `v_cofins`, `v_desc` e `v_nf` são **calculados automaticamente** dos itens. No `Total` informe apenas despesas extras:
+Os campos `v_bc`, `v_icms`, `v_icms_deson`, `v_bc_st`, `v_st`, `v_fcp`, `v_fcpst`, `v_fcpst_ret`,
+`v_prod`, `v_pis`, `v_cofins`, `v_desc`, `v_nf` e os totais do monofásico (`qBCMono`…`vICMSMonoRet`)
+são **calculados automaticamente** dos itens — cada parcela como impressa no item
+(`dfe::arred2`), então o total é exatamente a soma do XML.
+
+`vNF = vProd + vFrete + vSeg − vDesc + vOutro + vII + vIPI − vIPIDevol + vST + vFCPST − vICMSDeson
++ vPIS(PISST) + vCOFINS(COFINSST) + vICMSMonoReten`
+
+- `vICMSDeson` só dos itens com `ind_deduz_deson = 1` (NT 2023.004);
+- PISST/COFINSST só com `indSomaPISST`/`indSomaCOFINSST = 1` (NT 2020.005);
+- `vICMSMonoReten` do CST 15 (NT 2023.001). Todos pela regra 610.
+
+No `Total` informe apenas despesas extras:
 
 | Campo | Quando usar |
 |---|---|
 | `v_frete`, `v_seg`, `v_outro` | Frete, seguro e outras despesas |
 | `v_ii`, `v_ipi`, `v_ipi_devol` | Impostos específicos |
-| `v_bc_st`, `v_st` | ST global (itens com ICMS10/30/70 auto-somam) |
-| `v_fcp`, `v_fcpst`, `v_fcpst_ret` | Fundo de Combate à Pobreza |
+| `v_bc_st`, `v_st` | ST fora dos itens (somado ao dos itens) |
+| `v_fcp`, `v_fcpst`, `v_fcpst_ret` | FCP fora dos itens (somados aos dos itens) |
 | `v_fcpuf_dest`, `v_icms_uf_dest`, `v_icms_uf_remet` | DIFAL |
 
 Para uma venda simples sem extras: `Total::default()`.

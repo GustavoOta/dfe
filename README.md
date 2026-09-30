@@ -128,8 +128,8 @@ e validação — está sempre disponível, independente das features.
 | [ESC/POS](docs/escpos.md) | `EscPosBuilder` e `EscPosNFCeBuilder` |
 | [Status do Webservice](docs/status-webservice.md) | Disponibilidade por UF e modelo (NF-e 55 / NFC-e 65), códigos e limite de consulta |
 | [Tratamento de Erros](docs/erros.md) | `DfeError` — variantes e quando ocorrem |
-| [ICMS, PIS, COFINS](docs/icms-pis-cofins.md) | Tipos de ICMS, IPI, PIS/COFINS e validação CNPJ/CPF |
-| [Testes](docs/testes.md) | Suites disponíveis e requisitos |
+| [ICMS, PIS, COFINS](docs/icms-pis-cofins.md) | Todos os grupos de ICMS do leiaute (modalidades, partilha, repasse, monofásico, gCred/comb), PIS/COFINS de qualquer CST, IPI e validação CNPJ/CPF |
+| [Testes](docs/testes.md) | Suites disponíveis, requisitos e testes de grupo contra o XSD |
 | [Notas e Roadmap](docs/notas-roadmap.md) | Boas práticas e funcionalidades planejadas |
 
 Referência completa dos *builders* (incluindo `SubstituicaoBuilder`, `CartaCorrecaoBuilder` e as

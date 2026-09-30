@@ -1,7 +1,7 @@
 //! Structs de PIS e COFINS do XML de emissão (A7: extraído de entity.rs).
 
 use serde::{Deserialize, Serialize};
-use super::{serialize_f64_2_decimals, serialize_f64_4_decimals, serialize_option_f64_2_decimals};
+use super::{serialize_f64_2_decimals, serialize_f64_4_decimals};
 
 
 /// Grupo PIS Informar apenas um dos grupos PIS (PISAliq, PISQtde, PISNT ... )
@@ -88,6 +88,11 @@ pub struct PISNT {
 pub struct PISOutr {
     #[serde(rename = "CST")]
     pub cst: String,
+    // Choice do XSD: (vBC + pPIS) OU (qBCProd + vAliqProd). Só um par vem preenchido.
+    #[serde(rename = "vBC", skip_serializing_if = "Option::is_none")]
+    pub v_bc: Option<String>,
+    #[serde(rename = "pPIS", skip_serializing_if = "Option::is_none")]
+    pub p_pis: Option<String>,
     #[serde(rename = "qBCProd", skip_serializing_if = "Option::is_none")]
     pub qbc_prod: Option<String>,
     #[serde(rename = "vAliqProd", skip_serializing_if = "Option::is_none")]
@@ -111,6 +116,9 @@ pub struct PISST {
     pub valiq_prod: Option<String>,
     #[serde(rename = "vPIS", skip_serializing_if = "Option::is_none")]
     pub vpis: Option<String>,
+    /// 1 = o valor do ST entra no vNF (NT 2020.005, regra 610).
+    #[serde(rename = "indSomaPISST", skip_serializing_if = "Option::is_none")]
+    pub ind_soma: Option<String>,
 }
 
 
@@ -195,24 +203,17 @@ pub struct COFINSNT {
 pub struct COFINSOutr {
     #[serde(rename = "CST")]
     pub cst: String,
-    #[serde(
-        rename = "vBC",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_option_f64_2_decimals"
-    )]
-    pub v_bc: Option<f64>,
-    #[serde(
-        rename = "pCOFINS",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_option_f64_2_decimals"
-    )]
-    pub p_cofins: Option<f64>,
-    #[serde(
-        rename = "vCOFINS",
-        skip_serializing_if = "Option::is_none",
-        serialize_with = "serialize_option_f64_2_decimals"
-    )]
-    pub v_cofins: Option<f64>,
+    // Choice do XSD: (vBC + pCOFINS) OU (qBCProd + vAliqProd). Só um par vem preenchido.
+    #[serde(rename = "vBC", skip_serializing_if = "Option::is_none")]
+    pub v_bc: Option<String>,
+    #[serde(rename = "pCOFINS", skip_serializing_if = "Option::is_none")]
+    pub p_cofins: Option<String>,
+    #[serde(rename = "qBCProd", skip_serializing_if = "Option::is_none")]
+    pub qbc_prod: Option<String>,
+    #[serde(rename = "vAliqProd", skip_serializing_if = "Option::is_none")]
+    pub valiq_prod: Option<String>,
+    #[serde(rename = "vCOFINS", skip_serializing_if = "Option::is_none")]
+    pub v_cofins: Option<String>,
 }
 
 
@@ -230,4 +231,7 @@ pub struct COFINSST {
     pub valiq_prod: Option<String>,
     #[serde(rename = "vCOFINS", skip_serializing_if = "Option::is_none")]
     pub vcofins: Option<String>,
+    /// 1 = o valor do ST entra no vNF (NT 2020.005, regra 610).
+    #[serde(rename = "indSomaCOFINSST", skip_serializing_if = "Option::is_none")]
+    pub ind_soma: Option<String>,
 }

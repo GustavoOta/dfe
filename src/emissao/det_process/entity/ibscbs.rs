@@ -130,11 +130,11 @@ pub struct GDevTrib {
 pub struct GRed {
     /// Percentual de redução da alíquota 3v2-4
     #[serde(rename = "pRedAliq")]
-    pub p_red_aliq: Decimal,
+    pub p_red_aliq: String,
     /// Alíquota Efetiva do IBS de competência das UF que será aplicada a Base de Cálculo
     /// Alíquota efetiva, após aplicação da redução de alíquota 3v2-4
     #[serde(rename = "pAliqEfet")]
-    pub p_aliq_efet: Decimal,
+    pub p_aliq_efet: String,
 }
 
 
