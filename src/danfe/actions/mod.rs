@@ -232,7 +232,7 @@ impl DanfeBuilderActions {
             .map(|det| {
                 let prod = &det.prod;
                 let imposto = &det.imposto;
-                let icms = imposto.icms.as_ref().and_then(|i| i.icms00.as_ref());
+                let icms = imposto.icms.as_ref().and_then(|i| i.grupo());
                 PdfItemA4 {
                     n_item: det.n_item.clone().unwrap_or_default(),
                     c_prod: prod.c_prod.clone().unwrap_or_default(),

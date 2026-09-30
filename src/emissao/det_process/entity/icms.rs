@@ -8,15 +8,20 @@ use super::{serialize_f64_2_decimals, serialize_f64_4_decimals, serialize_option
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ICMSProcess {
     ICMS00(ICMS00),
+    ICMS02(ICMS02),
     ICMS10(ICMS10),
+    ICMS15(ICMS15),
     ICMS20(ICMS20),
     ICMS30(ICMS30),
     ICMS40(ICMS40),
     ICMS51(ICMS51),
+    ICMS53(ICMS53),
     ICMS60(ICMS60),
+    ICMS61(ICMS61),
     ICMS70(ICMS70),
     ICMS90(ICMS90),
     ICMSPart(ICMSPart),
+    ICMSST(ICMSST),
     ICMSSN101(ICMSSN101),
     ICMSSN102(ICMSSN102),
     ICMSSN201(ICMSSN201),
@@ -28,7 +33,7 @@ pub enum ICMSProcess {
 
 
 // Defina os structs para cada tipo de ICMS aqui
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMS00 {
     // Campos específicos para ICMS00
     pub orig: u8,
@@ -42,11 +47,17 @@ pub struct ICMS00 {
     pub p_icms: f64,
     #[serde(rename = "vICMS", serialize_with = "serialize_f64_2_decimals")]
     pub v_icms: f64,
+    #[serde(rename = "pFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcp: Option<f64>,
+    #[serde(rename = "vFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcp: Option<f64>,
 }
 
 
 /// CST 10 — Tributada e com cobrança do ICMS por substituição tributária
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMS10 {
     pub orig: u8,
     #[serde(rename = "CST")]
@@ -59,6 +70,15 @@ pub struct ICMS10 {
     pub p_icms: f64,
     #[serde(rename = "vICMS", serialize_with = "serialize_f64_2_decimals")]
     pub v_icms: f64,
+    #[serde(rename = "vBCFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcp: Option<f64>,
+    #[serde(rename = "pFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcp: Option<f64>,
+    #[serde(rename = "vFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcp: Option<f64>,
     #[serde(rename = "modBCST")]
     pub mod_bcst: u8,
     #[serde(rename = "pMVAST", serialize_with = "serialize_f64_4_decimals")]
@@ -72,11 +92,25 @@ pub struct ICMS10 {
     pub p_icmsst: f64,
     #[serde(rename = "vICMSST", serialize_with = "serialize_f64_2_decimals")]
     pub v_icmsst: f64,
+    #[serde(rename = "vBCFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcpst: Option<f64>,
+    #[serde(rename = "pFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcpst: Option<f64>,
+    #[serde(rename = "vFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcpst: Option<f64>,
+    #[serde(rename = "vICMSSTDeson", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icmsst_deson: Option<f64>,
+    #[serde(rename = "motDesICMSST", skip_serializing_if = "Option::is_none")]
+    pub mot_des_icms_st: Option<u16>,
 }
 
 
 /// CST 20 — Com redução de base de cálculo
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMS20 {
     pub orig: u8,
     #[serde(rename = "CST")]
@@ -91,16 +125,27 @@ pub struct ICMS20 {
     pub p_icms: f64,
     #[serde(rename = "vICMS", serialize_with = "serialize_f64_2_decimals")]
     pub v_icms: f64,
+    #[serde(rename = "vBCFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcp: Option<f64>,
+    #[serde(rename = "pFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcp: Option<f64>,
+    #[serde(rename = "vFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcp: Option<f64>,
     #[serde(rename = "vICMSDeson", skip_serializing_if = "Option::is_none",
             serialize_with = "serialize_option_f64_2_decimals")]
     pub v_icms_deson: Option<f64>,
     #[serde(rename = "motDesICMS", skip_serializing_if = "Option::is_none")]
     pub mot_des_icms: Option<u16>,
+    #[serde(rename = "indDeduzDeson", skip_serializing_if = "Option::is_none")]
+    pub ind_deduz_deson: Option<u8>,
 }
 
 
 /// CST 30 — Isenta/NT para o emitente e com cobrança do ICMS por ST
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMS30 {
     pub orig: u8,
     #[serde(rename = "CST")]
@@ -118,11 +163,22 @@ pub struct ICMS30 {
     pub p_icmsst: f64,
     #[serde(rename = "vICMSST", serialize_with = "serialize_f64_2_decimals")]
     pub v_icmsst: f64,
+    #[serde(rename = "vBCFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcpst: Option<f64>,
+    #[serde(rename = "pFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcpst: Option<f64>,
+    #[serde(rename = "vFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcpst: Option<f64>,
     #[serde(rename = "vICMSDeson", skip_serializing_if = "Option::is_none",
             serialize_with = "serialize_option_f64_2_decimals")]
     pub v_icms_deson: Option<f64>,
     #[serde(rename = "motDesICMS", skip_serializing_if = "Option::is_none")]
     pub mot_des_icms: Option<u16>,
+    #[serde(rename = "indDeduzDeson", skip_serializing_if = "Option::is_none")]
+    pub ind_deduz_deson: Option<u8>,
 }
 
 
@@ -144,7 +200,8 @@ pub struct ICMS40 {
     /// a) com produtos beneficiados com a desoneração condicional do ICMS.
     /// b) destinadas à SUFRAMA, informando-se o valor que seria devido se não houvesse isenção.
     /// c) de venda a órgão da administração pública direta e suas Nota Fiscal eletrônica fundações e autarquias com isenção do ICMS. (NT 2011/004)
-    #[serde(rename = "vICMSDeson", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "vICMSDeson", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
     pub vicmsdeson: Option<f64>,
     /// Campo será preenchido quando o campo anterior estiver preenchido.
     /// Informar o motivo da desoneração:
@@ -162,6 +219,8 @@ pub struct ICMS40 {
     /// Revogada a partir da versão 3.
     #[serde(rename = "motDesICMS", skip_serializing_if = "Option::is_none")]
     pub mot_des_icms: Option<u16>,
+    #[serde(rename = "indDeduzDeson", skip_serializing_if = "Option::is_none")]
+    pub ind_deduz_deson: Option<u8>,
 }
 
 
@@ -172,13 +231,14 @@ impl Default for ICMS40 {
             cst: 40,
             vicmsdeson: None,
             mot_des_icms: None,
+            ind_deduz_deson: None,
         }
     }
 }
 
 
 /// CST 51 — Diferimento total ou parcial (todos os campos opcionais por definição SEFAZ)
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMS51 {
     pub orig: u8,
     #[serde(rename = "CST")]
@@ -188,6 +248,8 @@ pub struct ICMS51 {
     #[serde(rename = "pRedBC", skip_serializing_if = "Option::is_none",
             serialize_with = "serialize_option_f64_4_decimals")]
     pub p_red_bc: Option<f64>,
+    #[serde(rename = "cBenefRBC", skip_serializing_if = "Option::is_none")]
+    pub c_benef_rbc: Option<String>,
     #[serde(rename = "vBC", skip_serializing_if = "Option::is_none",
             serialize_with = "serialize_option_f64_2_decimals")]
     pub v_bc: Option<f64>,
@@ -206,12 +268,30 @@ pub struct ICMS51 {
     #[serde(rename = "vICMS", skip_serializing_if = "Option::is_none",
             serialize_with = "serialize_option_f64_2_decimals")]
     pub v_icms: Option<f64>,
+    #[serde(rename = "vBCFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcp: Option<f64>,
+    #[serde(rename = "pFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcp: Option<f64>,
+    #[serde(rename = "vFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcp: Option<f64>,
+    #[serde(rename = "pFCPDif", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcp_dif: Option<f64>,
+    #[serde(rename = "vFCPDif", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcp_dif: Option<f64>,
+    #[serde(rename = "vFCPEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcp_efet: Option<f64>,
 }
 
 
 /// ICMS60 — ICMS cobrado anteriormente por substituição tributária
 /// Usar quando o produto entrou no estoque com ICMS-ST já retido (CFOP 5403, 5405, 6403, 6405)
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMS60 {
     pub orig: u8,
     #[serde(rename = "CST")]
@@ -229,11 +309,32 @@ pub struct ICMS60 {
     /// Valor do ICMS ST retido anteriormente 13v2
     #[serde(rename = "vICMSSTRet", skip_serializing_if = "Option::is_none")]
     pub v_icmsst_ret: Option<String>,
+    #[serde(rename = "vBCFCPSTRet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcpst_ret: Option<f64>,
+    #[serde(rename = "pFCPSTRet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcpst_ret: Option<f64>,
+    #[serde(rename = "vFCPSTRet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcpst_ret: Option<f64>,
+    #[serde(rename = "pRedBCEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_red_bc_efet: Option<f64>,
+    #[serde(rename = "vBCEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bc_efet: Option<f64>,
+    #[serde(rename = "pICMSEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_icms_efet: Option<f64>,
+    #[serde(rename = "vICMSEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icms_efet: Option<f64>,
 }
 
 
 /// CST 70 — Com redução de BC e cobrança do ICMS por substituição tributária
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMS70 {
     pub orig: u8,
     #[serde(rename = "CST")]
@@ -249,6 +350,15 @@ pub struct ICMS70 {
     pub p_icms: f64,
     #[serde(rename = "vICMS", serialize_with = "serialize_f64_2_decimals")]
     pub v_icms: f64,
+    #[serde(rename = "vBCFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcp: Option<f64>,
+    #[serde(rename = "pFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcp: Option<f64>,
+    #[serde(rename = "vFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcp: Option<f64>,
     #[serde(rename = "modBCST")]
     pub mod_bcst: u8,
     #[serde(rename = "pMVAST", serialize_with = "serialize_f64_4_decimals")]
@@ -262,34 +372,81 @@ pub struct ICMS70 {
     pub p_icmsst: f64,
     #[serde(rename = "vICMSST", serialize_with = "serialize_f64_2_decimals")]
     pub v_icmsst: f64,
+    #[serde(rename = "vBCFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcpst: Option<f64>,
+    #[serde(rename = "pFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcpst: Option<f64>,
+    #[serde(rename = "vFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcpst: Option<f64>,
     #[serde(rename = "vICMSDeson", skip_serializing_if = "Option::is_none",
             serialize_with = "serialize_option_f64_2_decimals")]
     pub v_icms_deson: Option<f64>,
     #[serde(rename = "motDesICMS", skip_serializing_if = "Option::is_none")]
     pub mot_des_icms: Option<u16>,
+    #[serde(rename = "indDeduzDeson", skip_serializing_if = "Option::is_none")]
+    pub ind_deduz_deson: Option<u8>,
+    #[serde(rename = "vICMSSTDeson", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icmsst_deson: Option<f64>,
+    #[serde(rename = "motDesICMSST", skip_serializing_if = "Option::is_none")]
+    pub mot_des_icms_st: Option<u16>,
 }
 
 
-/// CST 90 — Outros (todos os campos opcionais, exceto orig e CST)
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// CST 90 — Outros (todos os campos opcionais, exceto orig e CST). Ordem do XSD:
+/// modBC vBC pRedBC cBenefRBC pICMS [vICMSOp pDif vICMSDif] vICMS [FCP] [FCP dif] [ST]
+/// [FCP-ST] [deson] [ST deson].
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMS90 {
     pub orig: u8,
     #[serde(rename = "CST")]
     pub cst: String,
     #[serde(rename = "modBC", skip_serializing_if = "Option::is_none")]
     pub mod_bc: Option<u8>,
-    #[serde(rename = "pRedBC", skip_serializing_if = "Option::is_none",
-            serialize_with = "serialize_option_f64_4_decimals")]
-    pub p_red_bc: Option<f64>,
     #[serde(rename = "vBC", skip_serializing_if = "Option::is_none",
             serialize_with = "serialize_option_f64_2_decimals")]
     pub v_bc: Option<f64>,
+    #[serde(rename = "pRedBC", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_red_bc: Option<f64>,
+    #[serde(rename = "cBenefRBC", skip_serializing_if = "Option::is_none")]
+    pub c_benef_rbc: Option<String>,
     #[serde(rename = "pICMS", skip_serializing_if = "Option::is_none",
             serialize_with = "serialize_option_f64_4_decimals")]
     pub p_icms: Option<f64>,
+    #[serde(rename = "vICMSOp", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icms_op: Option<f64>,
+    #[serde(rename = "pDif", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_dif: Option<f64>,
+    #[serde(rename = "vICMSDif", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icms_dif: Option<f64>,
     #[serde(rename = "vICMS", skip_serializing_if = "Option::is_none",
             serialize_with = "serialize_option_f64_2_decimals")]
     pub v_icms: Option<f64>,
+    #[serde(rename = "vBCFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcp: Option<f64>,
+    #[serde(rename = "pFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcp: Option<f64>,
+    #[serde(rename = "vFCP", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcp: Option<f64>,
+    #[serde(rename = "pFCPDif", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcp_dif: Option<f64>,
+    #[serde(rename = "vFCPDif", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcp_dif: Option<f64>,
+    #[serde(rename = "vFCPEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcp_efet: Option<f64>,
     #[serde(rename = "modBCST", skip_serializing_if = "Option::is_none")]
     pub mod_bcst: Option<u8>,
     #[serde(rename = "pMVAST", skip_serializing_if = "Option::is_none",
@@ -307,44 +464,214 @@ pub struct ICMS90 {
     #[serde(rename = "vICMSST", skip_serializing_if = "Option::is_none",
             serialize_with = "serialize_option_f64_2_decimals")]
     pub v_icmsst: Option<f64>,
+    #[serde(rename = "vBCFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcpst: Option<f64>,
+    #[serde(rename = "pFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcpst: Option<f64>,
+    #[serde(rename = "vFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcpst: Option<f64>,
     #[serde(rename = "vICMSDeson", skip_serializing_if = "Option::is_none",
             serialize_with = "serialize_option_f64_2_decimals")]
     pub v_icms_deson: Option<f64>,
     #[serde(rename = "motDesICMS", skip_serializing_if = "Option::is_none")]
     pub mot_des_icms: Option<u16>,
+    #[serde(rename = "indDeduzDeson", skip_serializing_if = "Option::is_none")]
+    pub ind_deduz_deson: Option<u8>,
+    #[serde(rename = "vICMSSTDeson", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icmsst_deson: Option<f64>,
+    #[serde(rename = "motDesICMSST", skip_serializing_if = "Option::is_none")]
+    pub mot_des_icms_st: Option<u16>,
 }
 
 
-impl Default for ICMS90 {
-    fn default() -> Self {
-        ICMS90 {
-            orig: 0, cst: "90".to_string(),
-            mod_bc: None, p_red_bc: None, v_bc: None, p_icms: None, v_icms: None,
-            mod_bcst: None, p_mvast: None, p_red_bcst: None, v_bcst: None,
-            p_icmsst: None, v_icmsst: None, v_icms_deson: None, mot_des_icms: None,
-        }
-    }
-}
-
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// Partilha do ICMS entre a UF de origem e a UF de destino ou a UF definida na legislação
+/// (CST 10, 20 ou 90 — ex.: veículos novos em faturamento direto).
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMSPart {
-    // TODO: implementar ICMSPart — Partilha do ICMS entre UF de origem e UF de destino
-    // pub orig: u8,
-    // #[serde(rename = "CST")] pub cst: String,         // "10" ou "90"
-    // #[serde(rename = "modBC")] pub mod_bc: u8,
-    // #[serde(rename = "vBC")] pub v_bc: f64,
-    // #[serde(rename = "pRedBC", skip_serializing_if = "Option::is_none")] pub p_red_bc: Option<f64>,
-    // #[serde(rename = "pICMS")] pub p_icms: f64,
-    // #[serde(rename = "vICMS")] pub v_icms: f64,
-    // #[serde(rename = "modBCST")] pub mod_bcst: u8,
-    // #[serde(rename = "pMVAST", skip_serializing_if = "Option::is_none")] pub p_mvast: Option<f64>,
-    // #[serde(rename = "pRedBCST", skip_serializing_if = "Option::is_none")] pub p_red_bcst: Option<f64>,
-    // #[serde(rename = "vBCST")] pub v_bcst: f64,
-    // #[serde(rename = "pICMSST")] pub p_icmsst: f64,
-    // #[serde(rename = "vICMSST")] pub v_icmsst: f64,
-    // #[serde(rename = "pBCOp")] pub p_bcop: f64,       // percentual da BC operação própria
-    // #[serde(rename = "UFST")] pub ufst: String,        // UF para qual é devido o ICMS ST
+    pub orig: u8,
+    #[serde(rename = "CST")]
+    pub cst: String,
+    #[serde(rename = "modBC")]
+    pub mod_bc: u8,
+    #[serde(rename = "vBC", serialize_with = "serialize_f64_2_decimals")]
+    pub v_bc: f64,
+    #[serde(rename = "pRedBC", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_red_bc: Option<f64>,
+    #[serde(rename = "pICMS", serialize_with = "serialize_f64_4_decimals")]
+    pub p_icms: f64,
+    #[serde(rename = "vICMS", serialize_with = "serialize_f64_2_decimals")]
+    pub v_icms: f64,
+    #[serde(rename = "modBCST")]
+    pub mod_bcst: u8,
+    #[serde(rename = "pMVAST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_mvast: Option<f64>,
+    #[serde(rename = "pRedBCST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_red_bcst: Option<f64>,
+    #[serde(rename = "vBCST", serialize_with = "serialize_f64_2_decimals")]
+    pub v_bcst: f64,
+    #[serde(rename = "pICMSST", serialize_with = "serialize_f64_4_decimals")]
+    pub p_icmsst: f64,
+    #[serde(rename = "vICMSST", serialize_with = "serialize_f64_2_decimals")]
+    pub v_icmsst: f64,
+    #[serde(rename = "vBCFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcpst: Option<f64>,
+    #[serde(rename = "pFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcpst: Option<f64>,
+    #[serde(rename = "vFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcpst: Option<f64>,
+    #[serde(rename = "pBCOp", serialize_with = "serialize_f64_4_decimals")]
+    pub p_bc_op: f64,
+    #[serde(rename = "UFST")]
+    pub uf_st: String,
+    #[serde(rename = "vICMSDeson", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icms_deson: Option<f64>,
+    #[serde(rename = "motDesICMS", skip_serializing_if = "Option::is_none")]
+    pub mot_des_icms: Option<u16>,
+    #[serde(rename = "indDeduzDeson", skip_serializing_if = "Option::is_none")]
+    pub ind_deduz_deson: Option<u8>,
+}
+
+
+
+
+/// Repasse de ICMS-ST retido anteriormente em operações interestaduais (CST 41 ou 60).
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ICMSST {
+    pub orig: u8,
+    #[serde(rename = "CST")]
+    pub cst: String,
+    #[serde(rename = "vBCSTRet", serialize_with = "serialize_f64_2_decimals")]
+    pub v_bcst_ret: f64,
+    #[serde(rename = "pST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_st: Option<f64>,
+    #[serde(rename = "vICMSSubstituto", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icms_substituto: Option<f64>,
+    #[serde(rename = "vICMSSTRet", serialize_with = "serialize_f64_2_decimals")]
+    pub v_icmsst_ret: f64,
+    #[serde(rename = "vBCFCPSTRet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcpst_ret: Option<f64>,
+    #[serde(rename = "pFCPSTRet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcpst_ret: Option<f64>,
+    #[serde(rename = "vFCPSTRet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcpst_ret: Option<f64>,
+    #[serde(rename = "vBCSTDest", serialize_with = "serialize_f64_2_decimals")]
+    pub v_bcst_dest: f64,
+    #[serde(rename = "vICMSSTDest", serialize_with = "serialize_f64_2_decimals")]
+    pub v_icmsst_dest: f64,
+    #[serde(rename = "pRedBCEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_red_bc_efet: Option<f64>,
+    #[serde(rename = "vBCEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bc_efet: Option<f64>,
+    #[serde(rename = "pICMSEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_icms_efet: Option<f64>,
+    #[serde(rename = "vICMSEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icms_efet: Option<f64>,
+}
+
+
+/// CST 02 — Tributação monofásica própria sobre combustíveis (NT 2023.001).
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ICMS02 {
+    pub orig: u8,
+    #[serde(rename = "CST")]
+    pub cst: String,
+    #[serde(rename = "qBCMono", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub q_bc_mono: Option<f64>,
+    #[serde(rename = "adRemICMS", serialize_with = "serialize_f64_4_decimals")]
+    pub ad_rem_icms: f64,
+    #[serde(rename = "vICMSMono", serialize_with = "serialize_f64_2_decimals")]
+    pub v_icms_mono: f64,
+}
+
+
+/// CST 15 — Monofásica própria e com responsabilidade pela retenção sobre combustíveis.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ICMS15 {
+    pub orig: u8,
+    #[serde(rename = "CST")]
+    pub cst: String,
+    #[serde(rename = "qBCMono", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub q_bc_mono: Option<f64>,
+    #[serde(rename = "adRemICMS", serialize_with = "serialize_f64_4_decimals")]
+    pub ad_rem_icms: f64,
+    #[serde(rename = "vICMSMono", serialize_with = "serialize_f64_2_decimals")]
+    pub v_icms_mono: f64,
+    #[serde(rename = "qBCMonoReten", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub q_bc_mono_reten: Option<f64>,
+    #[serde(rename = "adRemICMSReten", serialize_with = "serialize_f64_4_decimals")]
+    pub ad_rem_icms_reten: f64,
+    #[serde(rename = "vICMSMonoReten", serialize_with = "serialize_f64_2_decimals")]
+    pub v_icms_mono_reten: f64,
+    #[serde(rename = "pRedAdRem", skip_serializing_if = "Option::is_none")]
+    pub p_red_ad_rem: Option<String>,
+    #[serde(rename = "motRedAdRem", skip_serializing_if = "Option::is_none")]
+    pub mot_red_ad_rem: Option<u8>,
+}
+
+
+/// CST 53 — Monofásica sobre combustíveis com recolhimento diferido.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ICMS53 {
+    pub orig: u8,
+    #[serde(rename = "CST")]
+    pub cst: String,
+    #[serde(rename = "qBCMono", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub q_bc_mono: Option<f64>,
+    #[serde(rename = "adRemICMS", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub ad_rem_icms: Option<f64>,
+    #[serde(rename = "vICMSMonoOp", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icms_mono_op: Option<f64>,
+    #[serde(rename = "pDif", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_dif: Option<f64>,
+    #[serde(rename = "vICMSMonoDif", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icms_mono_dif: Option<f64>,
+    #[serde(rename = "vICMSMono", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icms_mono: Option<f64>,
+}
+
+
+/// CST 61 — Monofásica sobre combustíveis cobrada anteriormente.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ICMS61 {
+    pub orig: u8,
+    #[serde(rename = "CST")]
+    pub cst: String,
+    #[serde(rename = "qBCMonoRet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub q_bc_mono_ret: Option<f64>,
+    #[serde(rename = "adRemICMSRet", serialize_with = "serialize_f64_4_decimals")]
+    pub ad_rem_icms_ret: f64,
+    #[serde(rename = "vICMSMonoRet", serialize_with = "serialize_f64_2_decimals")]
+    pub v_icms_mono_ret: f64,
 }
 
 
@@ -376,15 +703,71 @@ pub struct ICMSSN102 {
 }
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// CSOSN 201 — Simples com permissão de crédito e com cobrança do ICMS por ST
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMSSN201 {
-    // Campos específicos para ICMSSN201
+    pub orig: u8,
+    #[serde(rename = "CSOSN")]
+    pub csosn: String,
+    #[serde(rename = "modBCST")]
+    pub mod_bcst: u8,
+    #[serde(rename = "pMVAST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_mvast: Option<f64>,
+    #[serde(rename = "pRedBCST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_red_bcst: Option<f64>,
+    #[serde(rename = "vBCST", serialize_with = "serialize_f64_2_decimals")]
+    pub v_bcst: f64,
+    #[serde(rename = "pICMSST", serialize_with = "serialize_f64_4_decimals")]
+    pub p_icmsst: f64,
+    #[serde(rename = "vICMSST", serialize_with = "serialize_f64_2_decimals")]
+    pub v_icmsst: f64,
+    #[serde(rename = "vBCFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcpst: Option<f64>,
+    #[serde(rename = "pFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcpst: Option<f64>,
+    #[serde(rename = "vFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcpst: Option<f64>,
+    #[serde(rename = "pCredSN", serialize_with = "serialize_f64_4_decimals")]
+    pub p_cred_sn: f64,
+    #[serde(rename = "vCredICMSSN", serialize_with = "serialize_f64_2_decimals")]
+    pub v_cred_icmssn: f64,
 }
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// CSOSN 202/203 — Simples sem crédito (ou isento por faixa) e com cobrança do ICMS por ST
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct ICMSSN202 {
-    // Campos específicos para ICMSSN202
+    pub orig: u8,
+    #[serde(rename = "CSOSN")]
+    pub csosn: String,
+    #[serde(rename = "modBCST")]
+    pub mod_bcst: u8,
+    #[serde(rename = "pMVAST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_mvast: Option<f64>,
+    #[serde(rename = "pRedBCST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_red_bcst: Option<f64>,
+    #[serde(rename = "vBCST", serialize_with = "serialize_f64_2_decimals")]
+    pub v_bcst: f64,
+    #[serde(rename = "pICMSST", serialize_with = "serialize_f64_4_decimals")]
+    pub p_icmsst: f64,
+    #[serde(rename = "vICMSST", serialize_with = "serialize_f64_2_decimals")]
+    pub v_icmsst: f64,
+    #[serde(rename = "vBCFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcpst: Option<f64>,
+    #[serde(rename = "pFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcpst: Option<f64>,
+    #[serde(rename = "vFCPST", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcpst: Option<f64>,
 }
 
 
@@ -405,6 +788,27 @@ pub struct ICMSSN500 {
     pub v_icms_substituto: Option<String>,
     #[serde(rename = "vICMSSTRet", skip_serializing_if = "Option::is_none")]
     pub vicmsst_ret: Option<String>, // Valor do ICMS ST retido
+    #[serde(rename = "vBCFCPSTRet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bcfcpst_ret: Option<f64>,
+    #[serde(rename = "pFCPSTRet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_fcpst_ret: Option<f64>,
+    #[serde(rename = "vFCPSTRet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_fcpst_ret: Option<f64>,
+    #[serde(rename = "pRedBCEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_red_bc_efet: Option<f64>,
+    #[serde(rename = "vBCEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_bc_efet: Option<f64>,
+    #[serde(rename = "pICMSEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_4_decimals")]
+    pub p_icms_efet: Option<f64>,
+    #[serde(rename = "vICMSEfet", skip_serializing_if = "Option::is_none",
+            serialize_with = "serialize_option_f64_2_decimals")]
+    pub v_icms_efet: Option<f64>,
 }
 
 
@@ -439,6 +843,12 @@ pub struct ICMSSN900 {
     pub picmsst: Option<String>, // Alíquota do ICMS ST
     #[serde(rename = "vICMSST", skip_serializing_if = "Option::is_none")]
     pub vicmsst: Option<String>, // Valor do ICMS ST
+    #[serde(rename = "vBCFCPST", skip_serializing_if = "Option::is_none")]
+    pub vbcfcpst: Option<String>,
+    #[serde(rename = "pFCPST", skip_serializing_if = "Option::is_none")]
+    pub pfcpst: Option<String>,
+    #[serde(rename = "vFCPST", skip_serializing_if = "Option::is_none")]
+    pub vfcpst: Option<String>,
     // 245.52 N27.1 -x- Sequência XML G N10h  0-1  Grupo opcional.
     #[serde(rename = "pCredSN", skip_serializing_if = "Option::is_none")]
     pub pcred_sn: Option<String>, // Alíquota aplicável de cálculo do crédito (Simples Nacional)

@@ -1,6 +1,7 @@
 //! Montagem e assinatura do XML da NF-e/NFC-e (sem envio). Extraído do `mod.rs` na fase A7 (§2.1).
 
 use chrono::{DateTime, Datelike};
+use crate::arredondamento::fmt_dec;
 use crate::error::{DfeError, Result};
 use crate::interno::cert::{DigestValue, RawPubKey, Sign};
 use crate::interno::chave_acesso::ChaveAcesso;
@@ -15,7 +16,7 @@ use crate::tipos::Dest;
 use quick_xml::se::to_string;
 
 use super::det::det_process;
-use super::emit::{EmitProcess, EnderEmitProcess};
+use super::emit::{limitar_x_nome, EmitProcess, EnderEmitProcess};
 use super::ide::*;
 use super::inf_adic::inf_adic_process;
 use super::pag::pag_process;
@@ -108,8 +109,8 @@ pub(super) async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
     let emit_process = EmitProcess {
         cnpj: nfe.emit.cnpj.clone(),
         cpf: nfe.emit.cpf.clone(),
-        x_nome: nfe.emit.x_nome.clone(),
-        x_fant: nfe.emit.x_fant.clone(),
+        x_nome: limitar_x_nome(&nfe.emit.x_nome),
+        x_fant: nfe.emit.x_fant.as_deref().map(limitar_x_nome),
         ender_emit: EnderEmitProcess {
             x_lgr: nfe.emit.x_lgr.clone(),
             nro: nfe.emit.nro.clone(),
@@ -269,7 +270,7 @@ fn qrcode_v3_offline_payload_sem_assinatura(
     let dia = DateTime::parse_from_rfc3339(dh_emi)
         .map(|d| d.day())
         .map_err(|e| DfeError::Validacao(format!("dhEmi inválido para o QRCode de contingência: {e}")))?;
-    let valor = format!("{:.2}", v_nf);
+    let valor = fmt_dec(v_nf, 2);
 
     // tpIdDest/cDest: 1=CNPJ, 2=CPF, 3=idEstrangeiro. Sem destinatário identificado (venda comum
     // sem CPF/CNPJ na nota) ou destinatário estrangeiro, os dois campos ficam vazios — só o

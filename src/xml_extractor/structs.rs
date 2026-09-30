@@ -234,6 +234,44 @@ pub struct Imposto {
 pub struct ICMS {
     #[serde(rename = "ICMS00")]
     pub icms00: Option<ICMS00>,
+    // Demais grupos do Regime Normal (e os do Simples com valores): lidos com a mesma forma
+    // do ICMS00 — vBC, pICMS e vICMS, quando o grupo os tem — para o DANFE mostrar o ICMS de
+    // qualquer CST, não só do 00.
+    #[serde(rename = "ICMS02", default)]
+    pub icms02: Option<ICMS00>,
+    #[serde(rename = "ICMS10", default)]
+    pub icms10: Option<ICMS00>,
+    #[serde(rename = "ICMS15", default)]
+    pub icms15: Option<ICMS00>,
+    #[serde(rename = "ICMS20", default)]
+    pub icms20: Option<ICMS00>,
+    #[serde(rename = "ICMS30", default)]
+    pub icms30: Option<ICMS00>,
+    #[serde(rename = "ICMS40", default)]
+    pub icms40: Option<ICMS00>,
+    #[serde(rename = "ICMS51", default)]
+    pub icms51: Option<ICMS00>,
+    #[serde(rename = "ICMS53", default)]
+    pub icms53: Option<ICMS00>,
+    #[serde(rename = "ICMS60", default)]
+    pub icms60: Option<ICMS00>,
+    #[serde(rename = "ICMS61", default)]
+    pub icms61: Option<ICMS00>,
+    #[serde(rename = "ICMS70", default)]
+    pub icms70: Option<ICMS00>,
+    #[serde(rename = "ICMS90", default)]
+    pub icms90: Option<ICMS00>,
+    #[serde(rename = "ICMSPart", default)]
+    pub icmspart: Option<ICMS00>,
+    #[serde(rename = "ICMSST", default)]
+    pub icmsst: Option<ICMS00>,
+    #[serde(rename = "ICMSSN101", default)]
+    pub icmssn101: Option<ICMS00>,
+    #[serde(rename = "ICMSSN201", default)]
+    pub icmssn201: Option<ICMS00>,
+    #[serde(rename = "ICMSSN202", default)]
+    pub icmssn202: Option<ICMS00>,
+
     #[serde(rename = "ICMSSN102")]
     pub icms_sn102: Option<ICMSSNSimples>,
     #[serde(rename = "ICMSSN400")]
@@ -242,6 +280,20 @@ pub struct ICMS {
     pub icms_sn500: Option<ICMSSNSimples>,
     #[serde(rename = "ICMSSN900")]
     pub icms_sn900: Option<ICMSSNSimples>,
+}
+
+impl ICMS {
+    /// O grupo de ICMS do item, qualquer que seja o CST (para vBC/pICMS/vICMS no DANFE).
+    pub fn grupo(&self) -> Option<&ICMS00> {
+        [
+            &self.icms00, &self.icms02, &self.icms10, &self.icms15, &self.icms20, &self.icms30,
+            &self.icms40, &self.icms51, &self.icms53, &self.icms60, &self.icms61, &self.icms70,
+            &self.icms90, &self.icmspart, &self.icmsst, &self.icmssn101, &self.icmssn201,
+            &self.icmssn202,
+        ]
+        .into_iter()
+        .find_map(|g| g.as_ref())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -471,4 +523,26 @@ pub struct InfProt {
     pub c_stat: Option<String>,
     #[serde(rename = "xMotivo")]
     pub x_motivo: Option<String>,
+}
+
+#[cfg(test)]
+mod tests_icms_grupo {
+    use super::ICMS;
+
+    /// O DANFE lia o ICMS só do grupo ICMS00: item com CST 20 (ou 10, 51, 70, 90, partilha…)
+    /// saía com as colunas de ICMS em branco.
+    #[test]
+    fn danfe_le_o_icms_de_qualquer_grupo() {
+        for (grupo, cst) in [("ICMS20", "20"), ("ICMS90", "90"), ("ICMSPart", "10"), ("ICMS10", "10")] {
+            let xml = format!(
+                "<ICMS><{grupo}><orig>0</orig><CST>{cst}</CST><modBC>3</modBC><vBC>90.00</vBC><pICMS>18.0000</pICMS><vICMS>16.20</vICMS></{grupo}></ICMS>"
+            );
+            let icms: ICMS = quick_xml::de::from_str(&xml).unwrap_or_else(|e| panic!("{grupo}: {e}"));
+            let g = icms.grupo().unwrap_or_else(|| panic!("{grupo}: sem grupo"));
+            assert_eq!(g.cst.as_deref(), Some(cst));
+            assert_eq!((g.p_icms.as_deref(), g.v_icms.as_deref()), (Some("18.0000"), Some("16.20")), "{grupo}");
+        }
+        let sem: ICMS = quick_xml::de::from_str("<ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS>").unwrap();
+        assert!(sem.grupo().is_none());
+    }
 }

@@ -1,6 +1,6 @@
 use super::NFeInterno;
+use crate::arredondamento::{fmt_decimal, para_decimal};
 use crate::error::Result;
-use rust_decimal::prelude::FromPrimitive;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
@@ -68,8 +68,8 @@ pub(super) fn pag_process(nfe: NFeInterno, v_nf: f64) -> Result<PagProcess> {
     };
 
     let mut troco = Decimal::new(0, 2);
-    let v_nf = Decimal::from_f64(v_nf).unwrap_or_default();
-    let v_pag = Decimal::from_f64(nfe.pag.v_pag).unwrap_or_default();
+    let v_nf = para_decimal(v_nf);
+    let v_pag = para_decimal(nfe.pag.v_pag);
     if v_pag > v_nf {
         troco = v_pag - v_nf;
     }
@@ -79,11 +79,11 @@ pub(super) fn pag_process(nfe: NFeInterno, v_nf: f64) -> Result<PagProcess> {
             ind_pag: nfe.pag.ind_pag,
             t_pag: format!("{}", nfe.pag.t_pag),
             x_pag: nfe.pag.x_pag.clone(),
-            v_pag: format!("{:.2}", v_pag),
+            v_pag: fmt_decimal(v_pag, 2),
             card,
         },
         v_troco: Some(
-            format!("{:.2}", troco.round_dp(2))
+            fmt_decimal(troco, 2)
                 .parse::<Decimal>()
                 .unwrap_or_default(),
         ),

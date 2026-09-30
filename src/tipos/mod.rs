@@ -6,5 +6,5 @@ pub mod inutilizacao;
 pub mod manifestacao;
 pub mod service_status;
 
-pub use emissao::{Cofins, Det, Dest, Emit, Entrega, IbsCbs, Icms, Ide, InfAdic, Ipi, Pag, Pis, Total, Transp};
+pub use emissao::{Cofins, Comb, CredPresumido, CST_PIS_COFINS_NT, Det, Encerrante, OrigComb, Dest, Emit, Entrega, IbsCbs, Icms, IcmsParametros, Ide, InfAdic, Ipi, Pag, Pis, PisCofinsParametros, Total, Transp};
 pub use config::{Environment, Fields, PassFile, Password, Use};

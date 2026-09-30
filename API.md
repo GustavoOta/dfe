@@ -79,17 +79,37 @@ let resposta = NFeBuilder::new()
 
 ### `Total` — campos informados pelo usuário
 
-`v_bc`, `v_icms`, `v_prod`, `v_pis`, `v_cofins`, `v_nf`, `v_tot_trib`, `v_icms_deson` e `v_desc` são **calculados automaticamente** dos itens em `total_process`. Informar apenas:
+`v_bc`, `v_icms`, `v_prod`, `v_pis`, `v_cofins`, `v_nf`, `v_tot_trib`, `v_icms_deson`, `v_desc`,
+`v_bc_st`, `v_st`, `v_fcp`, `v_fcpst`, `v_fcpst_ret` e os totais do monofásico (`qBCMono`…
+`vICMSMonoRet`, só com item 02/15/53/61) são **calculados automaticamente** dos itens em
+`total_process`. Cada parcela é o valor **impresso** no item (`arred2`), então o total é
+exatamente a soma do que está no XML (rejeições 531/532/602/603). Informar apenas:
 
 | Campo | Descrição |
 |---|---|
 | `v_frete`, `v_seg`, `v_outro` | Despesas da NF (globais, não por item) |
 | `v_ii`, `v_ipi`, `v_ipi_devol` | Impostos específicos |
-| `v_bc_st`, `v_st` | ST (ICMS10/ICMS70 — não implementados ainda) |
-| `v_fcp`, `v_fcpst`, `v_fcpst_ret` | Fundo de Combate à Pobreza |
+| `v_bc_st`, `v_st` | ST fora dos itens — **somados** ao que vem dos itens |
+| `v_fcp`, `v_fcpst`, `v_fcpst_ret` | FCP fora dos itens — **somados** aos dos itens |
 | `v_fcpuf_dest`, `v_icms_uf_dest`, `v_icms_uf_remet` | Diferencial de alíquota UF destino |
 
+`vNF = vProd + vFrete + vSeg − vDesc + vOutro + vII + vIPI − vIPIDevol + vST + vFCPST − vICMSDeson
++ vPIS(PISST) + vCOFINS(COFINSST) + vICMSMonoReten`
+
+- `vICMSDeson` só dos itens com `ind_deduz_deson = 1` (NT 2023.004);
+- PISST/COFINSST só com `indSomaPISST`/`indSomaCOFINSST = 1` (NT 2020.005);
+- `vICMSMonoReten` do CST 15 (NT 2023.001). Todos pela regra 610.
+
 Para uma venda simples sem frete/seguro: `Total::default()`.
+
+### Ajustes automáticos na montagem
+
+- `xNome` e `xFant` do emitente são cortados nos **60 caracteres** do XSD (conta caracteres,
+  não bytes; espaço no ponto de corte é removido).
+- `vUnCom`/`vUnTrib` saem com **2 a 10 casas** e `qCom`/`qTrib` com **3 a 4** (zeros à direita
+  cortados até o mínimo): 602,6097 não vira "602.61" (rejeição 629 com quantidade maior).
+- Todo número do XML passa por `dfe::fmt_dec` (arredondamento meio para cima — ver
+  [Arredondamento](#arredondamento--dfearred2)).
 
 ---
 
@@ -111,19 +131,143 @@ Os construtores preenchem os campos obrigatórios e definem todos os `Option` co
 Icms::Sn500 { orig: 0, v_bcst_ret: Some(100.0), v_icmsst_ret: Some(12.0) }
 ```
 
+### `Icms::Parametros(IcmsParametros)` — caminho de código novo
+
+O consumidor manda só o que o cadastro do produto guarda e a crate escolhe o grupo do
+XSD e calcula os valores sobre a base do item (vProd + frete + acréscimo − desconto, já
+rateados) e a quantidade tributável (`qTrib`). Cobre **todos os grupos de ICMS do leiaute**:
+CST 00, 02, 10, 15, 20, 30, 40, 41, 50, 51, 53, 60, 61, 70, 90, ICMSPart, ICMSST e CSOSN 101,
+102, 103, 201, 202, 203, 300, 400, 500, 900. Tabela de grupos × parâmetros, modalidades e
+fórmulas: [`docs/icms-pis-cofins.md`](docs/icms-pis-cofins.md#icms).
+
+```rust
+Icms::Parametros(IcmsParametros {
+    cst: "20".into(), orig: 0,
+    p_icms: Some(18.0), p_red_bc: Some(33.33),
+    mot_des_icms: Some(9), ind_deduz_deson: Some(0),
+    ..Default::default()
+})
+```
+
+- Campo que o grupo exige e veio vazio (ex.: CST 20 sem `p_red_bc`) é `DfeError::Validacao`
+  na montagem, com o nome do campo — a nota não sai com o grupo errado.
+- Todas as modalidades são calculadas: `mod_bc` 3 (valor da operação), 0 (MVA própria,
+  `p_mva_proprio`), 1/2 (pauta / preço tabelado: `qTrib × v_pauta`); `mod_bcst` 4 (MVA), 6
+  (valor da operação), 0/1/2/3/5 (`qTrib × v_pauta_st`). Modalidade sem o seu parâmetro é erro.
+- `mot_des_icms` e `mot_des_icms_st` são conferidos contra a lista que o XSD aceita no grupo.
+- ICMS-ST deduz o ICMS próprio; no Simples (201/202/203) deduz `base × p_icms` quando
+  o cadastro informa a alíquota interna.
+- CST 60 / CSOSN 500: os campos de ST retido são repassados como vieram; FCP-ST retido
+  (`p_fcpst_ret`) e ICMS efetivo (`p_red_bc_efet`, `p_icms_efet`) a crate calcula.
+- Grupos por parâmetro: `uf_st` num 10/20/90 → **ICMSPart**; `v_bcst_dest` num 41/60 →
+  **ICMSST** (repasse; valores da operação).
+- Monofásico (02/15/53/61): `qTrib × ad rem`; exige `Det::comb` com o código ANP.
+- Totais: vFCP, vFCPST, vFCPSTRet, vBCST e vST saem da soma dos itens (ICMSPart incluído);
+  fórmula do vNF em [`Total`](#total--campos-informados-pelo-usuário).
+
+### `Det::c_benef` — código de benefício fiscal
+
+`Some("SP070001")` sai como `<cBenef>` no `<prod>` (entre `CEST` e `CFOP`). O XSD aceita
+8 ou 10 caracteres ou `SEM CBENEF`. Vazio/espaços é omitido. Algumas UFs exigem o código
+para CST de benefício (20, 30, 40, 41, 50, 51, 70, 90) — sem ele, rejeição 930.
+
+#### Campos de `IcmsParametros` (todos `Option`, `#[serde(default)]`)
+
+| Campo | Uso |
+|---|---|
+| `mod_bc`, `p_red_bc`, `p_icms`, `p_fcp`, `p_dif` | ICMS próprio, redução, FCP, diferimento (51/90) |
+| `p_mva_proprio`, `v_pauta` | `mod_bc` 0 e 1/2 |
+| `mod_bcst`, `p_mvast`, `p_red_bcst`, `p_icmsst`, `p_fcpst`, `v_pauta_st` | ICMS-ST |
+| `mot_des_icms`, `ind_deduz_deson` | desoneração |
+| `mot_des_icms_st` | ST desonerado (10/70/90: 3, 9, 12) |
+| `c_benef_rbc`, `p_fcp_dif` | cBenef da redução e FCP diferido (51/90) |
+| `v_bcst_ret`, `p_st`, `v_icms_substituto`, `v_icmsst_ret` | ST retido (60/500/ICMSST) |
+| `p_fcpst_ret`, `p_red_bc_efet`, `p_icms_efet` | FCP-ST retido e ICMS efetivo (60/500/ICMSST) |
+| `uf_st`, `p_bc_op` | ICMSPart |
+| `v_bcst_dest`, `v_icmsst_dest` | ICMSST (repasse) |
+| `ad_rem_icms`, `ad_rem_icms_reten`, `p_red_ad_rem`, `mot_red_ad_rem`, `ad_rem_icms_ret` | monofásico 02/15/53/61 |
+| `p_cred_sn` | crédito do Simples (101/201/900) |
+
+### `Det::cred_presumido` e `Det::comb`
+
+- `cred_presumido: Vec<CredPresumido { codigo, p }>` → `prod/gCred` (até 4; vCredPresumido =
+  base do item × `p`).
+- `comb: Option<Comb>` → `prod/comb` (código e descrição ANP, UF de consumo, % biodiesel,
+  CIDE, encerrante, origem). Obrigatório nos CST monofásicos.
+
+Exemplo em [`docs/icms-pis-cofins.md`](docs/icms-pis-cofins.md#dados-do-prod-c_benef-cred_presumido-comb).
+
 ## Enum `Pis` / `Cofins`
 
 ```rust
 Pis::Aliq { cst, v_bc, p_pis, v_pis }            // CST 01/02 — alíquota
+Pis::por_parametros(&PisCofinsParametros { cst, v_bc, aliquota, q_bc_prod, v_aliq_prod })
+                                                   // QUALQUER CST: 01/02 Aliq, 03 Qtde, 04-09 NT,
+                                                   // 49-99 Outr por % ou por R$/un. (ou zerado) — preferir
+Pis::OutrAliq { cst, v_bc, p_pis, v_pis }          // 49-99 por alíquota
+Pis::OutrQtde { cst, q_bc_prod, v_aliq_prod, v_pis } // 49-99 por quantidade
+Pis::St { v_bc, p_pis, q_bc_prod, v_aliq_prod, v_pis, ind_soma } // CST 05 do substituto: PISNT 05 + PISST irmão
+Pis::nao_tributado(cst)                            // sem valor: 04-09 → PISNT, 49-99 → PISOutr (preferir)
 Pis::Outr                                          // CST 99 — outros (zeros automáticos)
-Pis::Nt { cst }                                    // CST 04-09 — não tributado
+Pis::Nt { cst }                                    // sem valor; o grupo sai pelo CST (04-09 NT, 49-99 Outr)
 Pis::Qtde { cst, q_bc_prod, v_aliq_prod, v_pis }  // CST 03 — por quantidade
 
 Cofins::Aliq { cst, v_bc, p_cofins, v_cofins }
-Cofins::Outr { cst }
+Cofins::por_parametros(&p)                         // mesma regra do PIS
+Cofins::nao_tributado(cst)                         // sem valor: 04-09 → COFINSNT, 49-99 → COFINSOutr (preferir)
+Cofins::Outr { cst }                               // Outr e Nt: o grupo sai pelo CST, não pela variante
 Cofins::Nt { cst }
 Cofins::Qtde { cst, q_bc_prod, v_aliq_prod, v_cofins }
 ```
+
+`q_bc_prod` sai com 4 casas (TDec_1204v): 3,5 kg de 0,1234 não vira 0.123.
+
+## IBS/CBS — `Det::ibs_cbs: Option<IbsCbs>`
+
+```rust
+// IbsCbs não tem Default: todos os campos são informados.
+IbsCbs {
+    cst: "000".into(), class_trib: "000001".into(),
+    p_ibs_uf: dec!(0.10), p_ibs_mun: dec!(0.00), p_cbs: dec!(0.90),
+    v_bc: Decimal::ZERO, v_ibs_uf: Decimal::ZERO,     // ignorados com calcular = true
+    v_ibs_mun: Decimal::ZERO, v_cbs: Decimal::ZERO,
+    calcular: true,                     // a crate calcula vBC e valores
+    p_red_ibs: None, p_red_cbs: None,   // pRedIBS / pRedCBS do cClassTrib
+}
+```
+
+- **`calcular: true`** — a crate ignora os `v_*` recebidos e calcula
+  `vBC = vProd + vFrete + vSeg + vOutro − vDesc − vPIS − vCOFINS − vICMS − vFCP` do item (já
+  rateados, como impressos; NT 2025.002-RTC, rejeição 1115) e `vIBSUF`/`vIBSMun`/`vCBS = vBC ×
+  alíquota`. **`false`** — valores prontos do chamador, como antes.
+- **`p_red_ibs` / `p_red_cbs`** — monta `gRed` (`pRedAliq`, `pAliqEfet`) em `gIBSUF`, `gIBSMun`
+  e `gCBS`, com `pAliqEfet = p × (1 − pRedAliq/100)` (4 casas) e valor `vBC × pAliqEfet`.
+  Só vai ao XML quando `IbsCbs::cst_exige_reducao(cst)` (CST **200** e **515**, `ind_gRed = 1`):
+  nesses é obrigatório (1033/1074); em outro CST a redução é ignorada (gRed lá é a 1032).
+  Redução de 100% sai com `pAliqEfet 0.0000` e valores zerados.
+- `IBSCBSTot` só é enviado se algum item tiver IBS/CBS (1118). `vCredPres` e
+  `vCredPresCondSus` saem `0.00` (obrigatórios no XSD; vazio reprovava no pattern).
+
+## Arredondamento — `dfe::arred2`
+
+Regra única do ecossistema: **meio para cima, afastando do zero, sobre o valor decimal** (o
+`round(..., 2, PHP_ROUND_HALF_UP)` do NFePHP). O f64 passa por 15 algarismos significativos
+antes de virar `Decimal`, então `1.005` dá `1.01` — `format!("{:.2}")` e `(v*100).round()/100`
+dão `1.00`. O JS tem o espelho `arredondamento.js` (PDV e retaguarda).
+
+```rust
+use dfe::{arred, arred2, arred_decimal, fmt_dec, fmt_dec_ate};
+
+arred2(1.005)              // 1.01
+arred(0.12345, 4)          // 0.1235
+fmt_dec(0.125, 2)          // "0.13"   (texto do XML, casas fixas)
+fmt_dec_ate(602.6097, 2, 10) // "602.6097" (mín. 2, máx. 10 casas)
+arred_decimal(d, 2)        // Decimal
+```
+
+Regra de uso: campo derivado sai dos campos **já arredondados** que vão no XML (vBC do
+IBS/CBS = vProd − vICMS impresso…), e todo total é a soma dos itens arredondados. O rateio de
+desconto/acréscimo desempata para cima e o último item absorve a diferença.
 
 ---
 

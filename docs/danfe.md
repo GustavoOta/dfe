@@ -62,3 +62,10 @@ let b64 = DanfeBuilder::new()
 | `"a4"` | ✅ (suporta `.logo()`) | ❌ |
 | `"80mm"` | ✅ | ✅ (suporta `.qr_side()`) |
 | `"54mm"` | ❌ | ❌ |
+
+## Colunas de ICMS dos itens (A4)
+
+A base, a alíquota e o valor do ICMS de cada item vêm do grupo que o item tiver no XML —
+ICMS00, 10, 20, 51, 70, 90, ICMSPart, ICMSST, SN101/201/202 etc. (`xml_extractor::ICMS::grupo`).
+Até 30-09-2026 só o ICMS00 era lido e os demais CST saíam com as colunas em branco. Grupo sem
+esses campos (40, 60, monofásico, SN102) sai em branco, como manda o leiaute.

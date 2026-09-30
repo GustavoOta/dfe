@@ -378,6 +378,208 @@ pub enum Icms {
         p_icmsst: Option<f64>,
         v_icmsst: Option<f64>,
     },
+
+    // ── Parâmetros do cadastro (a crate monta o grupo e calcula) ─────────────
+    /// O consumidor manda só o que o cadastro do produto guarda (CST/CSOSN, percentuais,
+    /// modalidades, motivo de desoneração) e a crate escolhe o grupo do XSD e calcula
+    /// vBC, vICMS, vBCST, vICMSST, FCP e desoneração sobre a base do item — já com o
+    /// desconto, o frete e o acréscimo rateados. É o caminho de todo código novo: as
+    /// variantes acima exigem que o chamador faça a conta, e cada app fazia a sua.
+    Parametros(IcmsParametros),
+}
+
+/// Tributação do ICMS de um item como o cadastro de produto guarda: parâmetros, nunca
+/// valores. Os valores saem de [`Icms::Parametros`] na montagem do XML.
+///
+/// Campo que o grupo do CST não usa é ignorado. Campo que o grupo exige e veio vazio
+/// é erro de montagem (ex.: CST 20 sem `p_red_bc`), para a nota não sair com o grupo
+/// errado nem ser recusada pela SEFAZ com mensagem de schema.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct IcmsParametros {
+    /// CST (Regime Normal: "00", "10", "20", "30", "40", "41", "50", "51", "60", "70", "90")
+    /// ou CSOSN (Simples: "101", "102", "103", "201", "202", "203", "300", "400", "500", "900").
+    /// Aceita também o prefixo do grupo ("ICMS20", "ICMSSN201").
+    pub cst: String,
+    /// Origem da mercadoria (0 a 8)
+    pub orig: u8,
+    /// Modalidade da BC do ICMS próprio. Só 3 (valor da operação) é calculado.
+    #[serde(default)]
+    pub mod_bc: Option<u8>,
+    /// % de redução da BC do ICMS próprio (CST 20, 51, 70, 90, CSOSN 900)
+    #[serde(default)]
+    pub p_red_bc: Option<f64>,
+    /// Alíquota do ICMS próprio. No CST 30/40 e no Simples com ST é a alíquota interna
+    /// usada para a desoneração e para deduzir o ICMS próprio do ICMS-ST.
+    #[serde(default)]
+    pub p_icms: Option<f64>,
+    /// % do Fundo de Combate à Pobreza sobre a BC do ICMS próprio
+    #[serde(default)]
+    pub p_fcp: Option<f64>,
+    /// % do diferimento (CST 51)
+    #[serde(default)]
+    pub p_dif: Option<f64>,
+    /// Modalidade da BC do ICMS-ST. Só 4 (MVA) e 6 (valor da operação) são calculados.
+    #[serde(default)]
+    pub mod_bcst: Option<u8>,
+    /// % da margem de valor agregado do ICMS-ST
+    #[serde(default)]
+    pub p_mvast: Option<f64>,
+    /// % de redução da BC do ICMS-ST
+    #[serde(default)]
+    pub p_red_bcst: Option<f64>,
+    /// Alíquota do ICMS-ST
+    #[serde(default)]
+    pub p_icmsst: Option<f64>,
+    /// % do FCP retido por substituição tributária
+    #[serde(default)]
+    pub p_fcpst: Option<f64>,
+    /// Motivo da desoneração do ICMS. Com ele preenchido a crate calcula vICMSDeson.
+    #[serde(default)]
+    pub mot_des_icms: Option<u16>,
+    /// 1 = o valor desonerado é deduzido do valor do item (vNF); 0 = não. NT 2023.004.
+    #[serde(default)]
+    pub ind_deduz_deson: Option<u8>,
+    /// % do crédito do Simples Nacional (CSOSN 101, 201, 900)
+    #[serde(default)]
+    pub p_cred_sn: Option<f64>,
+    /// ICMS-ST retido anteriormente (CST 60 / CSOSN 500): repassados como vieram,
+    /// porque dependem da nota de compra e não do valor desta venda.
+    #[serde(default)]
+    pub v_bcst_ret: Option<f64>,
+    #[serde(default)]
+    pub p_st: Option<f64>,
+    #[serde(default)]
+    pub v_icms_substituto: Option<f64>,
+    #[serde(default)]
+    pub v_icmsst_ret: Option<f64>,
+
+    // ── Modalidades de BC que não são "valor da operação" ──────────────────────
+    /// % de MVA do ICMS próprio — `mod_bc` 0 (vBC = base × (1 + MVA)).
+    #[serde(default)]
+    pub p_mva_proprio: Option<f64>,
+    /// Valor unitário de pauta / preço tabelado máximo — `mod_bc` 1 e 2 (vBC = qTrib × valor).
+    #[serde(default)]
+    pub v_pauta: Option<f64>,
+    /// Valor unitário de referência do ST — `mod_bcst` 0 (preço tabelado/máximo sugerido),
+    /// 1/2/3 (listas negativa/positiva/neutra) e 5 (pauta): vBCST = qTrib × valor.
+    #[serde(default)]
+    pub v_pauta_st: Option<f64>,
+
+    // ── Grupos opcionais do leiaute ──────────────────────────────────────────
+    /// Motivo da desoneração do ICMS-ST (CST 10, 70, 90: 3, 9 ou 12). A crate calcula
+    /// vICMSSTDeson = ST sem a redução da BC-ST − ST destacado.
+    #[serde(default)]
+    pub mot_des_icms_st: Option<u16>,
+    /// Código de benefício da redução da BC (CST 51 e 90, junto do pRedBC).
+    #[serde(default)]
+    pub c_benef_rbc: Option<String>,
+    /// % do diferimento do FCP (CST 51 e 90).
+    #[serde(default)]
+    pub p_fcp_dif: Option<f64>,
+    /// ICMS efetivo (CST 60, CSOSN 500, ICMSST): % de redução da BC efetiva e alíquota
+    /// efetiva. Com `p_icms_efet` preenchido a crate calcula vBCEfet/vICMSEfet sobre a base.
+    #[serde(default)]
+    pub p_red_bc_efet: Option<f64>,
+    #[serde(default)]
+    pub p_icms_efet: Option<f64>,
+    /// % do FCP retido anteriormente por ST (CST 60, CSOSN 500, ICMSST).
+    #[serde(default)]
+    pub p_fcpst_ret: Option<f64>,
+
+    // ── Partilha (ICMSPart, CST 10/20/90) ──────────────────────────────────────
+    /// UF para a qual o ICMS-ST é devido. Preenchida = grupo ICMSPart.
+    #[serde(default)]
+    pub uf_st: Option<String>,
+    /// % da BC da operação própria (pBCOp).
+    #[serde(default)]
+    pub p_bc_op: Option<f64>,
+
+    // ── Repasse de ICMS-ST retido (ICMSST, CST 41/60) — valores da operação ────
+    /// BC e valor do ICMS-ST da UF de destino. Preenchidos = grupo ICMSST.
+    #[serde(default)]
+    pub v_bcst_dest: Option<f64>,
+    #[serde(default)]
+    pub v_icmsst_dest: Option<f64>,
+
+    // ── Monofásico de combustíveis (CST 02, 15, 53, 61 — NT 2023.001) ───────────
+    /// Alíquota ad rem do ICMS (R$ por unidade) — CST 02, 15 e 53.
+    #[serde(default)]
+    pub ad_rem_icms: Option<f64>,
+    /// Alíquota ad rem do ICMS com retenção — CST 15.
+    #[serde(default)]
+    pub ad_rem_icms_reten: Option<f64>,
+    /// % de redução do ad rem e motivo (1 = transporte coletivo, 9 = outros) — CST 15.
+    #[serde(default)]
+    pub p_red_ad_rem: Option<f64>,
+    #[serde(default)]
+    pub mot_red_ad_rem: Option<u8>,
+    /// Alíquota ad rem do ICMS retido anteriormente — CST 61.
+    #[serde(default)]
+    pub ad_rem_icms_ret: Option<f64>,
+}
+
+/// Crédito presumido do item (`prod/gCred`, até 4 por item). A crate calcula
+/// vCredPresumido = base do item × %.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct CredPresumido {
+    /// Código do benefício de crédito presumido na UF (8 ou 10 caracteres).
+    pub codigo: String,
+    /// % do crédito presumido.
+    pub p: f64,
+}
+
+/// Grupo `prod/comb` — obrigatório nos CST monofásicos de combustível (02, 15, 53, 61).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Comb {
+    /// Código do produto na ANP (9 dígitos).
+    pub c_prod_anp: String,
+    /// Descrição do produto na ANP.
+    pub desc_anp: String,
+    #[serde(default)]
+    pub p_glp: Option<f64>,
+    #[serde(default)]
+    pub p_gnn: Option<f64>,
+    #[serde(default)]
+    pub p_gni: Option<f64>,
+    #[serde(default)]
+    pub v_part: Option<f64>,
+    #[serde(default)]
+    pub codif: Option<String>,
+    #[serde(default)]
+    pub q_temp: Option<f64>,
+    /// UF de consumo.
+    pub uf_cons: String,
+    /// CIDE: (qBCProd, vAliqProd) — a crate calcula vCIDE.
+    #[serde(default)]
+    pub cide: Option<(f64, f64)>,
+    #[serde(default)]
+    pub encerrante: Option<Encerrante>,
+    /// % do biodiesel.
+    #[serde(default)]
+    pub p_bio: Option<f64>,
+    #[serde(default)]
+    pub orig_comb: Vec<OrigComb>,
+}
+
+/// Encerrante da bomba (NFC-e de posto).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Encerrante {
+    pub n_bico: String,
+    #[serde(default)]
+    pub n_bomba: Option<String>,
+    pub n_tanque: String,
+    pub v_enc_ini: f64,
+    pub v_enc_fin: f64,
+}
+
+/// Origem do combustível (`origComb`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct OrigComb {
+    /// 0 = nacional, 1 = importado.
+    pub ind_import: u8,
+    /// Código IBGE da UF de origem.
+    pub c_uf_orig: u8,
+    pub p_orig: f64,
 }
 
 impl Icms {
@@ -476,13 +678,126 @@ pub enum Pis {
     Aliq { cst: String, v_bc: f64, p_pis: f64, v_pis: f64 },
     /// CST 99 — outros (zeros automáticos)
     Outr,
-    /// CST 04-09 — não tributado/isento/suspenso
+    /// CST sem valor destacado. 04-09 saem no `PISNT`; 49-99 no `PISOutr` zerado com o
+    /// próprio CST (o XSD recusa 49+ no NT). Preferir [`Pis::nao_tributado`].
     Nt { cst: String },
     /// CST 03 — tributada por quantidade
     Qtde { cst: String, q_bc_prod: f64, v_aliq_prod: f64, v_pis: f64 },
-    /// CST 05 — substituição tributária
-    /// Use `v_bc + p_pis` OU `q_bc_prod + v_aliq_prod` (os outros ficam `None`)
-    St { v_bc: Option<f64>, p_pis: Option<f64>, q_bc_prod: Option<f64>, v_aliq_prod: Option<f64>, v_pis: f64 },
+    /// CST 49–99 com valor, por alíquota (`PISOutr` com vBC + pPIS)
+    OutrAliq { cst: String, v_bc: f64, p_pis: f64, v_pis: f64 },
+    /// CST 49–99 com valor, por quantidade (`PISOutr` com qBCProd + vAliqProd)
+    OutrQtde { cst: String, q_bc_prod: f64, v_aliq_prod: f64, v_pis: f64 },
+    /// CST 05 com o grupo `PISST` (substituto): sai `PISNT` CST 05 + `PISST` irmão.
+    /// Use `v_bc + p_pis` OU `q_bc_prod + v_aliq_prod` (os outros ficam `None`).
+    /// `ind_soma` = indSomaPISST (1 = o vPIS do ST entra no vNF).
+    St { v_bc: Option<f64>, p_pis: Option<f64>, q_bc_prod: Option<f64>, v_aliq_prod: Option<f64>, v_pis: f64, ind_soma: Option<u8> },
+}
+
+/// Parâmetros de PIS ou COFINS de um item — a crate escolhe o grupo do XSD pelo CST e
+/// calcula o valor ([`Pis::por_parametros`], [`Cofins::por_parametros`]).
+#[derive(Debug, Clone, Default)]
+pub struct PisCofinsParametros {
+    /// CST (01–09, 49–56, 60–67, 70–75, 98, 99)
+    pub cst: String,
+    /// Base por valor (vBC): valor da operação, já sem o ICMS quando o produto o exclui.
+    pub v_bc: f64,
+    /// Alíquota em % — 01/02; opcional no 49–99.
+    pub aliquota: Option<f64>,
+    /// Quantidade tributável (qBCProd) — CST 03 e 49–99 por quantidade.
+    pub q_bc_prod: f64,
+    /// R$ por unidade (vAliqProd) — CST 03; opcional no 49–99.
+    pub v_aliq_prod: Option<f64>,
+}
+
+/// Grupo e valores comuns a PIS e COFINS.
+enum PcGrupo {
+    Aliq { cst: String, v_bc: f64, p: f64, v: f64 },
+    Qtde { cst: String, q: f64, aliq: f64, v: f64 },
+    OutrAliq { cst: String, v_bc: f64, p: f64, v: f64 },
+    OutrQtde { cst: String, q: f64, aliq: f64, v: f64 },
+    SemValor { cst: String },
+}
+
+fn pis_cofins_grupo(p: &PisCofinsParametros) -> PcGrupo {
+    use crate::arredondamento::{arred, arred2};
+    let cst = p.cst.trim().to_string();
+    let positivo = |v: Option<f64>| v.filter(|x| *x > 0.0);
+    let por_aliquota = |aliq: f64| {
+        let base = arred2(p.v_bc);
+        (base, aliq, arred2(base * aliq / 100.0))
+    };
+    let por_qtde = |aliq: f64| {
+        let q = arred(p.q_bc_prod, 4);
+        let a = arred(aliq, 4);
+        (q, a, arred2(q * a))
+    };
+    match cst.as_str() {
+        "01" | "02" => {
+            let (v_bc, pp, v) = por_aliquota(p.aliquota.unwrap_or(0.0));
+            PcGrupo::Aliq { cst, v_bc, p: pp, v }
+        }
+        "03" => {
+            let (q, aliq, v) = por_qtde(p.v_aliq_prod.unwrap_or(0.0));
+            PcGrupo::Qtde { cst, q, aliq, v }
+        }
+        c if CST_PIS_COFINS_NT.contains(&c) => PcGrupo::SemValor { cst },
+        // 49–99: com R$ por unidade → por quantidade; com % → por alíquota; sem nada → zerado.
+        _ => {
+            if let Some(aliq) = positivo(p.v_aliq_prod) {
+                let (q, aliq, v) = por_qtde(aliq);
+                PcGrupo::OutrQtde { cst, q, aliq, v }
+            } else if let Some(aliq) = positivo(p.aliquota) {
+                let (v_bc, pp, v) = por_aliquota(aliq);
+                PcGrupo::OutrAliq { cst, v_bc, p: pp, v }
+            } else {
+                PcGrupo::SemValor { cst }
+            }
+        }
+    }
+}
+
+/// CST de PIS/COFINS que vão no grupo "não tributado" (PISNT/COFINSNT) — XSD NT 2026.004.
+/// Os sem valor fora desta lista (49–99) vão no grupo "outras" (PISOutr/COFINSOutr, zerado).
+pub const CST_PIS_COFINS_NT: &[&str] = &["04", "05", "06", "07", "08", "09"];
+
+impl Pis {
+    /// PIS sem valor destacado, no grupo que o XSD aceita para o CST: 04–09 em `PISNT`,
+    /// 49–99 em `PISOutr` (com o próprio CST). Use no lugar de escolher `Nt`/`Outr` à mão.
+    pub fn nao_tributado(cst: &str) -> Pis {
+        Pis::Nt { cst: cst.trim().to_string() }
+    }
+
+    /// PIS de qualquer CST do leiaute: 01/02 por alíquota, 03 por quantidade, 04–09 sem
+    /// valor (NT), 49–99 por alíquota, por quantidade ou zerado (Outr). Valor calculado com o
+    /// arredondamento único da crate.
+    pub fn por_parametros(p: &PisCofinsParametros) -> Pis {
+        match pis_cofins_grupo(p) {
+            PcGrupo::Aliq { cst, v_bc, p, v } => Pis::Aliq { cst, v_bc, p_pis: p, v_pis: v },
+            PcGrupo::Qtde { cst, q, aliq, v } => Pis::Qtde { cst, q_bc_prod: q, v_aliq_prod: aliq, v_pis: v },
+            PcGrupo::OutrAliq { cst, v_bc, p, v } => Pis::OutrAliq { cst, v_bc, p_pis: p, v_pis: v },
+            PcGrupo::OutrQtde { cst, q, aliq, v } => Pis::OutrQtde { cst, q_bc_prod: q, v_aliq_prod: aliq, v_pis: v },
+            PcGrupo::SemValor { cst } => Pis::nao_tributado(&cst),
+        }
+    }
+}
+
+impl Cofins {
+    /// COFINS sem valor destacado — mesma regra de [`Pis::nao_tributado`].
+    pub fn nao_tributado(cst: &str) -> Cofins {
+        let cst = cst.trim().to_string();
+        if CST_PIS_COFINS_NT.contains(&cst.as_str()) { Cofins::Nt { cst } } else { Cofins::Outr { cst } }
+    }
+
+    /// COFINS de qualquer CST — mesma regra de [`Pis::por_parametros`].
+    pub fn por_parametros(p: &PisCofinsParametros) -> Cofins {
+        match pis_cofins_grupo(p) {
+            PcGrupo::Aliq { cst, v_bc, p, v } => Cofins::Aliq { cst, v_bc, p_cofins: p, v_cofins: v },
+            PcGrupo::Qtde { cst, q, aliq, v } => Cofins::Qtde { cst, q_bc_prod: q, v_aliq_prod: aliq, v_cofins: v },
+            PcGrupo::OutrAliq { cst, v_bc, p, v } => Cofins::OutrAliq { cst, v_bc, p_cofins: p, v_cofins: v },
+            PcGrupo::OutrQtde { cst, q, aliq, v } => Cofins::OutrQtde { cst, q_bc_prod: q, v_aliq_prod: aliq, v_cofins: v },
+            PcGrupo::SemValor { cst } => Cofins::nao_tributado(&cst),
+        }
+    }
 }
 
 // ─── Cofins ───────────────────────────────────────────────────────────────────
@@ -491,14 +806,18 @@ pub enum Pis {
 pub enum Cofins {
     /// CST 01/02 — tributada por alíquota
     Aliq { cst: String, v_bc: f64, p_cofins: f64, v_cofins: f64 },
-    /// CST 99 — outros
+    /// CST sem valor. O grupo sai pelo CST (04-09 NT, 49-99 Outr zerado).
     Outr { cst: String },
-    /// CST 04-09 — não tributado/isento/suspenso
+    /// CST sem valor. O grupo sai pelo CST (04-09 NT, 49-99 Outr zerado).
     Nt { cst: String },
     /// CST 03 — tributada por quantidade
     Qtde { cst: String, q_bc_prod: f64, v_aliq_prod: f64, v_cofins: f64 },
-    /// CST 05 — substituição tributária
-    St { v_bc: Option<f64>, p_cofins: Option<f64>, q_bc_prod: Option<f64>, v_aliq_prod: Option<f64>, v_cofins: f64 },
+    /// CST 49–99 com valor, por alíquota (`COFINSOutr` com vBC + pCOFINS)
+    OutrAliq { cst: String, v_bc: f64, p_cofins: f64, v_cofins: f64 },
+    /// CST 49–99 com valor, por quantidade (`COFINSOutr` com qBCProd + vAliqProd)
+    OutrQtde { cst: String, q_bc_prod: f64, v_aliq_prod: f64, v_cofins: f64 },
+    /// CST 05 com o grupo `COFINSST` — mesma regra de [`Pis::St`].
+    St { v_bc: Option<f64>, p_cofins: Option<f64>, q_bc_prod: Option<f64>, v_aliq_prod: Option<f64>, v_cofins: f64, ind_soma: Option<u8> },
 }
 
 // ─── Ipi ──────────────────────────────────────────────────────────────────────
@@ -554,6 +873,30 @@ pub struct IbsCbs {
     pub v_ibs_mun: Decimal,
     pub p_cbs: Decimal,
     pub v_cbs: Decimal,
+    /// `true` = a crate calcula `v_bc` e os valores (os `v_*` recebidos são ignorados):
+    /// vBC = vProd + vFrete + vSeg + vOutro − vDesc − vPIS − vCOFINS − vICMS − vFCP do item,
+    /// já com o rateio (NT 2025.002-RTC, gIBSCBS/vBC); vIBSUF/vIBSMun/vCBS = vBC × alíquota.
+    /// `false` = valores prontos do chamador, como antes.
+    #[serde(default)]
+    pub calcular: bool,
+    /// Percentual de redução de alíquota do IBS (UF e Município) do `cClassTrib` — coluna
+    /// `pRedIBS` da tabela oficial. `Some` monta `gRed` em `gIBSUF` e `gIBSMun`, obrigatório
+    /// quando o CST tem `ind_gRed = 1` (200, 515 — rejeições 1033/1074). O valor passa a ser
+    /// `vBC × pAliqEfet`, com `pAliqEfet = pIBS × (1 − pRedAliq/100)`.
+    #[serde(default)]
+    pub p_red_ibs: Option<Decimal>,
+    /// Idem para a CBS (`pRedCBS` do `cClassTrib`) → `gCBS/gRed`.
+    #[serde(default)]
+    pub p_red_cbs: Option<Decimal>,
+}
+
+impl IbsCbs {
+    /// CSTs com `ind_gRed = 1` na tabela CST do IBS/CBS (IT 2025.002): o grupo de redução é
+    /// obrigatório (1033/1074) e proibido nos demais (1032). 011 também reduz, mas nenhum
+    /// `cClassTrib` dele vale em NF-e/NFC-e.
+    pub fn cst_exige_reducao(cst: &str) -> bool {
+        matches!(cst.trim(), "200" | "515")
+    }
 }
 
 // ─── Det ──────────────────────────────────────────────────────────────────────
@@ -593,6 +936,9 @@ pub struct Det {
     pub nve: Option<String>,
     pub extipi: Option<u8>,
     pub cest: Option<String>,
+    /// Código de benefício fiscal na UF (`cBenef`): 8 ou 10 caracteres, ou "SEM CBENEF".
+    /// Vazio vira ausente. Exigido por algumas UFs para CST de benefício (rejeição 930).
+    pub c_benef: Option<String>,
     pub cfop: u16,
     pub u_com: String,
     pub q_com: f64,
@@ -616,6 +962,12 @@ pub struct Det {
     pub v_tot_trib: f64,
     pub inf_ad_prod: Option<String>,
     pub ibs_cbs: Option<IbsCbs>,
+    /// Crédito presumido (`prod/gCred`), até 4.
+    #[serde(default)]
+    pub cred_presumido: Vec<CredPresumido>,
+    /// Combustível (`prod/comb`) — CST 02, 15, 53, 61.
+    #[serde(default)]
+    pub comb: Option<Comb>,
 }
 
 impl Default for Det {
@@ -628,6 +980,7 @@ impl Default for Det {
             nve: None,
             extipi: None,
             cest: None,
+            c_benef: None,
             cfop: 5102,
             u_com: "".to_string(),
             q_com: 0.0,
@@ -651,6 +1004,8 @@ impl Default for Det {
             v_tot_trib: 0.0,
             inf_ad_prod: None,
             ibs_cbs: None,
+            cred_presumido: Vec::new(),
+            comb: None,
         }
     }
 }

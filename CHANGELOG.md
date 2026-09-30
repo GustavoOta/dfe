@@ -5,6 +5,113 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 
 ## [Unreleased]
 
+### ICMS de todos os CST do leiaute
+
+#### Added
+- Grupos ICMS02/15/53/61 (monofásico de combustíveis, NT 2023.001), ICMSPart (partilha, pela
+  `uf_st`) e ICMSST (repasse de ST retido, pelo `v_bcst_dest`).
+- Modalidades `modBC` 0/1/2 (`p_mva_proprio`, `v_pauta`) e `modBCST` 0/1/2/3/5 (`v_pauta_st`) —
+  antes eram erro de montagem. `icms_de_parametros` recebe a quantidade tributável.
+- `motDesICMSST`/`vICMSSTDeson` (10/70/90), `cBenefRBC` e FCP diferido (51/90), diferimento no
+  90, ICMS efetivo e FCP-ST retido (60/500/ICMSST).
+- `Det::cred_presumido` (`prod/gCred`, até 4) e `Det::comb` (`prod/comb`, obrigatório nos CST
+  monofásicos: sem ANP é erro de montagem).
+- ICMSTot: `qBCMono`…`vICMSMonoRet` (só com item monofásico); `vFCPSTRet` soma os itens;
+  `vNF` soma `vICMSMonoReten` (regra 610); ICMSPart entra em vBC/vICMS/vBCST/vST.
+
+#### Fixed
+- DANFE A4 lia pICMS/vICMS só do ICMS00: agora de qualquer grupo (`xml_extractor::ICMS::grupo`).
+- `validar_fragmento` (testes) inclui todos os tipos simples do leiaute (o `<prod>` usa TGuid).
+
+### PIS/COFINS: qualquer CST do leiaute
+
+#### Added
+- `PisCofinsParametros` + `Pis/Cofins::por_parametros`: a crate escolhe o grupo pelo CST e
+  calcula (01/02 Aliq, 03 Qtde, 04–09 NT, 49–99 Outr por % ou por R$/unidade ou zerado).
+- Variantes `OutrAliq`/`OutrQtde`; `St` ganhou `ind_soma` (indSomaPISST/indSomaCOFINSST).
+
+#### Fixed
+- 49–99 com valor não existiam (`PISOutr` sem vBC/pPIS); ICMSTot/vPIS e vCOFINS agora somam o
+  grupo Outr.
+- `PISST`/`COFINSST` saíam dentro de `<PIS>`/`<COFINS>` (inválido): agora grupos irmãos, fora do
+  vPIS/vCOFINS do total e somados ao vNF só com indSoma = 1 (NT 2020.005, regra 610).
+
+### PIS/COFINS sem valor no grupo do CST
+
+#### Added
+- `Pis::nao_tributado(cst)` / `Cofins::nao_tributado(cst)` e `CST_PIS_COFINS_NT` (04–09).
+
+#### Fixed
+- **Rejeição de schema** "CST '07' is not an element of the set {'49', …, '99'}": os
+  conversores do PDV e do gravisServer mandavam 04–09 em `Outr`. O grupo agora sai pelo CST na
+  serialização (04–09 em PISNT/COFINSNT, 49–99 em PISOutr/COFINSOutr), qualquer que seja a
+  variante. `Pis::Nt` com 49–99 leva o próprio CST ao PISOutr — o `Pis::Outr` saía sempre 99.
+
+### Arredondamento fiscal único
+
+#### Added
+- **Módulo público `arredondamento`** com `arred`, `arred2`, `arred_decimal`, `fmt_dec` e
+  `fmt_dec_ate`, exportados na raiz (`dfe::arred2`). Arredonda meio para cima sobre o valor
+  decimal, o mesmo `PHP_ROUND_HALF_UP` do NFePHP. É a regra do ecossistema: gravisServer, PDV e
+  retaguarda reusam, e o JS tem o espelho `arredondamento.js`.
+
+#### Fixed
+- **Centavo do item diferente do total** (rejeições 531/532/602/603): o item saía por
+  `format!("{:.2}")`, que opera no binário e desempata para o par, e o total somava o f64 cru.
+  Com dois itens de 0.125, o XML imprimia 0.12 + 0.12 nos itens e 0.25 no total. Agora todo
+  número passa por `fmt_dec` e o total soma os valores **impressos** (`arred2`).
+- **Rateio de desconto/acréscimo** desempata para cima (antes era o `round_dp` bancário).
+- **`vUnCom`/`vUnTrib` perdiam casas**: 602,6097 saía "602.61" (rejeição 629 com quantidade
+  maior). Agora saem com 2 a 10 casas, `qCom`/`qTrib` com 3 a 4, e `qBCProd` do PIS/COFINS por
+  quantidade com 4.
+
+### ICMS por parâmetros do cadastro + cBenef
+
+#### Added
+- **`Icms::Parametros(IcmsParametros)`**: o consumidor manda CST/CSOSN, percentuais e
+  modalidades, e a crate escolhe o grupo e calcula vBC, vICMS, ST, FCP, FCP-ST e desoneração
+  sobre a base do item (vProd + frete + acréscimo − desconto, já rateados). Cobre os CST 00, 10,
+  20, 30, 40, 41, 50, 51, 60, 70 e 90 e os CSOSN 101, 102, 103, 201, 202, 203, 300, 400, 500 e
+  900 (grupos `ICMSSN201`/`ICMSSN202` novos). Um campo exigido que chega vazio vira
+  `DfeError::Validacao`. Só as modalidades de valor da operação são calculadas: `mod_bc` 3 e
+  `mod_bcst` 4 (MVA) ou 6. Plano: `ICMS_CADASTRO_PLANO.md`.
+- **`Det::c_benef`** → `<cBenef>` entre `CEST` e `CFOP`. Vazio é omitido (rejeição 930 nas UFs
+  que exigem).
+
+#### Changed
+- **Totais**: `vBCST`, `vST`, `vFCP` e `vFCPST` passam a sair da soma dos itens (o valor de
+  `Total` é somado a ela). O `vNF` agora soma `vST + vFCPST` e tira o `vICMSDeson` dos itens com
+  `ind_deduz_deson = 1` (regra 610, NT 2023.004).
+
+### IBS/CBS calculado pela crate + redução de alíquota
+
+#### Added
+- **`IbsCbs::calcular`**: com `true`, a crate calcula
+  `vBC = vProd + frete + seg + outro − desc − vPIS − vCOFINS − vICMS − vFCP` do item e os valores
+  `vBC × alíquota` (NT 2025.002-RTC, rejeição 1115). Com `false`, a crate usa os valores do
+  chamador, como antes.
+- **`IbsCbs::p_red_ibs` / `p_red_cbs`** e **`IbsCbs::cst_exige_reducao`**: montam `gRed`
+  (`pRedAliq`, `pAliqEfet`) em `gIBSUF`, `gIBSMun` e `gCBS` só nos CST 200 e 515 (rejeições
+  1033/1074). Em outro CST a redução recebida é ignorada, porque lá o `gRed` é a rejeição 1032.
+
+#### Changed
+- `GRed.p_red_aliq` / `p_aliq_efet` (entidade interna) passam de `Decimal` para `String`
+  formatada com 4 casas.
+
+#### Fixed
+- **`vCredPres` / `vCredPresCondSus` vazios no `IBSCBSTot`**: saíam `<vCredPres/>` e reprovavam
+  no pattern do XSD. Agora saem `0.00`.
+
+### Emitente
+
+#### Fixed
+- **`xNome` / `xFant` do emitente com mais de 60 caracteres** reprovavam no XSD. Agora são
+  cortados nos 60, contando caracteres e não bytes.
+
+### Testes
+- `interno::validation::validar_fragmento` (só `cfg(test)`) valida um grupo isolado (ex.:
+  `<ICMS>`, `<IBSCBS>`) contra o `leiauteNFe` embutido, travando a ordem e o formato dos campos.
+
 ### Status do serviço por modelo
 
 #### Added
