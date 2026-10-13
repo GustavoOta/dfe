@@ -5,14 +5,18 @@
 use crate::error::{DfeError, Result};
 use regex::Regex;
 
-use super::types::{InfProt, Response, TagInfProt};
+use super::types::{Alerta, InfProt, Response, TagInfProt};
+
+/// Máximo de alertas por nota (NT 2026.002 §2.2): a SEFAZ devolve só os 5 primeiros.
+const MAX_ALERTAS: usize = 5;
 
 pub(super) fn xml_result(response: &str, validated_xml: String) -> Result<Response> {
     let re = Regex::new(r#"<protNFe versao="4.00">(.*?)</protNFe>"#)
         .map_err(|e| DfeError::Xml(format!("Erro regex: {}", e)))?;
     if let Some(prot_nfe) = re.captures(response).and_then(|c| c.get(0)).map(|m| m.as_str()) {
-        let tag_inf_prot: TagInfProt = quick_xml::de::from_str(prot_nfe)
+        let mut tag_inf_prot: TagInfProt = quick_xml::de::from_str(prot_nfe)
             .map_err(|e| DfeError::Xml(format!("Erro desserializar protocolo: {} — {}", e, prot_nfe)))?;
+        tag_inf_prot.inf_prot.alertas = extrair_alertas(prot_nfe);
         return Ok(Response {
             protocolo: tag_inf_prot,
             xml: validated_xml,
@@ -36,6 +40,7 @@ pub(super) fn xml_result(response: &str, validated_xml: String) -> Result<Respon
             dig_val: None,
             c_stat,
             x_motivo: extract_xml_tag(response, "xMotivo").unwrap_or_default(),
+            alertas: Vec::new(),
         };
         return Ok(Response {
             protocolo: TagInfProt { inf_prot },
@@ -47,6 +52,21 @@ pub(super) fn xml_result(response: &str, validated_xml: String) -> Result<Respon
 
     // Nem protocolo de nota, nem status de lote — resposta realmente inesperada.
     Err(DfeError::Xml(format!("protNFe not found: {}", response)))
+}
+
+/// Pares `cMsg`/`xMsg` (grupo PR13) do `<protNFe>`, na ordem em que vieram, até [`MAX_ALERTAS`].
+/// Na autorização com alerta (`cStat 120`) cada alerta é um par; um `cMsg` sem `xMsg` é ignorado.
+pub(super) fn extrair_alertas(prot_nfe: &str) -> Vec<Alerta> {
+    let Ok(re) = Regex::new(r"(?s)<cMsg>(.*?)</cMsg>\s*<xMsg>(.*?)</xMsg>") else {
+        return Vec::new();
+    };
+    re.captures_iter(prot_nfe)
+        .take(MAX_ALERTAS)
+        .map(|c| Alerta {
+            c_msg: c[1].trim().to_string(),
+            x_msg: c[2].trim().to_string(),
+        })
+        .collect()
 }
 
 /// Extrai o conteúdo da primeira ocorrência de `<tag>…</tag>` no XML de resposta.
@@ -82,6 +102,36 @@ mod tests {
         assert_eq!(r.protocolo.inf_prot.ver_aplic, "SP_NFCE_PL_009_V400");
         assert_eq!(r.protocolo.inf_prot.x_motivo, "Rejeição: Falha no Schema XML do lote de NFe");
         assert!(r.protocolo.inf_prot.n_prot.is_none());
+    }
+
+    #[test]
+    fn xml_result_autorizacao_com_alerta_extrai_alertas() {
+        // NT 2026.002 §2.3: cStat 120 + pares cMsg/xMsg (PR13) dentro do infProt.
+        let resp = r#"<retEnviNFe versao="4.00"><protNFe versao="4.00"><infProt><tpAmb>2</tpAmb><verAplic>SP_NFCE</verAplic><chNFe>3500000000000000000065010000000011234567890</chNFe><dhRecbto>2026-10-13T11:09:10-03:00</dhRecbto><nProt>135260000000002</nProt><digVal>abc=</digVal><cStat>120</cStat><xMotivo>Autorizado o uso da NF-e, com alerta</xMotivo><cMsg>172</cMsg><xMsg>Alerta: Situacao do CNPJ destinatario inabilitado no momento da autorizacao</xMsg><cMsg>999</cMsg><xMsg>Outro alerta</xMsg></infProt></protNFe></retEnviNFe>"#;
+        let r = xml_result(resp, "<xml/>".into()).expect("deve extrair protocolo");
+        let inf = &r.protocolo.inf_prot;
+        assert_eq!(inf.c_stat, 120);
+        assert!(crate::cstat_autorizado(inf.c_stat));
+        assert_eq!(inf.n_prot.as_deref(), Some("135260000000002"));
+        assert_eq!(inf.alertas.len(), 2);
+        assert_eq!(inf.alertas[0].c_msg, "172");
+        assert!(inf.alertas[0].x_msg.contains("CNPJ destinatario inabilitado"));
+        assert_eq!(inf.alertas[1].c_msg, "999");
+    }
+
+    #[test]
+    fn alertas_limitados_a_cinco_e_ausentes_na_autorizacao_comum() {
+        let pares: String = (1..=7).map(|i| format!("<cMsg>{i}</cMsg><xMsg>m{i}</xMsg>")).collect();
+        assert_eq!(extrair_alertas(&pares).len(), 5);
+        assert!(extrair_alertas("<infProt><cStat>100</cStat></infProt>").is_empty());
+    }
+
+    #[test]
+    fn alertas_vazios_nao_aparecem_no_json() {
+        let resp = r#"<retEnviNFe versao="4.00"><protNFe versao="4.00"><infProt><tpAmb>2</tpAmb><verAplic>SP</verAplic><chNFe>1</chNFe><dhRecbto>x</dhRecbto><cStat>100</cStat><xMotivo>ok</xMotivo></infProt></protNFe></retEnviNFe>"#;
+        let r = xml_result(resp, "<xml/>".into()).unwrap();
+        let json = serde_json::to_string(&r.protocolo).unwrap();
+        assert!(!json.contains("alertas"), "contrato JSON da autorização comum não muda: {json}");
     }
 
     #[test]

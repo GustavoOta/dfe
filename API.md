@@ -68,12 +68,19 @@ let resposta = NFeBuilder::new()
     .emitir()
     .await?;
 
-// resposta.protocolo.inf_prot.c_stat   → "100" = autorizada
+// resposta.protocolo.inf_prot.c_stat   → autorizada se dfe::cstat_autorizado(c_stat) (100/120/150)
 // resposta.protocolo.inf_prot.x_motivo
+// resposta.protocolo.inf_prot.alertas  → Vec<AlertaAutorizacao { c_msg, x_msg }> (cStat 120)
 // resposta.xml                          → XML do nfeProc autorizado
 // resposta.send_xml                     → envelope SOAP enviado à SEFAZ (debug/auditoria)
 // resposta.receive_xml                  → corpo cru da resposta da SEFAZ (debug/auditoria)
 ```
+
+**Autorização com alerta (cStat 120, NT 2026.002).** A nota está autorizada e gravada na SEFAZ —
+não corrigir nem retransmitir. Decidir "autorizou?" sempre por `dfe::cstat_autorizado(c_stat)`
+(ou `cstat_autorizado_str` para o texto gravado no banco), nunca por lista `100 || 150`. Os avisos
+vêm em `inf_prot.alertas` (até 5; ex.: `cMsg 172`, CNPJ do destinatário inabilitado no CCC) e
+também saem no `protNFe` do `nfeProc` montado.
 
 **NFC-e** (modelo 65): mesma API, com `mod_: 65`, `tp_imp: 4`, `.id_csc()` e `.csc()` obrigatórios. `dh_sai_ent` e QR Code tratados automaticamente.
 
