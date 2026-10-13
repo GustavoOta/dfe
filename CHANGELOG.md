@@ -5,6 +5,19 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 
 ## [Unreleased]
 
+### Autorização com alerta — cStat 120 (NT 2026.002)
+
+#### Added
+- `dfe::cstat_autorizado` / `cstat_autorizado_str` / `CSTAT_AUTORIZADO` (módulo `autorizacao`):
+  regra única de "nota autorizada" = 100, 120 (com alerta) ou 150 (fora do prazo).
+- `InfProt::alertas: Vec<Alerta>` (`dfe::AlertaAutorizacao`) com os pares `cMsg`/`xMsg` (PR13) do
+  protocolo, até 5. Fora do JSON quando vazio — contrato da autorização comum não muda.
+
+#### Fixed
+- cStat 120 era tratado como rejeição: o `nfeProc` não era montado e o XML saía sem protocolo,
+  embora a nota estivesse autorizada na SEFAZ (produção desde 05/10/2026, NFC-e). O `protNFe`
+  montado agora reproduz os alertas.
+
 ### ICMS de todos os CST do leiaute
 
 #### Added

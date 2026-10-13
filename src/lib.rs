@@ -74,6 +74,7 @@
 //! # }
 //! ```
 pub mod arredondamento;
+pub mod autorizacao;
 pub mod cancelar;
 pub mod carta_correcao;
 pub mod consulta_situacao;
@@ -96,6 +97,8 @@ pub mod xml_extractor;
 mod interno;
 
 pub use arredondamento::{arred, arred2, arred_decimal, fmt_dec, fmt_dec_ate};
+pub use autorizacao::{cstat_autorizado, cstat_autorizado_str, CSTAT_AUTORIZADO};
+pub use emissao::Alerta as AlertaAutorizacao;
 pub use cancelar::CancelarBuilder;
 pub use consulta_situacao::ConsultaSituacaoBuilder;
 #[cfg(feature = "danfe")]

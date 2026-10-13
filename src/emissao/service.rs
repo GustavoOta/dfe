@@ -89,13 +89,22 @@ pub(super) async fn emit_nfe(nfe: NFeInterno) -> Result<Response> {
     transmitir_assinada(&assinada).await
 }
 
-// cStat 100 = autorizado · 150 = autorizado fora do prazo (§5.7 do CONTINGENCIA_NFCE.md) — mesma
-// convenção já usada pelo gravisServer/ACBr. Qualquer outro cStat é rejeição e não monta o nfeProc.
+// Autorizado = cStat 100, 120 (com alerta, NT 2026.002) ou 150 (fora do prazo, §5.7 do
+// CONTINGENCIA_NFCE.md) — regra única em `crate::autorizacao`. Qualquer outro cStat é rejeição e
+// não monta o nfeProc.
 fn autorizada(c_stat: i32) -> bool {
-    c_stat == 100 || c_stat == 150
+    crate::autorizacao::cstat_autorizado(c_stat)
 }
 
-// Envolve o `<NFe>` assinado com `<protNFe>`/`<nfeProc>` quando a SEFAZ autorizou (cStat 100/150).
+// Pares `cMsg`/`xMsg` (PR13) do protocolo — o `protNFe` guardado tem de ser fiel ao retorno.
+fn alertas_xml(alertas: &[super::types::Alerta]) -> String {
+    alertas
+        .iter()
+        .map(|a| format!("<cMsg>{}</cMsg><xMsg>{}</xMsg>", a.c_msg, a.x_msg))
+        .collect()
+}
+
+// Envolve o `<NFe>` assinado com `<protNFe>`/`<nfeProc>` quando a SEFAZ autorizou (cStat 100/120/150).
 // Compartilhado entre `emit_nfe` (emissão online) e `transmitir_xml_assinado` (transmissão tardia
 // de contingência) para não duplicar a montagem do protocolo.
 fn montar_resposta_autorizada(result: Response) -> Response {
@@ -103,12 +112,13 @@ fn montar_resposta_autorizada(result: Response) -> Response {
         return result;
     }
     let protocolo = format!(
-        r#"</NFe><protNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><infProt><tpAmb>{}</tpAmb><verAplic>{}</verAplic><chNFe>{}</chNFe><dhRecbto>{}</dhRecbto><nProt>{}</nProt><digVal>{}</digVal><cStat>{}</cStat><xMotivo>{}</xMotivo></infProt></protNFe></nfeProc>"#,
+        r#"</NFe><protNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00"><infProt><tpAmb>{}</tpAmb><verAplic>{}</verAplic><chNFe>{}</chNFe><dhRecbto>{}</dhRecbto><nProt>{}</nProt><digVal>{}</digVal><cStat>{}</cStat><xMotivo>{}</xMotivo>{}</infProt></protNFe></nfeProc>"#,
         result.protocolo.inf_prot.tp_amb, result.protocolo.inf_prot.ver_aplic,
         result.protocolo.inf_prot.ch_nfe, result.protocolo.inf_prot.dh_recbto,
         result.protocolo.inf_prot.n_prot.clone().unwrap_or_default(),
         result.protocolo.inf_prot.dig_val.clone().unwrap_or_default(),
-        result.protocolo.inf_prot.c_stat, result.protocolo.inf_prot.x_motivo
+        result.protocolo.inf_prot.c_stat, result.protocolo.inf_prot.x_motivo,
+        alertas_xml(&result.protocolo.inf_prot.alertas)
     );
     let nfe_proc_xml = r#"<?xml version="1.0" encoding="UTF-8"?><nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">"#.to_string()
         + &result.xml.replace("</NFe>", &protocolo);
@@ -126,8 +136,8 @@ fn montar_resposta_autorizada(result: Response) -> Response {
 /// para o cliente no momento da emissão em contingência.
 ///
 /// Usar quando a conexão com a SEFAZ volta, para transmitir notas pendentes de autorização.
-/// `cStat 100` e `150` (autorizado fora do prazo) são tratados como sucesso — ver §5.7 do
-/// `CONTINGENCIA_NFCE.md`.
+/// `cStat 100`, `120` (com alerta) e `150` (autorizado fora do prazo) são tratados como sucesso —
+/// ver [`crate::cstat_autorizado`] e §5.7 do `CONTINGENCIA_NFCE.md`.
 ///
 /// `c_uf` é o código IBGE da UF do emitente (o mesmo `Ide.c_uf` usado na emissão original).
 /// Contingência off-line é exclusiva de NFC-e — o serviço de autorização é sempre o do modelo 65.
@@ -191,5 +201,41 @@ mod tests {
     fn rejeita_chave_incompleta() {
         let err = extrair_chave(r#"<infNFe Id="NFe3526091122233300018165001">"#).unwrap_err();
         assert!(matches!(err, DfeError::Xml(_)));
+    }
+
+    fn resposta(c_stat: i32, alertas: Vec<super::super::types::Alerta>) -> Response {
+        Response {
+            protocolo: super::super::types::TagInfProt {
+                inf_prot: super::super::types::InfProt {
+                    tp_amb: 2,
+                    ver_aplic: "SP_NFCE".into(),
+                    ch_nfe: CHAVE.into(),
+                    dh_recbto: "2026-10-13T10:00:00-03:00".into(),
+                    n_prot: Some("135260000000009".into()),
+                    dig_val: Some("abc=".into()),
+                    c_stat,
+                    x_motivo: "Autorizado o uso da NF-e, com alerta".into(),
+                    alertas,
+                },
+            },
+            xml: format!(r#"<NFe xmlns="http://www.portalfiscal.inf.br/nfe"><infNFe Id="NFe{CHAVE}"/></NFe>"#),
+            send_xml: String::new(),
+            receive_xml: String::new(),
+        }
+    }
+
+    // cStat 120 (NT 2026.002): antes caía como rejeição e o XML saía sem protocolo.
+    #[test]
+    fn autorizacao_com_alerta_monta_nfe_proc_com_os_alertas() {
+        let alerta = super::super::types::Alerta { c_msg: "172".into(), x_msg: "Alerta: CNPJ inabilitado".into() };
+        let r = montar_resposta_autorizada(resposta(120, vec![alerta]));
+        assert!(r.xml.starts_with(r#"<?xml version="1.0" encoding="UTF-8"?><nfeProc"#), "{}", r.xml);
+        assert!(r.xml.contains("<cStat>120</cStat><xMotivo>Autorizado o uso da NF-e, com alerta</xMotivo><cMsg>172</cMsg><xMsg>Alerta: CNPJ inabilitado</xMsg></infProt>"));
+    }
+
+    #[test]
+    fn rejeicao_nao_monta_nfe_proc() {
+        let r = montar_resposta_autorizada(resposta(539, vec![]));
+        assert!(!r.xml.contains("nfeProc"));
     }
 }

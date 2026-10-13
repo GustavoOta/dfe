@@ -61,6 +61,20 @@ pub struct InfProt {
     #[serde(rename = "cStat")]   pub c_stat: i32,
     /// Descrição do status retornado pela SEFAZ.
     #[serde(rename = "xMotivo")] pub x_motivo: String,
+    /// Alertas da autorização (`cStat 120`, NT 2026.002): pares `cMsg`/`xMsg` do grupo PR13 do
+    /// `infProt`, até 5. Vazio em autorização comum e em rejeição. Preenchido pelo parser de
+    /// retorno (não pelo serde do XML, que não sabe agrupar os pares repetidos).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub alertas: Vec<Alerta>,
+}
+
+/// Alerta devolvido na autorização com alerta (`cStat 120`): código e texto da SEFAZ.
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, PartialEq, Eq)]
+pub struct Alerta {
+    /// Código do alerta (`cMsg`, PR14) — ex.: `172` (destinatário inabilitado no CCC).
+    pub c_msg: String,
+    /// Texto do alerta (`xMsg`, PR15).
+    pub x_msg: String,
 }
 
 /// Wrapper XML em torno de [`InfProt`] (`<protNFe><infProt>…`).

@@ -22,7 +22,7 @@ use crate::tipos::{Dest, Det, Emit, Entrega, Ide, InfAdic, Pag, Total, Transp};
 use rust_decimal::Decimal;
 
 use types::NFeInterno;
-pub use types::{InfProt, NFeAssinada, Response, TagInfProt};
+pub use types::{Alerta, InfProt, NFeAssinada, Response, TagInfProt};
 pub use service::transmitir_xml_assinado;
 
 // Validações de contingência (`tpEmis != 1`), comuns a `gerar_xml()` e `emitir()` — fail-fast,
