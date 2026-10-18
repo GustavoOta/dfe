@@ -15,7 +15,7 @@ use crate::interno::validation::is_xml_valid;
 use crate::tipos::Dest;
 use quick_xml::se::to_string;
 
-use super::det::det_process;
+use super::det::{det_process, tirar_grupo_ibscbs};
 use super::emit::{limitar_x_nome, EmitProcess, EnderEmitProcess};
 use super::ide::*;
 use super::inf_adic::inf_adic_process;
@@ -130,11 +130,12 @@ pub(super) async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
     // <entrega> vem logo após <dest> na ordem do XSD (delivery / indPres=4).
     let entrega_string = EntregaTAG::build(&nfe.entrega)?;
 
-    let dets = det_process(
+    let mut dets = det_process(
         nfe.det.clone(), nfe.ide.mod_, nfe.ide.tp_amb,
         nfe.desconto_rateio.clone(), nfe.frete_rateio.clone(), nfe.outro_rateio.clone(),
         nfe.active_ibs_cbs.clone(),
     )?;
+    tirar_grupo_ibscbs(&mut dets, &nfe.ibscbs_sem_grupo);
     let dets_total = dets.clone();
 
     let mut det_string = String::new();

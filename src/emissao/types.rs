@@ -24,6 +24,8 @@ pub(super) struct NFeInterno {
     pub outro_rateio: Option<Decimal>,
     pub entrega: Option<Entrega>,
     pub referencias: Vec<String>,
+    /// CSTs de IBS/CBS que saem sem o grupo `gIBSCBS` (opt-in, `NFeBuilder::ibscbs_sem_grupo`).
+    pub ibscbs_sem_grupo: Vec<String>,
 }
 
 /// Resposta da emissão de NF-e ou NFC-e retornada por [`super::NFeBuilder::emitir`].

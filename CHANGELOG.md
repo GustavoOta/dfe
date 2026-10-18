@@ -5,6 +5,14 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 
 ## [Unreleased]
 
+### IBS/CBS sem o grupo de valores, por CST (opt-in)
+
+#### Added
+- `NFeBuilder::ibscbs_sem_grupo(&["410"])`: itens com esses CSTs saem só com `CST` + `cClassTrib`,
+  sem `gIBSCBS` (opcional no XSD, `xs:choice minOccurs="0"`) — ex.: 410/410014, fornecimento de
+  produtor rural não contribuinte na nota de entrada da cooperativa. Não somam no `IBSCBSTot`.
+  Sem a chamada, o XML não muda (consumidores atuais intocados).
+
 ### Autorização com alerta — cStat 120 (NT 2026.002)
 
 #### Added

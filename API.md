@@ -252,7 +252,11 @@ IbsCbs {
   Só vai ao XML quando `IbsCbs::cst_exige_reducao(cst)` (CST **200** e **515**, `ind_gRed = 1`):
   nesses é obrigatório (1033/1074); em outro CST a redução é ignorada (gRed lá é a 1032).
   Redução de 100% sai com `pAliqEfet 0.0000` e valores zerados.
-- `IBSCBSTot` só é enviado se algum item tiver IBS/CBS (1118). `vCredPres` e
+- `IBSCBSTot` só é enviado se algum item tiver IBS/CBS (1118).
+- **CST sem o grupo de valores (opt-in):** `NFeBuilder::ibscbs_sem_grupo(&["410"])` faz os itens
+  desses CSTs saírem só com `CST` + `cClassTrib` (sem `gIBSCBS`, opcional no XSD) — ex.: entrada de
+  produtor rural não contribuinte (410/410014). Esses itens não somam no `IBSCBSTot`. Sem a chamada,
+  nada muda. `vCredPres` e
   `vCredPresCondSus` saem `0.00` (obrigatórios no XSD; vazio reprovava no pattern).
 
 ## Arredondamento — `dfe::arred2`

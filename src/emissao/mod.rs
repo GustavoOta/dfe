@@ -108,6 +108,7 @@ pub struct NFeBuilder {
     outro_rateio: Option<Decimal>,
     entrega: Option<Entrega>,
     referencias: Vec<String>,
+    ibscbs_sem_grupo: Vec<String>,
 }
 
 impl NFeBuilder {
@@ -118,7 +119,7 @@ impl NFeBuilder {
             destinatario: None, itens: Vec::new(), total: None, transporte: None,
             pagamento: None, informacoes_adicionais: None, id_csc: None, csc: None,
             active_ibs_cbs: None, desconto_rateio: None, frete_rateio: None, outro_rateio: None,
-            entrega: None, referencias: Vec::new(),
+            entrega: None, referencias: Vec::new(), ibscbs_sem_grupo: Vec::new(),
         }
     }
 
@@ -167,6 +168,14 @@ impl NFeBuilder {
     pub fn entrega(mut self, e: Entrega) -> Self { self.entrega = Some(e); self }
     /// Adiciona uma chave de acesso referenciada (`<NFref><refNFe>`). Use para devolução (finNFe=4).
     pub fn referencia(mut self, chave: &str) -> Self { self.referencias.push(chave.to_string()); self }
+    /// CSTs de IBS/CBS cujos itens saem só com `CST` + `cClassTrib`, **sem** o grupo `gIBSCBS`
+    /// (opcional no XSD; ex.: `"410"`, imunidade e não incidência — fornecimento de produtor rural
+    /// não contribuinte). Opt-in: sem esta chamada o XML não muda. Esses itens não somam no
+    /// `IBSCBSTot`.
+    pub fn ibscbs_sem_grupo(mut self, csts: &[&str]) -> Self {
+        self.ibscbs_sem_grupo.extend(csts.iter().map(|c| c.trim().to_string()));
+        self
+    }
 
     /// Gera e valida o XML da NF-e sem enviar à SEFAZ.
     ///
@@ -220,6 +229,7 @@ impl NFeBuilder {
             outro_rateio: self.outro_rateio,
             entrega: self.entrega,
             referencias: self.referencias,
+            ibscbs_sem_grupo: self.ibscbs_sem_grupo,
         })
     }
 
