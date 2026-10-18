@@ -254,13 +254,25 @@ fn g_red(p: Decimal, p_red: Option<Decimal>) -> Option<GRed> {
     })
 }
 
+/// Itens cujo CST de IBS/CBS o emissor pediu sem o grupo de valores (`NFeBuilder::ibscbs_sem_grupo`):
+/// ficam só `CST` + `cClassTrib` (o `gIBSCBS` é opcional no XSD, `xs:choice minOccurs="0"`).
+pub(super) fn tirar_grupo_ibscbs(dets: &mut [DetProcess], csts: &[String]) {
+    for det in dets.iter_mut() {
+        if let Some(ib) = det.imposto.ibs_cbs.as_mut() {
+            if csts.iter().any(|c| *c == ib.cst) {
+                ib.g_ibscbs = None;
+            }
+        }
+    }
+}
+
 fn ibs_cbs_process(ibs_cbs: Option<&IbsCbs>) -> Option<IBSCBSProcess> {
     let ibs = ibs_cbs?;
     let (red_ibs, red_cbs) = reducoes(ibs);
     Some(IBSCBSProcess {
         cst: ibs.cst.clone(),
         c_class_trib: ibs.class_trib.clone(),
-        g_ibscbs: GIBSCBS {
+        g_ibscbs: Some(GIBSCBS {
             v_bc: fmt_decimal(ibs.v_bc, 2),
             g_ibs_uf: GIBSUF {
                 p_ibs_uf: fmt_decimal(ibs.p_ibs_uf, 4),
@@ -282,7 +294,7 @@ fn ibs_cbs_process(ibs_cbs: Option<&IbsCbs>) -> Option<IBSCBSProcess> {
                 ..Default::default()
             },
             ..Default::default()
-        },
+        }),
     })
 }
 
@@ -954,7 +966,7 @@ mod tests {
             ..Default::default()
         };
         let dets = det_process(vec![item(), item()], 65, 1, Some(d("20.00")), None, None, None).unwrap();
-        let g = &dets[0].imposto.ibs_cbs.as_ref().unwrap().g_ibscbs;
+        let g = dets[0].imposto.ibs_cbs.as_ref().unwrap().g_ibscbs.as_ref().unwrap();
         assert_eq!(g.v_bc, "65.47");
         // 65,47 × 0,10% = 0,065 → 0,07; × 0,90% = 0,589 → 0,59 (valores recebidos ignorados)
         assert_eq!(g.g_ibs_uf.v_ibs_uf, "0.07");
@@ -1049,10 +1061,29 @@ mod tests {
     }
 
     #[test]
+    fn cst_pedido_sem_grupo_sai_so_com_cst_e_classificacao() {
+        // Fornecimento de produtor rural não contribuinte (CST 410 / 410014): sem gIBSCBS.
+        let ib = crate::tipos::IbsCbs { cst: "410".into(), class_trib: "410014".into(), ..ibs(true) };
+        let (mut dets, com_grupo) = xml_do_item(ib, 50.0);
+        assert!(com_grupo.contains("<gIBSCBS>"), "sem pedir, nada muda: {com_grupo}");
+        let outro = crate::tipos::IbsCbs { ..ibs(true) }; // CST 000 continua com o grupo
+        let (mut dets_000, _) = xml_do_item(outro, 50.0);
+        super::tirar_grupo_ibscbs(&mut dets, &["410".to_string()]);
+        super::tirar_grupo_ibscbs(&mut dets_000, &["410".to_string()]);
+        let xml = quick_xml::se::to_string(dets[0].imposto.ibs_cbs.as_ref().unwrap()).unwrap();
+        assert_eq!(xml, "<IBSCBS><CST>410</CST><cClassTrib>410014</cClassTrib></IBSCBS>");
+        crate::interno::validation::validar_fragmento("IBSCBS", &xml).expect("sem o grupo também é XSD");
+        assert!(dets_000[0].imposto.ibs_cbs.as_ref().unwrap().g_ibscbs.is_some());
+        // Item sem grupo não soma: só ele na nota → sem IBSCBSTot (zerado é a rejeição 1118).
+        let tot = total_process(crate::tipos::Total::default(), dets, 3, None).unwrap();
+        assert!(tot.ibs_cbs_tot.is_none());
+    }
+
+    #[test]
     fn ibs_cbs_com_valores_prontos_segue_como_antes() {
         let det = Det { v_prod: 10.0, ibs_cbs: Some(ibs(false)), ..Default::default() };
         let dets = det_process(vec![det], 65, 1, None, None, None, None).unwrap();
-        assert_eq!(dets[0].imposto.ibs_cbs.as_ref().unwrap().g_ibscbs.v_bc, "999.00");
+        assert_eq!(dets[0].imposto.ibs_cbs.as_ref().unwrap().g_ibscbs.as_ref().unwrap().v_bc, "999.00");
     }
 
     #[test]

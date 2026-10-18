@@ -235,33 +235,34 @@ pub fn total_process(
             + arred2(cofins_st_soma_no_vnf(&det.imposto.cofins));
         v_tot_trib   += det.imposto.v_tot_trib.parse::<f64>().unwrap_or(0.0);
 
-        if let Some(ibs_cbs) = det.imposto.ibs_cbs.as_ref() {
-            v_bc_ibs_cbs_total += ibs_cbs.g_ibscbs.v_bc.parse::<f64>().unwrap_or(0.0);
+        // Item com IBS/CBS sem o grupo de valores (CST sem gIBSCBS) não soma nada.
+        if let Some(g_ibscbs) = det.imposto.ibs_cbs.as_ref().and_then(|i| i.g_ibscbs.as_ref()) {
+            v_bc_ibs_cbs_total += g_ibscbs.v_bc.parse::<f64>().unwrap_or(0.0);
 
-            let v_ibs_uf = ibs_cbs.g_ibscbs.g_ibs_uf.v_ibs_uf.parse::<f64>().unwrap_or(0.0);
+            let v_ibs_uf = g_ibscbs.g_ibs_uf.v_ibs_uf.parse::<f64>().unwrap_or(0.0);
             ibs_uf_total += v_ibs_uf;
-            if let Some(ref g) = ibs_cbs.g_ibscbs.g_ibs_uf.g_dif {
+            if let Some(ref g) = g_ibscbs.g_ibs_uf.g_dif {
                 ibs_uf_dif_total += g.v_dif.to_f64().unwrap_or(0.0);
             }
-            if let Some(ref g) = ibs_cbs.g_ibscbs.g_ibs_uf.g_dev_trib {
+            if let Some(ref g) = g_ibscbs.g_ibs_uf.g_dev_trib {
                 ibs_uf_dev_trib_total += g.v_dev_trib.to_f64().unwrap_or(0.0);
             }
 
-            let v_ibs_mun = ibs_cbs.g_ibscbs.g_ibs_mun.v_ibs_mun.parse::<f64>().unwrap_or(0.0);
+            let v_ibs_mun = g_ibscbs.g_ibs_mun.v_ibs_mun.parse::<f64>().unwrap_or(0.0);
             ibs_mun_total += v_ibs_mun;
-            if let Some(ref g) = ibs_cbs.g_ibscbs.g_ibs_mun.g_dif {
+            if let Some(ref g) = g_ibscbs.g_ibs_mun.g_dif {
                 ibs_mun_dif_total += g.v_dif.to_f64().unwrap_or(0.0);
             }
-            if let Some(ref g) = ibs_cbs.g_ibscbs.g_ibs_mun.g_dev_trib {
+            if let Some(ref g) = g_ibscbs.g_ibs_mun.g_dev_trib {
                 ibs_mun_dev_trib_total += g.v_dev_trib.to_f64().unwrap_or(0.0);
             }
 
-            ibs_total += ibs_cbs.g_ibscbs.v_ibs.parse::<f64>().unwrap_or(0.0);
-            cbs_total += ibs_cbs.g_ibscbs.g_cbs.v_cbs.parse::<f64>().unwrap_or(0.0);
-            if let Some(ref g) = ibs_cbs.g_ibscbs.g_cbs.g_dif {
+            ibs_total += g_ibscbs.v_ibs.parse::<f64>().unwrap_or(0.0);
+            cbs_total += g_ibscbs.g_cbs.v_cbs.parse::<f64>().unwrap_or(0.0);
+            if let Some(ref g) = g_ibscbs.g_cbs.g_dif {
                 cbs_dif_total += g.v_dif.to_f64().unwrap_or(0.0);
             }
-            if let Some(ref g) = ibs_cbs.g_ibscbs.g_cbs.g_dev_trib {
+            if let Some(ref g) = g_ibscbs.g_cbs.g_dev_trib {
                 cbs_dev_trib_total += g.v_dev_trib.to_f64().unwrap_or(0.0);
             }
         }

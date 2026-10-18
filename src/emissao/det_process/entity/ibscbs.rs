@@ -13,9 +13,10 @@ pub struct IBSCBSProcess {
     /// Código de Classificação Tributária do IBS e da CBS CHAR 6
     #[serde(rename = "cClassTrib")]
     pub c_class_trib: String,
-    /// Grupo de Informações do IBS e CBS
-    #[serde(rename = "gIBSCBS")]
-    pub g_ibscbs: GIBSCBS,
+    /// Grupo de Informações do IBS e CBS. `None` = CST sem o grupo (no XSD ele é opcional,
+    /// `xs:choice minOccurs="0"`), só quando o emissor pede por [`crate::NFeBuilder::ibscbs_sem_grupo`].
+    #[serde(rename = "gIBSCBS", skip_serializing_if = "Option::is_none")]
+    pub g_ibscbs: Option<GIBSCBS>,
 }
 
 
@@ -24,7 +25,7 @@ impl Default for IBSCBSProcess {
         IBSCBSProcess {
             cst: "IBS CBS cst não infomado".to_string(),
             c_class_trib: "c_class_trib não infomado".to_string(),
-            g_ibscbs: GIBSCBS {
+            g_ibscbs: Some(GIBSCBS {
                 v_bc: "-0.01".to_string(),
                 g_ibs_uf: GIBSUF {
                     p_ibs_uf: "p_ibs_uf valor incorreto".to_string(),
@@ -39,7 +40,7 @@ impl Default for IBSCBSProcess {
                     p_cbs: "p_cbs valor incorreto".to_string(),
                     ..Default::default()
                 },
-            },
+            }),
         }
     }
 }
