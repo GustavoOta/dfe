@@ -517,9 +517,10 @@ fn build_receipt(p: BuildParams) -> Result<Vec<u8>> {
     if !p.url_chave.is_empty() {
         b = b.text(format!("{}\n", p.url_chave));
     }
-    // Font B (~64 cols em 80 mm) para a chave caber em 1 linha
+    // Font B (~64 cols em 80 mm) para a chave caber em 1 linha. Sem linha em branco
+    // antes: a chave vem colada à URL de consulta (nos dois layouts).
     let cols_b: usize = if p.paper_width >= 80 { 64 } else { 42 };
-    b = b.text("\n").font_b(true);
+    b = b.font_b(true);
     for chunk in wrap_text(&format_chave_acesso(&p.chave_acesso), cols_b) {
         b = b.text(format!("{chunk}\n"));
     }
@@ -1107,6 +1108,23 @@ mod tests {
         assert!(t.contains("AUTORIZADA PELA SEFAZ"));
         assert!(!t.contains("PENDENTE DE AUTORIZ"), "2ª via autorizada não pode dizer pendente");
         assert!(t.contains("135260000000001"), "protocolo deve sair no cupom");
+    }
+
+    // A chave de acesso vem logo abaixo da URL de consulta, sem linha em branco no meio —
+    // nos dois layouts (o trecho é anterior ao QR e comum aos dois).
+    #[test]
+    fn chave_vem_logo_abaixo_da_url_de_consulta_nos_dois_layouts() {
+        for qr_side in [false, true] {
+            let mut p = base_params("1");
+            p.url_chave = "www.nfce.fazenda.sp.gov.br/consulta".to_string();
+            p.qr_side = qr_side;
+            let t = texto(&build_receipt(p).unwrap());
+            assert!(t.contains("fazenda.sp.gov.br/consulta\n"), "qr_side={qr_side}");
+            assert!(
+                !t.contains("fazenda.sp.gov.br/consulta\n\n"),
+                "linha em branco após a URL de consulta (qr_side={qr_side})"
+            );
+        }
     }
 
     #[test]

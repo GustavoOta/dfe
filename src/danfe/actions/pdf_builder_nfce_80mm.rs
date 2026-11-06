@@ -75,11 +75,7 @@ pub fn build_pdf_nfce_80mm(
     let qr = QrCode::encode_text(&qr_url, QrCodeEcc::Medium)
         .map_err(|e| format!("Erro ao gerar QR code: {:?}", e))?;
     let qr_n = qr.size() as f32;
-    let qr_size_mm = if qr_side {
-        33.0
-    } else {
-        USABLE_WIDTH.min(55.0)
-    };
+    let qr_size_mm = qr_size_mm(qr_side);
     let qr_module_mm = qr_size_mm / qr_n;
     let qr_actual_size = qr_module_mm * qr_n;
     let qr_x_origin = if qr_side {
@@ -442,7 +438,7 @@ pub fn build_pdf_nfce_80mm(
         }
         // NF-e nro / série / data emissão (abaixo do protocolo na coluna direita)
         {
-            let nf_line = format!("NF-e {:>09} Serie {}", n_nf, serie);
+            let nf_line = linha_numero_lateral(n_nf, serie);
             for line in wrap_text(&nf_line, col_chars) {
                 layer.use_text(&line, fsz, Mm(x_col), Mm(y_col), &font);
                 y_col -= LINE_HEIGHT;
@@ -516,12 +512,7 @@ pub fn build_pdf_nfce_80mm(
             &font,
             FONT_SIZE_SMALL,
             y,
-            &format!(
-                "NF-e No {:>09}  Serie {}  {}",
-                n_nf,
-                serie,
-                format_datetime(dh_emi)
-            ),
+            &linha_numero_centro(n_nf, serie, dh_emi),
         );
         y -= 1.5;
         draw_line(&layer, y, 0.3);
@@ -720,6 +711,26 @@ fn draw_line(layer: &PdfLayerReference, y: f32, thickness: f32) {
     };
     layer.set_outline_thickness(thickness);
     layer.add_line(line);
+}
+
+/// Lado do QR Code em mm. Lateral: 33 mm (divide a largura com o protocolo).
+/// Centralizado: 38,5 mm — era 55 mm e ficava grande demais no cupom (reduzido 30%).
+fn qr_size_mm(qr_side: bool) -> f32 {
+    if qr_side {
+        33.0
+    } else {
+        USABLE_WIDTH.min(38.5)
+    }
+}
+
+/// Número/série/data da nota no layout centralizado. O documento é modelo 65: "NFC-e".
+fn linha_numero_centro(n_nf: &str, serie: &str, dh_emi: &str) -> String {
+    format!("NFC-e No {:>09}  Serie {}  {}", n_nf, serie, format_datetime(dh_emi))
+}
+
+/// Número/série da nota na coluna ao lado do QR (layout lateral).
+fn linha_numero_lateral(n_nf: &str, serie: &str) -> String {
+    format!("NFC-e {:>09} Serie {}", n_nf, serie)
 }
 
 /// Draws a QR code at the given position, returning the y coordinate of the bottom edge.
@@ -958,6 +969,22 @@ mod tests {
         let contingencia = build("9");
         assert!(!normal.is_empty());
         assert!(contingencia.len() > normal.len());
+    }
+
+    #[test]
+    fn qr_centralizado_tem_38_5_mm_e_lateral_33_mm() {
+        assert_eq!(qr_size_mm(false), 38.5);
+        assert_eq!(qr_size_mm(true), 33.0);
+    }
+
+    #[test]
+    fn linha_do_numero_diz_nfc_e_nos_dois_layouts() {
+        let centro = linha_numero_centro("206", "1", "2026-11-06T14:16:52-03:00");
+        assert!(centro.starts_with("NFC-e No "), "{centro}");
+        assert!(centro.contains("206  Serie 1  06/11/2026 14:16:52"), "{centro}");
+        let lateral = linha_numero_lateral("206", "1");
+        assert!(lateral.starts_with("NFC-e ") && lateral.ends_with("206 Serie 1"), "{lateral}");
+        assert!(!centro.contains("NF-e") && !lateral.contains("NF-e"));
     }
 
     #[test]
