@@ -1,0 +1,3 @@
+# Scripts de shell sempre com LF: rodam no Linux/WSL, e o CRLF do checkout no Windows
+# (core.autocrlf=true) quebra o bash com "\r: command not found".
+*.sh text eol=lf
