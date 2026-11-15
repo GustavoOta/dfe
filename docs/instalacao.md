@@ -2,7 +2,7 @@
 
 ```toml
 [dependencies]
-dfe = "0.5.8"
+dfe = "0.8"
 ```
 
 > **Schemas XSD** (`PL_010b_NT2025_002_v1.21`) estão embutidos no binário via `include_bytes!`.
@@ -17,9 +17,24 @@ As operações com certificado digital (abertura do `.pfx`, assinatura RSA-SHA1 
 
 O CAPI suporta nativamente os algoritmos legados dos certificados ICP-Brasil (RC2-40-CBC, 3DES), independentemente da versão do Windows. O certificado **não precisa estar instalado** no repositório de certificados do sistema — ele é carregado em memória a partir do arquivo `.pfx` e descartado ao final de cada operação.
 
-### Linux / macOS 🔜
+### Linux ✅
 
-Ainda não suportado. As funções de certificado retornam erro em plataformas não-Windows. Ver [roadmap](notas-roadmap.md).
+Certificado e assinatura pelo **OpenSSL do sistema**, com o provider `legacy` carregado pela
+crate (necessário para os PFX ICP-Brasil em RC2/3DES), e a cadeia ICP-Brasil embutida para
+confiar nos servidores da SEFAZ. O resultado é idêntico ao do Windows. Dependências de build
+(Debian/Ubuntu):
+
+```bash
+sudo apt install build-essential pkg-config libssl-dev libxml2-dev
+```
+
+### macOS ⚠️
+
+Não testado — o código compila pelo mesmo caminho do Linux, mas o TLS no macOS usa o
+Security.framework, não o OpenSSL.
+
+Detalhes de implementação, o motivo de cada escolha, Fedora/Docker e testes:
+[Certificado digital e plataformas](certificado-e-plataformas.md).
 
 ---
 

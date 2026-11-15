@@ -17,13 +17,31 @@ uma única biblioteca Rust `async`, com roteamento para as 27 UFs.
 - **API `async` em Rust.** Cada operação é um *builder* fluente que retorna a resposta da SEFAZ tipada.
 - **Roteamento multi-UF.** Seleciona o webservice a partir da UF do documento (autorizadores próprios e
   compartilhados), em produção e homologação, para as 27 UFs.
-- **Certificado A1 (.pfx).** Assinatura XML-DSig (RSA-SHA1) e TLS mútuo resolvidos internamente. Não
-  depende de OpenSSL; `libxml2` é linkado estaticamente.
+- **Certificado A1 (.pfx).** Assinatura XML-DSig (RSA-SHA1) e TLS mútuo resolvidos internamente,
+  inclusive para os PFX ICP-Brasil antigos (RC2/3DES).
+- **Windows e Linux.** No Windows usa a CryptoAPI do próprio sistema (sem OpenSSL, `libxml2`
+  estático); no Linux, o OpenSSL do sistema com o provider `legacy` e a cadeia ICP-Brasil embutida
+  para confiar nos servidores da SEFAZ — mesmo resultado, byte a byte. Detalhes em
+  [Certificado digital e plataformas](docs/certificado-e-plataformas.md).
 - **Validação XSD.** Schemas oficiais da SEFAZ embutidos no binário, sem arquivos externos.
 - **Erros tipados.** Todas as operações retornam `Result<T, DfeError>`; o caminho de request não dá
   `panic`.
 - **Build modular.** As camadas de DANFE, ESC/POS e distribuição são *features* opcionais (ligadas por
   padrão) — veja [Features de compilação](#features-de-compilação).
+
+---
+
+## Plataformas
+
+| Sistema | Certificado e assinatura | TLS com a SEFAZ | Situação |
+|---|---|---|---|
+| **Windows** | CryptoAPI do sistema (sem OpenSSL) | SChannel | ✅ em produção |
+| **Linux** | OpenSSL do sistema + provider `legacy` (PFX ICP-Brasil em RC2/3DES) | OpenSSL + cadeia ICP-Brasil embutida | ✅ desde a 0.8 — NF-e e NFC-e autorizadas, corrigidas e canceladas em homologação com A1 real |
+| **macOS** | — | — | ⚠️ não testado |
+
+A API é a mesma nos dois sistemas suportados, e o resultado também: a assinatura sai idêntica byte a
+byte. Como cada parte funciona, por que o provider `legacy` é necessário, a cadeia ICP-Brasil, o
+build no Linux e os testes: **[Certificado digital e plataformas](docs/certificado-e-plataformas.md)**.
 
 ---
 
@@ -58,7 +76,7 @@ uma única biblioteca Rust `async`, com roteamento para as 27 UFs.
 
 ```toml
 [dependencies]
-dfe = "0.6"
+dfe = "0.8"
 ```
 
 ```rust
@@ -91,6 +109,11 @@ async fn emitir() -> Result<(), DfeError> {
 
 > **Windows:** antes de compilar, leia [docs/instalacao.md](docs/instalacao.md) — é necessário
 > configurar o vcpkg para linking estático do `libxml2`. OpenSSL **não** é uma dependência.
+>
+> **Linux:** instale `pkg-config`, `libssl-dev` e `libxml2-dev` (Debian/Ubuntu). Como o certificado
+> funciona em cada sistema — CAPI no Windows, OpenSSL no Linux, provider `legacy` e cadeia
+> ICP-Brasil — está em [Certificado digital e plataformas](docs/certificado-e-plataformas.md).
+> macOS não foi testado.
 
 ---
 
@@ -107,7 +130,7 @@ usar:
 
 ```toml
 # Só emissão/cancelamento + DANFE, sem ESC/POS nem distribuição:
-dfe = { version = "0.6", default-features = false, features = ["danfe"] }
+dfe = { version = "0.8", default-features = false, features = ["danfe"] }
 ```
 
 O núcleo — emissão, cancelamento, substituição, carta de correção, status, extração de XML, assinatura
@@ -120,6 +143,7 @@ e validação — está sempre disponível, independente das features.
 | Seção | Descrição |
 |---|---|
 | [Instalação](docs/instalacao.md) | Plataformas suportadas, libxml2/vcpkg (linking estático no Windows) |
+| [Certificado digital e plataformas](docs/certificado-e-plataformas.md) | CAPI no Windows × OpenSSL no Linux, provider `legacy` (PFX RC2/3DES) e por quê, cadeia ICP-Brasil para o TLS com a SEFAZ, macOS, testes |
 | [Emissão NF-e / NFC-e](docs/emissao-nfe-nfce.md) | `NFeBuilder`, métodos, totais automáticos |
 | [Cancelamento](docs/cancelamento.md) | `CancelarBuilder` |
 | [Manifestação do Destinatário](docs/manifestacao.md) | Ciência, confirmação, desconhecimento, op. não realizada |

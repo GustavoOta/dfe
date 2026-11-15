@@ -13,6 +13,10 @@ Cargo.lock
 *.env
 !env.example
 cert_pass.txt
+# Exceção: PFX SINTÉTICOS dos testes (autoassinados, CNPJ fictício, senha pública — gerar.sh)
+!tests/fixtures/cert/sintetico_*.pfx
+# Exceção: cadeia PÚBLICA de ACs ICP-Brasil (ITI), embutida no build Linux — icp_brasil_gerar.sh
+!src/data/icp_brasil.pem
 
 # Planejamento com LLM — NÃO versionar (docs de trabalho, não de produto)
 /planning/

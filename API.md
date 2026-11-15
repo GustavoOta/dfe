@@ -82,7 +82,7 @@ não corrigir nem retransmitir. Decidir "autorizou?" sempre por `dfe::cstat_auto
 vêm em `inf_prot.alertas` (até 5; ex.: `cMsg 172`, CNPJ do destinatário inabilitado no CCC) e
 também saem no `protNFe` do `nfeProc` montado.
 
-**NFC-e** (modelo 65): mesma API, com `mod_: 65`, `tp_imp: 4`, `.id_csc()` e `.csc()` obrigatórios. `dh_sai_ent` e QR Code tratados automaticamente.
+**NFC-e** (modelo 65): mesma API, com `mod_: 65`, `tp_imp: 4`, `.id_csc()` e `.csc()` obrigatórios. `dh_sai_ent` e QR Code tratados automaticamente. O ID do CSC pode ser passado como o portal da SEFAZ mostra (`000001`): no QR Code ele vai sem os zeros à esquerda (`1`), como exigem o manual e o XSD.
 
 ### `Total` — campos informados pelo usuário
 
@@ -470,6 +470,13 @@ r.response.n_prot;   // Option<String> — protocolo, só quando homologada
 
 `.ano("26")` é opcional (padrão: ano corrente, 2 dígitos). Rejeições comuns: a faixa já foi usada
 por uma nota autorizada, ou já existe pedido de inutilização para ela.
+
+> ⚠️ **UFs sem inutilização.** Os Ajustes SINIEF 38/2026 (NF-e) e 40/2026 (NFC-e) dispensam a
+> inutilização em **São Paulo** a partir de 01/11/2026 (fontes de terceiros citam também AC e BA).
+> Nelas o serviço responde **`998` — Serviço Desativado** (SP confirmado em homologação em
+> 15-11-2026, NF-e e NFC-e): número pulado **não** se inutiliza, a emissão segue do número
+> seguinte e a escrituração registra a quebra de sequência. Trate `998` como "não se aplica nesta
+> UF", não como falha a repetir. Confira a regra vigente no portal da SEFAZ da UF.
 
 ---
 

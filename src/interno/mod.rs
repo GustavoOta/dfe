@@ -1,5 +1,7 @@
 pub mod assinatura;
 pub mod cert;
+#[cfg(not(target_os = "windows"))]
+pub mod cert_openssl;
 pub mod cnpj_cpf;
 pub mod chave_acesso;
 pub mod chave_acesso_props;

@@ -207,12 +207,10 @@ pub(super) async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
             } else {
                 "https://www.nfce.fazenda.sp.gov.br/qrcode"
             };
-            let versao_qr = "2";
-            let ambiente = ide_tp_amb.to_string();
             let id_csc = id_csc.ok_or_else(|| DfeError::Validacao("ID do CSC não foi informado.".to_string()))?;
             let csc = csc.ok_or_else(|| DfeError::Validacao("CSC não foi informado.".to_string()))?;
-            let c_hash = qrcode_hash(&chave_acesso, versao_qr, &ambiente, &id_csc, &csc)?;
-            format!("{url_base}?p={chave_acesso}|{versao_qr}|{ambiente}|{id_csc}|{c_hash}")
+            let payload = qrcode_v2_online_payload(&chave_acesso, ide_tp_amb, &id_csc, &csc)?;
+            format!("{url_base}?p={payload}")
         };
         qrcode = cleaner::Strings::clear_xml_string(&format!(
             r#"<infNFeSupl><qrCode><![CDATA[{qr_p}]]></qrCode><urlChave>{url_consulta}</urlChave></infNFeSupl>"#
@@ -228,6 +226,30 @@ pub(super) async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
     };
 
     Ok(SignedNfe { validated_xml, cert_path, cert_pass, ide_mod, ide_tp_amb, ide_c_uf })
+}
+
+/// Texto de `p=` do QR Code v2 da NFC-e emitida on-line: `chave|2|tpAmb|cIdToken|cHashQRCode`.
+///
+/// O `cIdToken` (identificador do CSC) vai **sem zeros à esquerda** — o portal da SEFAZ mostra
+/// `000001`, mas o manual do QR Code e o XSD (`(0|[1-9][0-9]{0,5})`) exigem `1`. Com o zero, toda
+/// NFC-e falhava na validação local. O hash usa o mesmo valor normalizado que vai na URL.
+pub(super) fn qrcode_v2_online_payload(chave_acesso: &str, tp_amb: u8, id_csc: &str, csc: &str) -> Result<String> {
+    let id = id_csc.trim();
+    if id.is_empty() || !id.chars().all(|c| c.is_ascii_digit()) {
+        return Err(DfeError::Validacao(format!(
+            "ID do CSC inválido: \"{id_csc}\" (só números, como o portal da SEFAZ mostra — ex.: 000001)"
+        )));
+    }
+    let id = match id.trim_start_matches('0') {
+        "" => "0",
+        sem_zeros => sem_zeros,
+    };
+    if id.len() > 6 {
+        return Err(DfeError::Validacao(format!("ID do CSC inválido: \"{id_csc}\" (até 6 dígitos)")));
+    }
+    let ambiente = tp_amb.to_string();
+    let c_hash = qrcode_hash(chave_acesso, "2", &ambiente, id, csc.trim())?;
+    Ok(format!("{chave_acesso}|2|{ambiente}|{id}|{c_hash}"))
 }
 
 pub(super) fn qrcode_hash(chave_acesso: &str, versao_qr: &str, ambiente: &str, id_csc: &str, csc: &str) -> Result<String> {
@@ -259,8 +281,8 @@ pub(super) async fn qrcode_v3_offline(
 }
 
 // Montagem pura (sem I/O) do payload de contingência antes da assinatura — extraída à parte
-// pra ser testável sem precisar de um certificado real (mesma limitação do resto da crate:
-// `Sign::xml_string` só é exercida nos testes `sefaz-live` com `.env`+cert de verdade).
+// pra ser testável sem certificado. A assinatura em si (`Sign::xml_string`) é testada em
+// `interno/cert.rs` com os PFX sintéticos de `tests/fixtures/cert/`, no Windows e no Linux.
 fn qrcode_v3_offline_payload_sem_assinatura(
     chave_acesso: &str,
     tp_amb: u8,
@@ -289,6 +311,46 @@ fn qrcode_v3_offline_payload_sem_assinatura(
     };
 
     Ok(format!("{chave_acesso}|3|{tp_amb}|{dia:02}|{valor}|{tp_id_dest}|{c_dest}"))
+}
+
+#[cfg(test)]
+mod qrcode_v2_online_tests {
+    use super::*;
+
+    const CHAVE: &str = "35261147810175000128650998947703461187964482";
+    /// Alternativa do `qrCode` para v2 on-line, copiada de `schemas/leiauteNFe_v4.00.xsd`.
+    const PADRAO_XSD: &str = r"^((HTTPS?|https?)://.*\?p=([0-9]{34}(1|3|4)[0-9]{9})\|[2]\|[1-2]\|(0|[1-9]{1}([0-9]{1,5})?)\|[A-Fa-f0-9]{40})$";
+
+    fn passa_no_xsd(payload: &str) -> bool {
+        regex::Regex::new(PADRAO_XSD).unwrap().is_match(&format!("https://exemplo.teste/qr?p={payload}"))
+    }
+
+    /// Regressão (15-11-2026): `000001`, como o portal da SEFAZ mostra, saía na URL com os zeros e
+    /// a NFC-e era recusada pela validação local — em homologação a partir do Linux e do Windows.
+    #[test]
+    fn id_do_csc_com_zeros_a_esquerda_sai_sem_eles_e_passa_no_xsd() {
+        let p = qrcode_v2_online_payload(CHAVE, 2, "000001", "CSC-TESTE").unwrap();
+        assert!(p.starts_with(&format!("{CHAVE}|2|2|1|")), "{p}");
+        assert!(passa_no_xsd(&p), "fora do padrão do XSD: {p}");
+    }
+
+    #[test]
+    fn id_com_e_sem_zeros_dao_o_mesmo_qr_inclusive_o_hash() {
+        let com = qrcode_v2_online_payload(CHAVE, 1, " 000001 ", "CSC-TESTE").unwrap();
+        let sem = qrcode_v2_online_payload(CHAVE, 1, "1", "CSC-TESTE").unwrap();
+        assert_eq!(com, sem);
+        // hash = SHA-1(chave|2|tpAmb|cIdToken + CSC), com o cIdToken já sem zeros
+        let esperado = qrcode_hash(CHAVE, "2", "1", "1", "CSC-TESTE").unwrap();
+        assert!(sem.ends_with(&format!("|{esperado}")), "{sem}");
+    }
+
+    #[test]
+    fn id_do_csc_invalido_e_erro_de_validacao() {
+        for ruim in ["", "  ", "A1", "0000001x", "1234567"] {
+            let r = qrcode_v2_online_payload(CHAVE, 2, ruim, "CSC-TESTE");
+            assert!(matches!(r, Err(DfeError::Validacao(_))), "{ruim:?}: {r:?}");
+        }
+    }
 }
 
 #[cfg(test)]

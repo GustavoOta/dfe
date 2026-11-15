@@ -5,6 +5,51 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-11-15
+
+### Linux: certificado, assinatura e mTLS
+
+> **Atualizando de 0.7.x:** nada muda na API nem no Windows. O `Cargo.lock` do seu projeto ganha
+> `openssl` na lista de dependências da `dfe` (dependência só de Linux). No Linux, o build pede
+> `pkg-config`, `libssl-dev` e `libxml2-dev` — ver
+> [docs/certificado-e-plataformas.md](docs/certificado-e-plataformas.md#compilando-no-linux).
+
+#### Added
+- Suporte a Linux: `CertInfo`, extração do certificado e assinatura RSA-SHA1 pelo **OpenSSL do
+  sistema** (`openssl` só em `cfg(not(target_os = "windows"))`), com o provider `legacy` carregado
+  pela crate para os PFX ICP-Brasil em RC2-40/3DES. Resultado idêntico ao CAPI do Windows (titular
+  só com o CN, datas UTC, assinatura byte a byte). No Windows nada muda.
+- Cadeia ICP-Brasil (`src/data/icp_brasil.pem`, ITI) somada à lista de ACs do sistema nos clientes
+  mTLS fora do Windows — sem ela o Linux não confia na maioria dos servidores da SEFAZ.
+  Regeneração: `src/data/icp_brasil_gerar.sh`.
+- Validado em homologação na SEFAZ-SP a partir do Linux, com A1 real: NF-e (100, CC-e 135,
+  cancelamento 135) e NFC-e (100, cancelamento 135). Detalhes:
+  [docs/certificado-e-plataformas.md](docs/certificado-e-plataformas.md).
+
+#### Fixed
+- **QR Code da NFC-e com ID do CSC com zeros à esquerda** (`000001`, como o portal da SEFAZ mostra):
+  saía assim na URL e a NFC-e era recusada pela validação local (o XSD e o manual exigem `1`). O
+  `cIdToken` agora vai sem os zeros, na URL e no hash; ID com letra ou mais de 6 dígitos vira
+  `DfeError::Validacao`. Quem já informava `1` não vê diferença.
+- `EscPosNFCeBuilder`: o exemplo de `print()` na documentação compilava só no Windows.
+
+#### Changed
+- DANFE NFC-e 80 mm: QR Code centralizado de 55 mm para 38,5 mm (o lateral segue em 33 mm) e a linha
+  do número diz "NFC-e" (dizia "NF-e"); no ESC/POS, sem a linha em branco entre a URL de consulta e
+  a chave.
+
+#### Testes
+- PFX sintéticos (AES e RC2/3DES) em `tests/fixtures/cert/`, com comparação Windows × Linux.
+- Testes que falam com a SEFAZ **sempre em homologação**, fixado no código (`tests/common::HOMOLOGACAO`
+  + `tests/homologacao_travada.rs`); o ambiente saiu do `.env`. Seis testes de manifestação usavam
+  produção.
+- Ciclos completos em homologação (`live_ciclo_nfe_55_homologacao`, `live_ciclo_nfce_65_homologacao`,
+  `live_inutilizacao_homologacao`) e prova de TLS com todos os servidores (`live_tls`).
+
+## Até 0.7.3
+
+Entradas anteriores ao corte por versão (todas publicadas até a 0.7.3).
+
 ### IBS/CBS sem o grupo de valores, por CST (opt-in)
 
 #### Added

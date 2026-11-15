@@ -21,4 +21,7 @@
 | ESC/POS `EscPosBuilder` | ✅ |
 | ESC/POS `EscPosNFCeBuilder` | ✅ |
 | Contingência (EPEC / FS-DA) | 🔜 |
-| **Suporte Linux / macOS** — reimplementar assinatura e extração de certificado sem CAPI (OpenSSL com provider legacy do sistema ou biblioteca puro-Rust com suporte a 3DES) | 🔜 |
+| **Suporte Linux** — certificado, assinatura e mTLS pelo OpenSSL do sistema com provider `legacy` + cadeia ICP-Brasil embutida ([detalhes](certificado-e-plataformas.md)) | ✅ |
+| Emissão em homologação com A1 real a partir do Linux (NF-e 55: autorização, CC-e, cancelamento) | ✅ |
+| NFC-e 65 em homologação a partir do Linux (autorização com QR Code, cancelamento) | ✅ |
+| **Suporte macOS** — testar (TLS pelo Security.framework) | 🔜 |

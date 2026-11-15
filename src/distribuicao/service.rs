@@ -37,7 +37,8 @@ impl Consulta {
             self.log_and_return_error(mensagem)
         })?;
 
-        let client = reqwest::Client::builder()
+        // Mesmo ponto de partida da emissão: fora do Windows soma a cadeia ICP-Brasil.
+        let client = crate::interno::connection::WebService::builder()
             .identity(cert.identity)
             .build()
             .map_err(|e| {

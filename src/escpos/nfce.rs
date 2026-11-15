@@ -27,7 +27,8 @@ const SPACING_DIVIDER: u8 = 4;
 ///     .paper_width(80)
 ///     .build()?;
 ///
-/// // Imprimir diretamente (Windows)
+/// // Imprimir diretamente (só existe no Windows)
+/// #[cfg(target_os = "windows")]
 /// EscPosNFCeBuilder::new()
 ///     .xml("./nota_nfce.xml")
 ///     .printer_name("EPSON TM-T20 Receipt")

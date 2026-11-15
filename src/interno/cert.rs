@@ -16,7 +16,10 @@ impl Cert {
         let mut pfx = File::open(path)?;
         pfx.read_to_end(&mut buf)?;
 
-        // reqwest usa native-tls (Windows CAPI) que suporta RC2/3DES dos certificados ICP-Brasil
+        // reqwest usa native-tls: no Windows é o SChannel/CAPI, que lê RC2/3DES dos certificados
+        // ICP-Brasil; no Linux é o OpenSSL, que só lê com o provider `legacy` já carregado.
+        #[cfg(not(target_os = "windows"))]
+        super::cert_openssl::garantir_provider_legacy();
         let pkcs2 = reqwest::Identity::from_pkcs12_der(&buf, password).map_err(|e| {
             DfeError::Certificado(format!(
                 "Erro ao ler certificado: Senha inválida ou PFX corrompido: {}", e
@@ -485,16 +488,172 @@ fn pfx_capi_read_info(pfx_bytes: &[u8], password: &str) -> std::result::Result<C
 }
 
 #[cfg(not(target_os = "windows"))]
-fn pfx_capi_read_info(_pfx_bytes: &[u8], _password: &str) -> std::result::Result<CertInfo, String> {
-    Err("Leitura de certificado via CAPI disponível apenas no Windows".to_string())
+fn pfx_capi_read_info(pfx_bytes: &[u8], password: &str) -> std::result::Result<CertInfo, String> {
+    super::cert_openssl::ler_info(pfx_bytes, password)
+}
+
+// Fora do Windows os três pontos de entrada caem no OpenSSL (`cert_openssl.rs`), com o mesmo
+// resultado do CAPI — conferido pelos testes abaixo com os PFX sintéticos.
+#[cfg(not(target_os = "windows"))]
+fn pfx_capi_extract_cert_der(pfx_bytes: &[u8], password: &str) -> std::result::Result<Vec<u8>, String> {
+    super::cert_openssl::extrair_cert_der(pfx_bytes, password)
 }
 
 #[cfg(not(target_os = "windows"))]
-fn pfx_capi_extract_cert_der(_pfx_bytes: &[u8], _password: &str) -> std::result::Result<Vec<u8>, String> {
-    Err("Extração de certificado via CAPI disponível apenas no Windows".to_string())
+fn pfx_capi_sign_rsa_sha1(data: &[u8], pfx_bytes: &[u8], password: &str) -> std::result::Result<Vec<u8>, String> {
+    super::cert_openssl::assinar_rsa_sha1(data, pfx_bytes, password)
 }
 
-#[cfg(not(target_os = "windows"))]
-fn pfx_capi_sign_rsa_sha1(_data: &[u8], _pfx_bytes: &[u8], _password: &str) -> std::result::Result<Vec<u8>, String> {
-    Err("Assinatura via CAPI disponível apenas no Windows".to_string())
+/// Mesmos PFX sintéticos (`tests/fixtures/cert/gerar.sh`) nos dois sistemas: o Windows (CAPI) é a
+/// referência e o Linux (OpenSSL) tem de devolver exatamente o mesmo. Os valores esperados foram
+/// medidos no Windows em 15-11-2026.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::DfeError;
+
+    const SENHA: &str = "senha-teste-dfe";
+    const PFX: [&str; 2] = ["sintetico_aes.pfx", "sintetico_legado.pfx"];
+
+    fn fixture(nome: &str) -> String {
+        format!("{}/tests/fixtures/cert/{nome}", env!("CARGO_MANIFEST_DIR"))
+    }
+
+    #[test]
+    fn cert_info_igual_ao_capi_no_pfx_moderno_e_no_legado() {
+        for nome in PFX {
+            let i = CertInfo::from_pfx(&fixture(nome), SENHA).unwrap_or_else(|e| panic!("{nome}: {e:?}"));
+            assert_eq!(i.subject, "EMPRESA TESTE DFE LTDA:12345678000195", "{nome}");
+            assert_eq!(i.issuer, "AC SINTETICA DFE", "{nome}");
+            assert_eq!((i.valid_from.as_str(), i.valid_to.as_str()), ("2026/11/15", "2126/10/22"), "{nome}");
+        }
+    }
+
+    #[test]
+    fn cert_info_senha_errada_diz_senha() {
+        for nome in PFX {
+            match CertInfo::from_pfx(&fixture(nome), "senha-errada") {
+                Err(DfeError::Certificado(m)) => assert!(m.starts_with("Senha inválida ou PFX corrompido"), "{nome}: {m}"),
+                outro => panic!("{nome}: esperado erro de senha, veio {outro:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn cert_info_arquivo_inexistente_e_erro_de_arquivo_nao_de_senha() {
+        let r = CertInfo::from_pfx(&fixture("nao_existe.pfx"), SENHA);
+        assert!(matches!(r, Err(DfeError::Io(_))), "{r:?}");
+    }
+
+    #[test]
+    fn cert_info_pfx_corrompido_e_recusado() {
+        let bytes = std::fs::read(fixture("sintetico_aes.pfx")).unwrap();
+        let caminho = std::env::temp_dir().join(format!("dfe_pfx_corrompido_{}.pfx", std::process::id()));
+        std::fs::write(&caminho, &bytes[..bytes.len() / 2]).unwrap();
+        let r = CertInfo::from_pfx(caminho.to_str().unwrap(), SENHA);
+        let _ = std::fs::remove_file(&caminho);
+        assert!(matches!(r, Err(DfeError::Certificado(_))), "{r:?}");
+    }
+
+    /// Começo do DER (base64) do certificado da empresa — o que vai no `<X509Certificate>`.
+    const DER_INICIO: &str = "MIIDuDCCAqCgAwIBAgIUVFhcNsPRZomovpobVpVt";
+    /// SHA-1 desse base64 inteiro, calculado à parte pela linha de comando
+    /// (`openssl pkcs12 -clcerts -nokeys | openssl x509 -outform DER | base64 -w0 | sha1sum`).
+    const DER_SHA1: &str = "344768496703f86f51deac0bc8509e04749c8560";
+    /// RSA-SHA1 PKCS#1 v1.5 é determinístico: mesmo PFX + mesmo texto = mesma assinatura.
+    const ASSINATURA: &str = "N3hu7sky2GXYaeMbbTZpa+VCpwptrF7Xr6t/+Zg5J9FHFkCztVNknjcxIEu35KzAasPCwFmemUYCpZvHTzerPFJUdbSWraB+gyQqA3l6vPRcmophGu91375XPiegiFGYXJi2VRDfDrtJ85rF/OOIjp8IJnPP1Qf8Y0KSAlObxTaZklYX3VaeAJWi1OcPaGv4vFJRivTTA7q0GOT4JWd7M4eJDDYvfeF+M/MdtTOOR4RBiXOJhzZK9YGHgq63aaQ4Kqe4H9KwStwAHiuGIQ+fBWHRZv2jcvvQRocCLH4/dvnNEVphs32DL3V1OLW06Pvlz2yXouBOKJQc6+XMbvWktg==";
+
+    #[tokio::test]
+    async fn certificado_extraido_e_o_da_empresa_inteiro() {
+        for nome in PFX {
+            let der = RawPubKey::get_from_file(&fixture(nome), SENHA).await.unwrap_or_else(|e| panic!("{nome}: {e:?}"));
+            assert_eq!(der.len(), 1276, "{nome}");
+            assert!(der.starts_with(DER_INICIO), "{nome}");
+            assert_eq!(hex::encode(Sha1::digest(der.as_bytes())), DER_SHA1, "{nome}: não é o certificado da empresa");
+        }
+    }
+
+    #[tokio::test]
+    async fn extracao_e_assinatura_com_senha_errada_falham() {
+        let p = fixture("sintetico_aes.pfx");
+        assert!(matches!(RawPubKey::get_from_file(&p, "x").await, Err(DfeError::Certificado(_))));
+        assert!(matches!(Sign::xml_string("a", &p, "x").await, Err(DfeError::Assinatura(_))));
+    }
+
+    #[tokio::test]
+    async fn assinatura_igual_a_do_capi() {
+        for nome in PFX {
+            let sig = Sign::xml_string("<SignedInfo>teste dfe</SignedInfo>", &fixture(nome), SENHA)
+                .await
+                .unwrap_or_else(|e| panic!("{nome}: {e:?}"));
+            assert_eq!(sig, ASSINATURA, "{nome}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests_mtls {
+    use super::*;
+
+    /// A identidade do mTLS (`reqwest::Identity`) abre os dois PFX. No Linux ela passa pelo
+    /// OpenSSL do `native-tls`, que só lê o legado (RC2/3DES) com o provider `legacy` já
+    /// carregado — este teste fica num módulo próprio e roda isolado na verificação.
+    #[test]
+    fn identidade_mtls_abre_pfx_moderno_e_legado() {
+        for nome in ["sintetico_aes.pfx", "sintetico_legado.pfx"] {
+            let p = format!("{}/tests/fixtures/cert/{nome}", env!("CARGO_MANIFEST_DIR"));
+            if let Err(e) = Cert::from_pfx(&p, "senha-teste-dfe") {
+                panic!("{nome}: {e:?}");
+            }
+        }
+    }
+}
+
+/// Camada `sefaz-live` com o **A1 real** do `.env` (sem enviar nada à SEFAZ): imprime o que
+/// precisa sair igual no Windows (CAPI) e no Linux (OpenSSL) — dados do certificado, SHA-1 do
+/// DER e SHA-256 de uma assinatura sobre texto fixo. Rodar nos dois e comparar a linha `REF`.
+/// Não imprime chave nem senha; a assinatura vai só como hash.
+#[cfg(all(test, feature = "sefaz-live"))]
+mod tests_live_cert_real {
+    use super::*;
+    use sha2::Sha256;
+
+    fn env_cert() -> Option<(String, String)> {
+        if let Err(e) = dotenvy::from_path(concat!(env!("CARGO_MANIFEST_DIR"), "/.env")) {
+            assert!(e.not_found(), ".env inválido: {e} — use `/` no caminho ou aspas simples");
+        }
+        let caminho = std::env::var("DFE_TEST_CERT_PATH").ok().filter(|v| !v.is_empty())?;
+        let senha = std::env::var("DFE_TEST_CERT_PASS").unwrap_or_default();
+        let b = caminho.as_bytes();
+        let eh_windows = b.len() > 2 && b[1] == b':' && (b[2] == b'\\' || b[2] == b'/');
+        let caminho = if cfg!(target_os = "windows") || !eh_windows {
+            caminho.clone()
+        } else {
+            format!("/mnt/{}/{}", (b[0] as char).to_ascii_lowercase(), caminho[3..].replace('\\', "/"))
+        };
+        Some((caminho, senha))
+    }
+
+    #[tokio::test]
+    async fn live_certificado_real_igual_nos_dois_sistemas() {
+        let Some((caminho, senha)) = env_cert() else {
+            eprintln!("skip: .env sem DFE_TEST_CERT_PATH");
+            return;
+        };
+        let info = CertInfo::from_pfx(&caminho, &senha).unwrap_or_else(|e| panic!("CertInfo: {e:?}"));
+        let der = RawPubKey::get_from_file(&caminho, &senha).await.unwrap_or_else(|e| panic!("DER: {e:?}"));
+        let sig = Sign::xml_string("<SignedInfo>dfe equivalencia</SignedInfo>", &caminho, &senha)
+            .await
+            .unwrap_or_else(|e| panic!("assinatura: {e:?}"));
+        Cert::from_pfx(&caminho, &senha).unwrap_or_else(|e| panic!("identidade mTLS: {e:?}"));
+        println!(
+            "REF subject={} | issuer={} | {}..{} | der_sha1={} | sig_sha256={}",
+            info.subject,
+            info.issuer,
+            info.valid_from,
+            info.valid_to,
+            hex::encode(Sha1::digest(der.as_bytes())),
+            hex::encode(Sha256::digest(sig.as_bytes())),
+        );
+    }
 }

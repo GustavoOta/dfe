@@ -1,6 +1,5 @@
 ---
 source: tests/xml_extractor.rs
-assertion_line: 17
 expression: proc
 ---
 NFeProc {
@@ -245,6 +244,23 @@ NFeProc {
                                         ),
                                     },
                                 ),
+                                icms02: None,
+                                icms10: None,
+                                icms15: None,
+                                icms20: None,
+                                icms30: None,
+                                icms40: None,
+                                icms51: None,
+                                icms53: None,
+                                icms60: None,
+                                icms61: None,
+                                icms70: None,
+                                icms90: None,
+                                icmspart: None,
+                                icmsst: None,
+                                icmssn101: None,
+                                icmssn201: None,
+                                icmssn202: None,
                                 icms_sn102: None,
                                 icms_sn400: None,
                                 icms_sn500: None,

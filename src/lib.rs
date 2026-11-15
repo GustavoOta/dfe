@@ -7,7 +7,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! dfe = "0.5.7"
+//! dfe = "0.8"
 //! ```
 //!
 //! ## Funcionalidades
@@ -25,6 +25,19 @@
 //! | [`manifestacao`] | Manifestação do destinatário |
 //! | [`xml_extractor`] | Extração de campos de XML autorizado |
 //! | [`tipos`] | Structs e enums de domínio (`Icms`, `Det`, `Ide`, …) |
+//!
+//! ## Plataformas
+//!
+//! | Sistema | Certificado e assinatura | TLS com a SEFAZ |
+//! |---|---|---|
+//! | Windows | CryptoAPI do sistema (sem OpenSSL) | SChannel |
+//! | Linux | OpenSSL do sistema + provider `legacy` (PFX ICP-Brasil em RC2/3DES) | OpenSSL + cadeia ICP-Brasil embutida |
+//! | macOS | não testado | não testado |
+//!
+//! A API é a mesma nos dois sistemas suportados, e o resultado também (a assinatura sai idêntica
+//! byte a byte). No Linux, compile com `pkg-config`, `libssl-dev` e `libxml2-dev`. Como cada parte
+//! funciona e por quê:
+//! [Certificado digital e plataformas](https://github.com/GustavoOta/dfe/blob/main/docs/certificado-e-plataformas.md).
 //!
 //! ## Exemplo — Emissão de NF-e
 //!
