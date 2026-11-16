@@ -308,6 +308,128 @@ async fn live_ciclo_nfce_65_homologacao() {
     assert_eq!(canc.response.c_stat, "135", "cancelamento não registrado: {}", canc.response.x_motivo);
 }
 
+/// NFC-e com destinatário **CNPJ** (NT 2026.007, regra 12E02-10 → rejeição 181). A SEFAZ
+/// procura o CNPJ na LCC-RFB pela chave **UF do destinatário + CNPJ**, e a UF só existe no XML
+/// dentro do `<enderDest>`. A homologação consulta a LCC de produção, então o destinatário
+/// precisa ser um CNPJ real e ativo — e diferente do emitente (senão 220). Padrão: Banco
+/// Bradesco (Osasco/SP, dado público); `DFE_TEST_DEST_CNPJ`/`_UF`/`_CMUN`/`_XMUN` trocam
+/// (o município tem de ser da UF, senão 275). Rua e bairro são os do emitente: não entram na LCC. Autoriza e cancela.
+#[tokio::test]
+async fn live_nfce_65_destinatario_cnpj_homologacao() {
+    let (Some(env), Some(em), Some((id_csc, csc))) =
+        (common::live_env(), common::live_emitente(), common::live_csc())
+    else {
+        eprintln!("skip live_nfce_65_destinatario_cnpj_homologacao: .env sem certificado, emitente ou CSC");
+        return;
+    };
+    let n_nf = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs()
+        % 900_000_000
+        + 1;
+
+    let emitente = Emit {
+        cnpj: Some(env.cnpj.clone()),
+        ie: Some(em.ie.clone()),
+        crt: em.crt,
+        x_nome: em.razao.clone(),
+        x_lgr: em.logradouro.clone(),
+        nro: em.numero.clone(),
+        x_cpl: em.complemento.clone(),
+        x_bairro: em.bairro.clone(),
+        c_mun: em.cod_municipio.clone(),
+        x_mun: em.municipio.clone(),
+        uf: env.uf.clone(),
+        cep: em.cep.clone(),
+        ..Default::default()
+    };
+    let dest_cnpj = std::env::var("DFE_TEST_DEST_CNPJ").unwrap_or_else(|_| "60746948000112".to_string());
+    let dest_uf = std::env::var("DFE_TEST_DEST_UF").unwrap_or_else(|_| "SP".to_string());
+    let dest_c_mun = std::env::var("DFE_TEST_DEST_CMUN").unwrap_or_else(|_| em.cod_municipio.clone());
+    let dest_x_mun = std::env::var("DFE_TEST_DEST_XMUN").unwrap_or_else(|_| em.municipio.clone());
+    let destinatario = Dest {
+        cnpj: Some(dest_cnpj),
+        x_nome: Some("NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL".to_string()),
+        x_lgr: Some(em.logradouro.clone()),
+        nro: Some(em.numero.clone()),
+        x_bairro: Some(em.bairro.clone()),
+        c_mun: Some(dest_c_mun),
+        x_mun: Some(dest_x_mun),
+        uf: Some(dest_uf),
+        cep: Some(em.cep.clone()),
+        ind_ie_dest: Some(9),
+        ..Default::default()
+    };
+    let item = Det {
+        c_prod: "001".to_string(),
+        x_prod: "PRODUTO TESTE DFE".to_string(),
+        ncm: "22030000".to_string(),
+        cfop: 5102,
+        u_com: "UN".to_string(),
+        q_com: 1.0,
+        v_un_com: 10.0,
+        v_prod: 10.0,
+        u_trib: "UN".to_string(),
+        q_trib: 1.0,
+        v_un_trib: 10.0,
+        icms: Icms::sn102(0, "102"),
+        pis: Pis::Nt { cst: "07".to_string() },
+        cofins: Cofins::Nt { cst: "07".to_string() },
+        ..Default::default()
+    };
+
+    let emissao = NFeBuilder::new()
+        .cert(&env.cert_path, &env.cert_pass)
+        .ide(Ide {
+            c_uf: 35,
+            mod_: 65,
+            serie: em.serie,
+            n_nf,
+            c_mun_fg: em.cod_municipio.clone(),
+            tp_amb: common::HOMOLOGACAO,
+            tp_imp: 4,
+            ind_final: 1,
+            ind_pres: 1,
+            ..Default::default()
+        })
+        .emitente(emitente)
+        .destinatario(destinatario)
+        .itens(vec![item])
+        .total(Total::default())
+        .transporte(Transp { mod_frete: 9, ..Default::default() })
+        .pagamento(Pag { ind_pag: 0, t_pag: "01".to_string(), v_pag: 10.0, ..Default::default() })
+        .id_csc(&id_csc)
+        .csc(&csc)
+        .emitir()
+        .await
+        .unwrap_or_else(|e| panic!("emissão NFC-e com destinatário CNPJ: {e:?}"));
+    let prot = &emissao.protocolo.inf_prot;
+    println!(
+        "1. NFC-e série {} nº {n_nf} (dest CNPJ, enderDest no XML: {}): cStat {} — {}",
+        em.serie,
+        emissao.xml.contains("<enderDest>"),
+        prot.c_stat,
+        prot.x_motivo
+    );
+    assert!(dfe::cstat_autorizado(prot.c_stat), "NFC-e não autorizada: {} {}", prot.c_stat, prot.x_motivo);
+    let chave = prot.ch_nfe.clone();
+    let protocolo = prot.n_prot.clone().expect("autorizada sem nProt");
+
+    let canc = CancelarBuilder::new()
+        .cert(&env.cert_path, &env.cert_pass)
+        .tp_amb(common::HOMOLOGACAO)
+        .chave(&chave)
+        .protocolo(&protocolo)
+        .justificativa("Teste automatizado da crate dfe em homologacao")
+        .mod_(65)
+        .send()
+        .await
+        .unwrap_or_else(|e| panic!("cancelamento NFC-e: {e:?}"));
+    println!("2. cancelamento: cStat {} — {}", canc.response.c_stat, canc.response.x_motivo);
+    assert_eq!(canc.response.c_stat, "135", "cancelamento não registrado: {}", canc.response.x_motivo);
+}
+
 // ── Distribuição de DF-e / manifestação do destinatário ──────────────────────
 
 #[cfg(feature = "distribuicao")]

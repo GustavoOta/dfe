@@ -5,6 +5,15 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 
 ## [Unreleased]
 
+### Fixed
+- **NFC-e com destinatário CNPJ rejeitada com 181** (NT 2026.007, regra 12E02-10, em produção
+  desde 16/11/2026). A SEFAZ procura o CNPJ na LCC-RFB pela chave UF + CNPJ do destinatário, e
+  o `<dest>` da NFC-e saía sem `<enderDest>` — sem UF, até CNPJ ativo voltava 181. Agora o
+  `<enderDest>` sai na NFC-e quando o `Dest` traz o endereço completo (`x_lgr`, `nro`,
+  `x_bairro`, `c_mun`, `x_mun`, `uf`; `cep`/`fone` opcionais). Endereço incompleto continua
+  fora, como antes. Validado em homologação na SEFAZ-SP: CNPJ ativo de SP passou de 181 para
+  100, e destinatário do PR (emitente de SP, `idDest = 1`) também autoriza.
+
 ## [0.8.0] — 2026-11-15
 
 ### Linux: certificado, assinatura e mTLS

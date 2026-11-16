@@ -124,6 +124,22 @@ pub(crate) fn validar_fragmento(elemento: &str, fragmento: &str) -> Result<()> {
             pos = nome_fim;
         }
     }
+    // Tipos complexos globais do leiaute que o elemento usa (o <dest> usa TEndereco no
+    // enderDest). Um nível basta para os fragmentos testados.
+    let mut complexos = String::new();
+    let mut pos = 0;
+    while let Some(i) = leiaute[pos..].find(r#"<xs:complexType name=""#) {
+        let nome_ini = pos + i + r#"<xs:complexType name=""#.len();
+        let nome_fim = leiaute[nome_ini..].find('"').map(|j| nome_ini + j).unwrap_or(nome_ini);
+        let nome = &leiaute[nome_ini..nome_fim];
+        if el.contains(&format!(r#"type="{nome}""#)) {
+            if let Some(t) = recorte(&format!(r#"<xs:complexType name="{nome}">"#), "complexType") {
+                complexos.push_str(&t);
+                complexos.push('\n');
+            }
+        }
+        pos = nome_fim;
+    }
 
     let xsd = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -131,6 +147,7 @@ pub(crate) fn validar_fragmento(elemento: &str, fragmento: &str) -> Result<()> {
 <xs:include schemaLocation="tiposBasico_v4.00.xsd"/>
 <xs:include schemaLocation="DFeTiposBasicos_v1.00.xsd"/>
 {torig}
+{complexos}
 {el}
 </xs:schema>"#
     );
