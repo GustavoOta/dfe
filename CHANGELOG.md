@@ -5,6 +5,14 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 
 ## [Unreleased]
 
+### Added
+- **NF-e de saída não referencia mais NFC-e/CF-e** (Ajuste SINIEF 32/2025, adiado para
+  14/12/2026 pelo Ajuste SINIEF 29/2026; NT 2026.002 v1.11, rejeições 679 e 375). A montagem
+  recusa com `DfeError::Validacao` a NF-e 55 de saída (exceto complementar e devolução) com
+  referência de modelo 65 ou 59 — em homologação já, em produção a partir de 14/12/2026. Funções
+  públicas para recusar antes: `chave_e_de_cupom`, `finalidade_sujeita_a_vedacao`,
+  `vedacao_referencia_cupom_ativa`, `MSG_REFERENCIA_CUPOM_VEDADA`.
+
 ### Fixed
 - **NFC-e com destinatário CNPJ rejeitada com 181** (NT 2026.007, regra 12E02-10, em produção
   desde 16/11/2026). A SEFAZ procura o CNPJ na LCC-RFB pela chave UF + CNPJ do destinatário, e

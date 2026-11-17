@@ -130,6 +130,10 @@ pub use manifestacao::ManifestacaoBuilder;
 pub use substituicao::SubstituicaoBuilder;
 pub use carta_correcao::CartaCorrecaoBuilder;
 pub use emissao::NFeBuilder;
+pub use emissao::referencia_cupom::{
+    chave_e_de_cupom, finalidade_sujeita_a_vedacao, vedacao_referencia_cupom_ativa,
+    MSG_REFERENCIA_CUPOM_VEDADA, VEDACAO_REFERENCIA_CUPOM_PRODUCAO,
+};
 pub use inutilizacao::InutilizacaoBuilder;
 pub use emissao::NFeAssinada;
 pub use emissao::Response as EmissaoResponse;

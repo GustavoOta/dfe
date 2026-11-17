@@ -118,6 +118,25 @@ Para uma venda simples sem frete/seguro: `Total::default()`.
 - Todo número do XML passa por `dfe::fmt_dec` (arredondamento meio para cima — ver
   [Arredondamento](#arredondamento--dfearred2)).
 
+### NF-e de saída não referencia cupom (NFC-e / CF-e SAT)
+
+Ajuste SINIEF 32/2025 (início adiado para **14/12/2026** pelo Ajuste SINIEF 29/2026; NT 2026.002
+v1.11, rejeições 679/375). A montagem (`gerar_xml`/`assinar`/`emitir`) devolve
+`DfeError::Validacao` quando uma NF-e 55 de **saída** que não é complementar (`fin_nfe = 2`) nem
+devolução (`fin_nfe = 4`) tem `.referencia(...)` de modelo **65** ou **59**. Em homologação a recusa
+vale já; em produção, a partir de 14/12/2026 (data do relógio local). A mensagem
+(`dfe::MSG_REFERENCIA_CUPOM_VEDADA`) explica ao operador e lista as chaves de cupom.
+
+Para quem precisa recusar antes de montar a nota (faturamento, telas):
+
+```rust
+use chrono::Local;
+let hoje = Local::now().date_naive();
+let sujeita = dfe::finalidade_sujeita_a_vedacao(55, 1, 1);          // mod, tpNF, finNFe
+let ativa   = dfe::vedacao_referencia_cupom_ativa(tp_amb, hoje);   // homologação: sempre
+let cupom   = dfe::chave_e_de_cupom(&chave);                       // modelo 65 ou 59 na chave
+```
+
 ---
 
 ## Enum `Icms` — variantes e construtores

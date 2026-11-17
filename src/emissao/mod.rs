@@ -13,6 +13,7 @@ mod transp;
 // assinatura), `service` (orquestração/envio) e `parser` (resposta). O `mod.rs` fica só com o
 // Builder público e as re-exports.
 mod parser;
+pub mod referencia_cupom;
 mod service;
 mod types;
 mod xml;
@@ -167,6 +168,8 @@ impl NFeBuilder {
     /// Ausente → grupo não emitido (XML inalterado).
     pub fn entrega(mut self, e: Entrega) -> Self { self.entrega = Some(e); self }
     /// Adiciona uma chave de acesso referenciada (`<NFref><refNFe>`). Use para devolução (finNFe=4).
+    /// NF-e de saída que não é devolução nem complementar **não** pode referenciar NFC-e/CF-e
+    /// (Ajuste SINIEF 32/2025, desde 14/12/2026): a montagem recusa, ver [`referencia_cupom`].
     pub fn referencia(mut self, chave: &str) -> Self { self.referencias.push(chave.to_string()); self }
     /// CSTs de IBS/CBS cujos itens saem só com `CST` + `cClassTrib`, **sem** o grupo `gIBSCBS`
     /// (opcional no XSD; ex.: `"410"`, imunidade e não incidência — fornecimento de produtor rural
@@ -213,6 +216,8 @@ impl NFeBuilder {
         let pagamento  = self.pagamento.ok_or_else(|| DfeError::Validacao("pagamento não informado".to_string()))?;
 
         validar_contingencia(&ide)?;
+        // Ajuste SINIEF 32/2025: NF-e de saída não referencia NFC-e/CF-e (produção 14/12/2026).
+        referencia_cupom::validar_referencias(&ide, &self.referencias, chrono::Local::now().date_naive())?;
 
         if self.itens.is_empty() {
             return Err(DfeError::Validacao("pelo menos um item (det) deve ser informado".to_string()));
@@ -272,6 +277,30 @@ mod tests {
             x_just: x_just.map(str::to_string),
             ..Default::default()
         }
+    }
+
+    /// A guarda da referência a cupom roda na montagem, antes de qualquer certificado ou rede.
+    #[test]
+    fn nfe_de_saida_referenciando_nfce_e_recusada_antes_de_assinar() {
+        let nfce = "35261148510510000135650010000002781297742703";
+        let montar = |fin_nfe: u8| {
+            NFeBuilder::new()
+                .cert("inexistente.pfx", "x")
+                .ide(Ide { mod_: 55, tp_nf: 1, tp_amb: 2, tp_emis: 1, fin_nfe, ..Default::default() })
+                .emitente(Emit::default())
+                .itens(vec![Det::default()])
+                .total(Total::default())
+                .transporte(Transp::default())
+                .pagamento(Pag::default())
+                .referencia(nfce)
+                .montar_interno()
+        };
+        match montar(1) {
+            Err(DfeError::Validacao(m)) => assert!(m.contains("Ajuste SINIEF 32/2025"), "{m}"),
+            Err(e) => panic!("erro inesperado: {e:?}"),
+            Ok(_) => panic!("NF-e normal referenciando NFC-e deveria ser recusada"),
+        }
+        assert!(montar(4).is_ok(), "devolução continua podendo referenciar NFC-e");
     }
 
     #[test]
