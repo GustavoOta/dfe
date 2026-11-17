@@ -471,10 +471,11 @@ r.response.n_prot;   // Option<String> — protocolo, só quando homologada
 `.ano("26")` é opcional (padrão: ano corrente, 2 dígitos). Rejeições comuns: a faixa já foi usada
 por uma nota autorizada, ou já existe pedido de inutilização para ela.
 
-> ⚠️ **UFs sem inutilização.** Os Ajustes SINIEF 38/2026 (NF-e) e 40/2026 (NFC-e) dispensam a
-> inutilização em **São Paulo** a partir de 01/11/2026 (fontes de terceiros citam também AC e BA).
-> Nelas o serviço responde **`998` — Serviço Desativado** (SP confirmado em homologação em
-> 15-11-2026, NF-e e NFC-e): número pulado **não** se inutiliza, a emissão segue do número
+> ⚠️ **UFs sem inutilização.** Os Ajustes SINIEF 38/2026 (NFC-e, § 6º da cl. 16ª do Ajuste
+> 19/2016) e 40/2026 (NF-e, § 6º da cl. 14ª do Ajuste 7/2005) dispensam a inutilização em **AC,
+> BA e SP** a partir de 01/11/2026; a NT 2023.002 v1.02 tira o webservice dessas UFs do ar.
+> Nelas o serviço responde **`998` — Serviço Desativado** ou HTTP 404 (SP confirmado em
+> homologação em 15-11-2026, NF-e e NFC-e): número pulado **não** se inutiliza, a emissão segue do número
 > seguinte e a escrituração registra a quebra de sequência. Trate `998` como "não se aplica nesta
 > UF", não como falha a repetir. Confira a regra vigente no portal da SEFAZ da UF.
 
