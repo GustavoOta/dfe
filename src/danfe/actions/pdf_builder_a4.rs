@@ -31,6 +31,11 @@ const H_IMP: f32 = 13.0;
 const H_TRANSP: f32 = 22.0;
 const H_ITEMS_HDR: f32 = 8.5; // faixa título (3.5 mm) + faixa cabeçalhos colunas (5.0 mm)
 const H_ITEM: f32 = 4.0;
+/// Sublinha do item com IBS/CBS/IS (NT 2026.010 §4.3) — só existe quando o XML traz o grupo.
+const H_ITEM_RTC: f32 = 3.0;
+/// Bloco "TOTAL DO IBS / CBS / IS" (NT 2026.010 §4.1) e a linha extra da monofasia.
+const H_RTC_TOT: f32 = 13.0;
+const H_RTC_MONO: f32 = 9.5;
 const H_ADIC_MIN: f32 = 18.0;
 const H_PROT: f32 = 5.0;
 
@@ -63,6 +68,47 @@ pub struct PdfItemA4 {
     pub p_icms: String,
     pub v_icms: String,
     pub p_ipi: String,
+    /// IBS/CBS/IS do item, quando o XML traz (NT 2026.010 §4.3). `None` = sem sublinha.
+    pub rtc: Option<PdfItemRtcA4>,
+}
+
+/// Campos da Reforma Tributária de um item, já com a alíquota a imprimir resolvida (efetiva
+/// quando há `gRed`, vigente sem ele — regra da NT 2026.010 §4.3). Valores crus do XML.
+#[derive(Debug, Clone, Default)]
+pub struct PdfItemRtcA4 {
+    pub tem_ibs_cbs: bool,
+    pub c_class_trib: String,
+    pub v_bc: String,
+    pub p_ibs_uf: String,
+    pub v_ibs_uf: String,
+    pub p_ibs_mun: String,
+    pub v_ibs_mun: String,
+    pub p_cbs: String,
+    pub v_cbs: String,
+    pub tem_is: bool,
+    pub v_bc_is: String,
+    pub p_is: String,
+    pub v_is: String,
+}
+
+/// Totais do bloco "TOTAL DO IBS / CBS / IS" (NT 2026.010 §4.1). Campo vazio = ausente no XML
+/// (a NT proíbe inventar valor: sai em branco, não "0,00").
+#[derive(Debug, Clone, Default)]
+pub struct PdfTotRtcA4 {
+    pub v_cbs: String,
+    pub v_ibs_uf: String,
+    pub v_ibs_mun: String,
+    pub v_is: String,
+    /// Monofasia: a linha só existe quando o XML traz `gMono`.
+    pub mono: Option<PdfMonoA4>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct PdfMonoA4 {
+    pub v_ibs_mono: String,
+    pub v_cbs_mono: String,
+    pub v_ibs_mono_reten: String,
+    pub v_cbs_mono_reten: String,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -127,6 +173,9 @@ pub fn build_pdf_a4(
     // info adicional
     inf_cpl: &str,
     inf_fisco: &str,
+    // Reforma Tributária (NT 2026.010): CRT do emitente e totais de IBS/CBS/IS
+    crt: &str,
+    rtc_tot: &PdfTotRtcA4,
     // itens
     items: &[PdfItemA4],
 ) -> Result<Vec<u8>, String> {
@@ -134,9 +183,10 @@ pub fn build_pdf_a4(
     let fixed_h = H_CAB
         + H_DEST
         + H_IMP
+        + altura_bloco_rtc(rtc_tot)
         + H_TRANSP
         + H_ITEMS_HDR
-        + (items.len().max(1) as f32 * H_ITEM)
+        + altura_itens(items)
         + H_ADIC_MIN
         + H_PROT;
     let page_h = (2.0 * M + fixed_h).max(PAGE_H);
@@ -166,8 +216,10 @@ pub fn build_pdf_a4(
     let x_danfe = M + COL_EMIT;
     let x_chave = x_danfe + COL_DANFE;
 
-    vline(&layer, x_danfe, cab_bot, H_CAB, 0.3);
-    vline(&layer, x_chave, cab_bot, H_CAB, 0.3);
+    // As divisórias das três colunas param no topo da faixa de baixo (CNPJ/IE/CRT/datas), que
+    // tem colunas próprias — atravessá-la cortava os rótulos ao meio.
+    vline(&layer, x_danfe, subrow_top, H_CAB - H_SUBROW, 0.3);
+    vline(&layer, x_chave, subrow_top, H_CAB - H_SUBROW, 0.3);
     hline(&layer, M, subrow_top, BODY_W, 0.3);
 
     // ── Coluna emitente (0..84 mm) ──
@@ -400,13 +452,17 @@ pub fn build_pdf_a4(
     // ── Sub-row: CNPJ | IE | IEST | Data Emissão | Data Saída/Entrada ──
     {
         // Larguras de referência (somam REF_BODY_W = 206) reprojetadas por SCALE:
-        // CNPJ:50 | IE:40 | IEST:40 | DtEmi:38 | DtEnt:38 = 206
+        // CNPJ:42 | IE:33 | IEST:31 | CRT:44 | DtEmi:28 | DtEnt:28 = 206
+        // CRT entrou com a NT 2026.010 (§4.2). O "Tipo de Regime de Apuração do IBS e da CBS"
+        // é campo reservado sem tag publicada: a NT manda não imprimir conteúdo — fica de fora.
+        let crt_txt = crt_label(crt);
         let subrow_cols: &[(&str, &str, f32)] = &[
-            ("CNPJ", &format_cnpj_cpf(emit_cnpj), 50.0 * SCALE),
-            ("I.E.", emit_ie, 40.0 * SCALE),
-            ("I.E. SUBS. TRIB.", emit_iest, 40.0 * SCALE),
-            ("DATA DE EMISSÃO", &format_date(dh_emi), 38.0 * SCALE),
-            ("DATA SAÍ./ENT.", &format_date(dh_sai_ent), 38.0 * SCALE),
+            ("CNPJ", &format_cnpj_cpf(emit_cnpj), 42.0 * SCALE),
+            ("I.E.", emit_ie, 33.0 * SCALE),
+            ("I.E. SUBS. TRIB.", emit_iest, 31.0 * SCALE),
+            ("CÓDIGO DO REGIME TRIBUTÁRIO", &crt_txt, 44.0 * SCALE),
+            ("DATA DE EMISSÃO", &format_date(dh_emi), 28.0 * SCALE),
+            ("DATA SAÍ./ENT.", &format_date(dh_sai_ent), 28.0 * SCALE),
         ];
 
         let lbl_y = subrow_top - FLBL;
@@ -681,6 +737,44 @@ pub fn build_pdf_a4(
     y = imp_bot;
 
     // ══════════════════════════════════════════════════════════════════════
+    // BLOCO 3-A — TOTAL DO IBS / CBS / IS (NT 2026.010 §4.1)
+    // ══════════════════════════════════════════════════════════════════════
+    {
+        let rtc_top = y;
+        let rtc_h = altura_bloco_rtc(rtc_tot);
+        let rtc_bot = rtc_top - rtc_h;
+        draw_rect(&layer, M, rtc_bot, BODY_W, rtc_h, 0.4);
+        t(&layer, &font, M + 0.8, rtc_top - FLBL, FS_LBL, "TOTAL DO IBS / CBS / IS");
+        hline(&layer, M, rtc_top - 3.5, BODY_W, 0.2);
+
+        let (linha1, linha_mono) = campos_totais_rtc(rtc_tot);
+        let mut linhas: Vec<Vec<(&str, String)>> = vec![linha1];
+        if let Some(mono) = linha_mono {
+            linhas.push(mono);
+        }
+        let mut lin_top = rtc_top - 3.5;
+        for (n, linha) in linhas.iter().enumerate() {
+            let lin_h = if n == 0 { H_RTC_TOT - 3.5 } else { H_RTC_MONO };
+            let lin_bot = lin_top - lin_h;
+            if n > 0 {
+                hline(&layer, M, lin_top, BODY_W, 0.2);
+            }
+            let col_w = BODY_W / linha.len() as f32;
+            let mut xi = M;
+            for (i, (lbl, val)) in linha.iter().enumerate() {
+                text_truncated(&layer, &font, xi + 0.5, lin_top - FLBL, FS_LBL, lbl, col_w - 1.0);
+                t(&layer, &font, xi + 0.5, lin_top - FVAL, FS_SM, val);
+                xi += col_w;
+                if i < linha.len() - 1 {
+                    vline(&layer, xi, lin_bot, lin_h, 0.2);
+                }
+            }
+            lin_top = lin_bot;
+        }
+        y = rtc_bot;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
     // BLOCO 4 — TRANSPORTADOR / VOLUMES (25 mm)
     // ══════════════════════════════════════════════════════════════════════
     let transp_top = y;
@@ -858,7 +952,7 @@ pub fn build_pdf_a4(
     // BLOCO 5 — DADOS DOS PRODUTOS / SERVIÇOS
     // ══════════════════════════════════════════════════════════════════════
     let items_top = y;
-    let items_rows_h = items.len().max(1) as f32 * H_ITEM;
+    let items_rows_h = altura_itens(items);
     let items_total_h = H_ITEMS_HDR + items_rows_h;
     let items_bot = items_top - items_total_h;
     draw_rect(&layer, M, items_bot, BODY_W, items_total_h, 0.4);
@@ -920,11 +1014,13 @@ pub fn build_pdf_a4(
     // Data rows
     let mut row_y = col_hdr_sep_y; // top of first data row (abaixo do separador de col-headers)
     for item in items {
-        if row_y - H_ITEM < items_bot - 0.1 {
+        let linha_rtc = item.rtc.as_ref().map(linha_rtc_item).filter(|l| !l.is_empty());
+        let h_total = H_ITEM + if linha_rtc.is_some() { H_ITEM_RTC } else { 0.0 };
+        if row_y - h_total < items_bot - 0.1 {
             break;
         }
         let row_bot = row_y - H_ITEM;
-        hline(&layer, M, row_bot, BODY_W, 0.1);
+        hline(&layer, M, row_y - h_total, BODY_W, 0.1);
         let text_y = row_bot + H_ITEM * 0.28; // baseline ~28% from bottom of row
 
         let row_vals: &[(&str, bool)] = &[
@@ -956,7 +1052,19 @@ pub fn build_pdf_a4(
             xi += w;
         }
 
-        row_y = row_bot;
+        // Sublinha IBS/CBS/IS (NT 2026.010 §4.3): cobre a largura toda, abaixo da linha do item.
+        if let Some(linha) = linha_rtc {
+            let sub_bot = row_bot - H_ITEM_RTC;
+            // apaga as divisórias de coluna atrás da sublinha
+            let branco = Color::Rgb(Rgb::new(1.0, 1.0, 1.0, None));
+            layer.set_fill_color(branco);
+            layer.add_rect(Rect::new(Mm(M + 0.15), Mm(sub_bot + 0.1), Mm(M + BODY_W - 0.15), Mm(row_bot - 0.05)));
+            layer.set_fill_color(Color::Rgb(Rgb::new(0.0, 0.0, 0.0, None)));
+            text_truncated(&layer, &font, M + 1.5, sub_bot + H_ITEM_RTC * 0.3, FS_LBL, &linha, BODY_W - 3.0);
+            row_y = sub_bot;
+        } else {
+            row_y = row_bot;
+        }
     }
 
     y = items_bot;
@@ -1041,6 +1149,118 @@ pub fn build_pdf_a4(
     // ── Salvar ────────────────────────────────────────────────────────────
     doc.save_to_bytes()
         .map_err(|e| format!("Erro ao gerar PDF: {}", e))
+}
+
+// ── Reforma Tributária (NT 2026.010) — funções puras ──────────────────────
+
+/// Texto do CRT no quadro do emitente.
+pub(crate) fn crt_label(crt: &str) -> String {
+    match crt.trim() {
+        "1" => "1 - SIMPLES NACIONAL".to_string(),
+        "2" => "2 - SIMPLES NACIONAL - EXCESSO DE SUBLIMITE".to_string(),
+        "3" => "3 - REGIME NORMAL".to_string(),
+        "4" => "4 - SIMPLES NACIONAL - MEI".to_string(),
+        outro => outro.to_string(),
+    }
+}
+
+/// Valor monetário pt-BR, ou vazio quando o XML não traz o campo (nunca "0,00" inventado).
+fn brl_ou_vazio(v: &str) -> String {
+    if v.trim().is_empty() { String::new() } else { format_brl(v.trim()) }
+}
+
+/// Alíquota pt-BR com 2 a 4 casas ("0.1000" → "0,10"; "0.0425" → "0,0425").
+pub(crate) fn pct_br(v: &str) -> String {
+    let v = v.trim();
+    if v.is_empty() {
+        return String::new();
+    }
+    let (int, frac) = v.split_once('.').unwrap_or((v, ""));
+    let mut frac = frac.trim_end_matches('0').to_string();
+    while frac.len() < 2 {
+        frac.push('0');
+    }
+    format!("{},{}", if int.is_empty() { "0" } else { int }, frac)
+}
+
+/// Sublinha do item: classificação, base, alíquota e valor de cada tributo da Reforma.
+/// Só o que o XML trouxe; vazio = item sem nada a imprimir.
+pub(crate) fn linha_rtc_item(r: &PdfItemRtcA4) -> String {
+    let mut partes: Vec<String> = Vec::new();
+    if r.tem_ibs_cbs {
+        if !r.c_class_trib.trim().is_empty() {
+            partes.push(format!("cClassTrib {}", r.c_class_trib.trim()));
+        }
+        if !r.v_bc.trim().is_empty() {
+            partes.push(format!("BC IBS/CBS {}", brl_ou_vazio(&r.v_bc)));
+            let trib = |nome: &str, p: &str, v: &str| {
+                let pct = pct_br(p);
+                let val = brl_ou_vazio(v);
+                match (pct.is_empty(), val.is_empty()) {
+                    (true, true) => None,
+                    (false, false) => Some(format!("{} {}% {}", nome, pct, val)),
+                    (false, true) => Some(format!("{} {}%", nome, pct)),
+                    (true, false) => Some(format!("{} {}", nome, val)),
+                }
+            };
+            partes.extend(trib("IBS UF", &r.p_ibs_uf, &r.v_ibs_uf));
+            partes.extend(trib("IBS Mun.", &r.p_ibs_mun, &r.v_ibs_mun));
+            partes.extend(trib("CBS", &r.p_cbs, &r.v_cbs));
+        }
+    }
+    if r.tem_is {
+        let mut is = String::from("IS");
+        if !r.v_bc_is.trim().is_empty() {
+            is.push_str(&format!(" BC {}", brl_ou_vazio(&r.v_bc_is)));
+        }
+        if !r.p_is.trim().is_empty() {
+            is.push_str(&format!(" {}%", pct_br(&r.p_is)));
+        }
+        if !r.v_is.trim().is_empty() {
+            is.push_str(&format!(" {}", brl_ou_vazio(&r.v_is)));
+        }
+        if is != "IS" {
+            partes.push(is);
+        }
+    }
+    partes.join("  |  ")
+}
+
+/// Campos do bloco de totais: a linha principal sempre; a da monofasia só com `gMono`.
+pub(crate) fn campos_totais_rtc(t: &PdfTotRtcA4) -> (Vec<(&'static str, String)>, Option<Vec<(&'static str, String)>>) {
+    let principal = vec![
+        ("VALOR DA CBS", brl_ou_vazio(&t.v_cbs)),
+        ("VALOR DO IBS UF", brl_ou_vazio(&t.v_ibs_uf)),
+        ("VALOR DO IBS MUNICÍPIO", brl_ou_vazio(&t.v_ibs_mun)),
+        ("VALOR DO IMPOSTO SELETIVO", brl_ou_vazio(&t.v_is)),
+    ];
+    let mono = t.mono.as_ref().map(|m| {
+        vec![
+            ("VALOR DO IBS MONOFÁSICO", brl_ou_vazio(&m.v_ibs_mono)),
+            ("VALOR DA CBS MONOFÁSICA", brl_ou_vazio(&m.v_cbs_mono)),
+            ("VALOR DO IBS MONOFÁSICO POR RETENÇÃO", brl_ou_vazio(&m.v_ibs_mono_reten)),
+            ("VALOR DA CBS MONOFÁSICA POR RETENÇÃO", brl_ou_vazio(&m.v_cbs_mono_reten)),
+        ]
+    });
+    (principal, mono)
+}
+
+fn altura_bloco_rtc(t: &PdfTotRtcA4) -> f32 {
+    H_RTC_TOT + if t.mono.is_some() { H_RTC_MONO } else { 0.0 }
+}
+
+/// Altura das linhas de itens: cada item ganha a sublinha só quando tem o que imprimir.
+fn altura_itens(items: &[PdfItemA4]) -> f32 {
+    if items.is_empty() {
+        return H_ITEM;
+    }
+    items
+        .iter()
+        .map(|i| {
+            let tem = i.rtc.as_ref().map(|r| !linha_rtc_item(r).is_empty()).unwrap_or(false);
+            H_ITEM + if tem { H_ITEM_RTC } else { 0.0 }
+        })
+        .sum()
 }
 
 // ── Logo ───────────────────────────────────────────────────────────────────
@@ -1421,6 +1641,97 @@ fn format_date(dt: &str) -> String {
         }
     }
     dt.to_string()
+}
+
+#[cfg(test)]
+mod tests_rtc {
+    use super::*;
+
+    fn rtc_cheio() -> PdfItemRtcA4 {
+        PdfItemRtcA4 {
+            tem_ibs_cbs: true,
+            c_class_trib: "000001".into(),
+            v_bc: "100.00".into(),
+            p_ibs_uf: "0.1000".into(),
+            v_ibs_uf: "0.10".into(),
+            p_ibs_mun: "0.0000".into(),
+            v_ibs_mun: "0.00".into(),
+            p_cbs: "0.9000".into(),
+            v_cbs: "0.90".into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn crt_no_quadro_do_emitente() {
+        assert_eq!(crt_label("1"), "1 - SIMPLES NACIONAL");
+        assert_eq!(crt_label("3"), "3 - REGIME NORMAL");
+        assert_eq!(crt_label("4"), "4 - SIMPLES NACIONAL - MEI");
+        assert_eq!(crt_label(""), "");
+    }
+
+    #[test]
+    fn aliquota_em_pt_br_com_duas_a_quatro_casas() {
+        assert_eq!(pct_br("0.1000"), "0,10");
+        assert_eq!(pct_br("0.0425"), "0,0425");
+        assert_eq!(pct_br("18"), "18,00");
+        assert_eq!(pct_br(""), "");
+    }
+
+    #[test]
+    fn sublinha_do_item_com_ibs_cbs() {
+        let l = linha_rtc_item(&rtc_cheio());
+        assert!(l.contains("cClassTrib 000001"), "{l}");
+        assert!(l.contains("BC IBS/CBS 100,00"), "{l}");
+        assert!(l.contains("IBS UF 0,10% 0,10"), "{l}");
+        assert!(l.contains("IBS Mun. 0,00% 0,00"), "{l}");
+        assert!(l.contains("CBS 0,90% 0,90"), "{l}");
+        assert!(!l.contains("IS BC"), "{l}");
+    }
+
+    #[test]
+    fn sublinha_com_imposto_seletivo() {
+        let r = PdfItemRtcA4 { tem_is: true, v_bc_is: "100.00".into(), p_is: "2.0000".into(), v_is: "2.00".into(), ..rtc_cheio() };
+        assert!(linha_rtc_item(&r).contains("IS BC 100,00 2,00% 2,00"));
+    }
+
+    #[test]
+    fn item_so_com_cst_e_classificacao_mostra_so_a_classificacao() {
+        let r = PdfItemRtcA4 { tem_ibs_cbs: true, c_class_trib: "410001".into(), ..Default::default() };
+        assert_eq!(linha_rtc_item(&r), "cClassTrib 410001");
+    }
+
+    #[test]
+    fn sem_reforma_nao_ha_sublinha_nem_altura_extra() {
+        assert_eq!(linha_rtc_item(&PdfItemRtcA4::default()), "");
+        let item = |rtc| PdfItemA4 {
+            n_item: "1".into(), c_prod: String::new(), x_prod: String::new(), ncm: String::new(),
+            cfop: String::new(), u_com: String::new(), q_com: String::new(), v_un_com: String::new(),
+            v_prod: String::new(), v_desc: String::new(), v_ipi: String::new(), p_icms: String::new(),
+            v_icms: String::new(), p_ipi: String::new(), rtc,
+        };
+        assert_eq!(altura_itens(&[item(None), item(None)]), 2.0 * H_ITEM);
+        assert_eq!(altura_itens(&[item(Some(rtc_cheio())), item(None)]), 2.0 * H_ITEM + H_ITEM_RTC);
+    }
+
+    #[test]
+    fn totais_em_branco_quando_o_xml_nao_traz_e_mono_so_com_gmono() {
+        let (linha, mono) = campos_totais_rtc(&PdfTotRtcA4::default());
+        assert_eq!(linha.len(), 4);
+        assert!(linha.iter().all(|(_, v)| v.is_empty()), "nada de 0,00 inventado");
+        assert!(mono.is_none());
+        assert_eq!(altura_bloco_rtc(&PdfTotRtcA4::default()), H_RTC_TOT);
+
+        let t = PdfTotRtcA4 {
+            v_cbs: "9.00".into(), v_ibs_uf: "1.00".into(), v_ibs_mun: "0.00".into(), v_is: String::new(),
+            mono: Some(PdfMonoA4 { v_ibs_mono: "1.10".into(), ..Default::default() }),
+        };
+        let (linha, mono) = campos_totais_rtc(&t);
+        assert_eq!(linha[0], ("VALOR DA CBS", "9,00".to_string()));
+        assert_eq!(linha[3].1, "");
+        assert_eq!(mono.unwrap()[0], ("VALOR DO IBS MONOFÁSICO", "1,10".to_string()));
+        assert_eq!(altura_bloco_rtc(&t), H_RTC_TOT + H_RTC_MONO);
+    }
 }
 
 #[cfg(test)]

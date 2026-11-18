@@ -6,6 +6,20 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 ## [Unreleased]
 
 ### Added
+- **DANFE A4 no modelo da Reforma Tributária** (NT 2026.010, vigente a partir de 01/12/2026):
+  CRT no quadro do emitente; bloco "TOTAL DO IBS / CBS / IS" (com a linha da monofasia só
+  quando há `gMono`); sublinha por item com cClassTrib, base, alíquotas (efetiva com `gRed`) e
+  valores de IBS UF, IBS Município, CBS e IS. Campo ausente no XML sai em branco. O
+  `xml_extractor` passou a ler `det/imposto/IBSCBS`, `det/imposto/IS` e `IBSCBSTot/gMono`.
+- **Amostras do DANFE A4** (`tests/danfe_a4_amostras.rs`): seis PDFs de NF-e fictícias para
+  conferir o leiaute sem certificado — `cargo test --test danfe_a4_amostras -- --nocapture`;
+  os arquivos ficam em `target/tmp/danfe-a4/` (ou em `DFE_DANFE_SAIDA`).
+
+### Fixed
+- As divisórias verticais do cabeçalho do DANFE A4 atravessavam a faixa de CNPJ/IE/datas e
+  cortavam os rótulos ao meio; agora param no topo da faixa.
+
+### Added
 - **NF-e de saída não referencia mais NFC-e/CF-e** (Ajuste SINIEF 32/2025, adiado para
   14/12/2026 pelo Ajuste SINIEF 29/2026; NT 2026.002 v1.11, rejeições 679 e 375). A montagem
   recusa com `DfeError::Validacao` a NF-e 55 de saída (exceto complementar e devolução) com

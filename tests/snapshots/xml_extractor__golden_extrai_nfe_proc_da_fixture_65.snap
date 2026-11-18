@@ -216,6 +216,8 @@ NFeProc {
                                 cofins_aliq: None,
                             },
                         ),
+                        ibs_cbs: None,
+                        is: None,
                     },
                 },
             ],

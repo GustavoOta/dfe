@@ -302,3 +302,33 @@ async fn test_danfe_nfe_a4_modelo65_retorna_erro() {
         result.unwrap_err()
     );
 }
+
+/// NT 2026.010 (DANFE A4 da Reforma): a mesma NF-e com IBS/CBS no item 1 (com `gRed` na CBS) e
+/// `IBSCBSTot`. Gera o PDF com CRT no cabeçalho, bloco "TOTAL DO IBS / CBS / IS" e a sublinha do
+/// item; o arquivo fica no temp do SO para conferência visual.
+fn nfe_xml_55_com_rtc() -> String {
+    let ibscbs = "</COFINS>\n          <IBSCBS><CST>200</CST><cClassTrib>200003</cClassTrib><gIBSCBS><vBC>211.87</vBC>\
+<gIBSUF><pIBSUF>0.1000</pIBSUF><vIBSUF>0.21</vIBSUF></gIBSUF>\
+<gIBSMun><pIBSMun>0.0000</pIBSMun><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>0.21</vIBS>\
+<gCBS><pCBS>0.9000</pCBS><gRed><pRedAliq>60.0000</pRedAliq><pAliqEfet>0.3600</pAliqEfet></gRed><vCBS>0.76</vCBS></gCBS>\
+</gIBSCBS></IBSCBS>";
+    let tot = "</ICMSTot>\n        <IBSCBSTot><vBCIBSCBS>211.87</vBCIBSCBS><gIBS><gIBSUF><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSUF>0.21</vIBSUF></gIBSUF>\
+<gIBSMun><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>0.21</vIBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gIBS>\
+<gCBS><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vCBS>0.76</vCBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gCBS></IBSCBSTot>";
+    NFE_XML_55.replacen("</COFINS>", ibscbs, 1).replacen("</ICMSTot>", tot, 1)
+}
+
+#[tokio::test]
+async fn test_danfe_nfe_a4_reforma_tributaria_nt_2026_010() {
+    let xml = nfe_xml_55_com_rtc();
+    assert!(xml.contains("<IBSCBS>") && xml.contains("<IBSCBSTot>"));
+    let saida = std::env::temp_dir().join("dfe_test_nfe_a4_rtc.pdf");
+    let r = DanfeBuilder::new()
+        .xml(&xml)
+        .paper_size("a4")
+        .as_file(saida.to_str().unwrap())
+        .build()
+        .await;
+    assert!(r.is_ok(), "DANFE A4 com IBS/CBS: {:?}", r.err());
+    assert!(std::fs::metadata(&saida).unwrap().len() > 0);
+}

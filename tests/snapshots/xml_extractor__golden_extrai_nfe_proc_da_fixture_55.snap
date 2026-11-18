@@ -277,6 +277,57 @@ NFeProc {
                                 cofins_aliq: None,
                             },
                         ),
+                        ibs_cbs: Some(
+                            IBSCBSItem {
+                                cst: Some(
+                                    "000",
+                                ),
+                                c_class_trib: Some(
+                                    "000001",
+                                ),
+                                g_ibs_cbs: Some(
+                                    GIBSCBSItem {
+                                        v_bc: Some(
+                                            "828.00",
+                                        ),
+                                        g_ibs_uf: Some(
+                                            GIBSUFItem {
+                                                p_ibs_uf: Some(
+                                                    "0.1000",
+                                                ),
+                                                g_red: None,
+                                                v_ibs_uf: Some(
+                                                    "0.83",
+                                                ),
+                                            },
+                                        ),
+                                        g_ibs_mun: Some(
+                                            GIBSMunItem {
+                                                p_ibs_mun: Some(
+                                                    "0.0000",
+                                                ),
+                                                g_red: None,
+                                                v_ibs_mun: Some(
+                                                    "0.00",
+                                                ),
+                                            },
+                                        ),
+                                        g_cbs: Some(
+                                            GCBSItem {
+                                                p_cbs: Some(
+                                                    "0.9000",
+                                                ),
+                                                g_red: None,
+                                                v_cbs: Some(
+                                                    "7.45",
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                        is: None,
                     },
                 },
             ],
@@ -387,6 +438,7 @@ NFeProc {
                                 ),
                             },
                         ),
+                        g_mono: None,
                     },
                 ),
                 is_tot: None,

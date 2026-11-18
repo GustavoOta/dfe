@@ -64,7 +64,7 @@ build no Linux e os testes: **[Certificado digital e plataformas](docs/certifica
 | **Roteamento multi-UF** | 27 UFs (autorizadores próprios e compartilhados), produção e homologação |
 | **IBS/CBS (Reforma Tributária)** | Grupo IBS/CBS por item e nos totais (omitido quando não aplicável) |
 | **CNPJ alfanumérico** | Suporte ao novo formato de CNPJ (letras e dígitos) |
-| **DANFE em PDF** | A4 e 80mm, NF-e e NFC-e, com suporte a logotipo |
+| **DANFE em PDF** | A4 e 80mm, NF-e e NFC-e, com suporte a logotipo; A4 no modelo da Reforma Tributária (NT 2026.010: CRT, totais e itens de IBS/CBS/IS) |
 | **ESC/POS** | `EscPosBuilder` (layout livre) e `EscPosNFCeBuilder` (NFC-e pronto) |
 | **Validação XSD** | Schemas oficiais da SEFAZ embutidos no binário |
 | **Validação CNPJ/CPF** | Dígito verificador (inclui CNPJ alfanumérico) |
@@ -114,6 +114,54 @@ async fn emitir() -> Result<(), DfeError> {
 > funciona em cada sistema — CAPI no Windows, OpenSSL no Linux, provider `legacy` e cadeia
 > ICP-Brasil — está em [Certificado digital e plataformas](docs/certificado-e-plataformas.md).
 > macOS não foi testado.
+
+---
+
+## Ver o DANFE A4 sem certificado
+
+A crate traz amostras do DANFE A4 da NF-e (modelo 55) no padrão da Reforma Tributária
+(NT 2026.010, vigente a partir de 01/12/2026). Elas rodam no `cargo test` normal, **sem
+certificado e sem acesso à SEFAZ**, e gravam os PDFs para você abrir e conferir:
+
+```bash
+git clone https://github.com/GustavoOta/dfe
+cd dfe
+cargo test --test danfe_a4_amostras -- --nocapture
+```
+
+Cada teste imprime o caminho do arquivo gerado. Os PDFs ficam em `target/tmp/danfe-a4/`; para
+gravar em outra pasta, defina `DFE_DANFE_SAIDA`:
+
+```bash
+# Linux/macOS
+DFE_DANFE_SAIDA=./amostras cargo test --test danfe_a4_amostras -- --nocapture
+# Windows (PowerShell)
+$env:DFE_DANFE_SAIDA = ".\amostras"; cargo test --test danfe_a4_amostras -- --nocapture
+```
+
+| Arquivo | O que mostra |
+|---|---|
+| `01-simples-sem-ibs-cbs.pdf` | Simples Nacional (CRT 1) sem IBS/CBS: bloco "TOTAL DO IBS / CBS / IS" em branco e itens sem sublinha |
+| `02-regime-normal-ibs-cbs.pdf` | Regime normal (CRT 3) com IBS/CBS em todos os itens |
+| `03-reducao-e-imposto-seletivo.pdf` | Redução de alíquota (`gRed`: sai a alíquota efetiva) e Imposto Seletivo |
+| `04-monofasico.pdf` | Totais com `gMono`: aparece a linha da monofasia |
+| `05-muitos-itens.pdf` | 60 itens, metade com IBS/CBS |
+| `06-mei.pdf` | MEI (CRT 4) |
+
+As notas são fictícias (dados e valores ilustrativos). Para gerar o DANFE de uma nota sua, use o
+`DanfeBuilder` com o XML autorizado (`nfeProc`) — ver [DANFE](docs/danfe.md):
+
+```rust
+let base64_pdf = dfe::DanfeBuilder::new()
+    .xml(xml_autorizado)   // conteúdo do nfeProc ou caminho de um arquivo .xml
+    .paper_size("a4")
+    .as_base64()           // ou .as_file("danfe.pdf")
+    .build()
+    .await?;
+```
+
+> **Limite conhecido:** NF-e com muitos itens não é quebrada em várias folhas A4 — a página
+> cresce em altura (a amostra de 60 itens sai com ~485 mm).
 
 ---
 

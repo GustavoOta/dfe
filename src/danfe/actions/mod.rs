@@ -4,7 +4,8 @@ pub mod pdf_builder_nfce_80mm;
 
 use crate::xml_extractor::structs::NFeProc;
 use pdf_builder_80mm::PdfItem;
-use pdf_builder_a4::PdfItemA4;
+use pdf_builder_a4::{PdfItemA4, PdfItemRtcA4, PdfMonoA4, PdfTotRtcA4};
+use crate::xml_extractor::structs::{GRedItem, Imposto, Total};
 use pdf_builder_nfce_80mm::NfcePayment;
 
 pub struct DanfeBuilderActions;
@@ -248,9 +249,14 @@ impl DanfeBuilderActions {
                     p_icms: icms.and_then(|i| i.p_icms.clone()).unwrap_or_default(),
                     v_icms: icms.and_then(|i| i.v_icms.clone()).unwrap_or_default(),
                     p_ipi: String::new(),
+                    rtc: rtc_do_item(imposto),
                 }
             })
             .collect();
+
+        // Reforma Tributária (NT 2026.010): CRT no quadro do emitente e bloco de totais.
+        let crt = emit.crt.clone().unwrap_or_default();
+        let rtc_tot = rtc_dos_totais(&inf.total);
 
         pdf_builder_a4::build_pdf_a4(
             logo.as_deref(),
@@ -308,6 +314,8 @@ impl DanfeBuilderActions {
             "", // vol_peso_l
             &inf_cpl,
             "", // inf_fisco
+            &crt,
+            &rtc_tot,
             &items,
         )
     }
@@ -457,5 +465,99 @@ impl DanfeBuilderActions {
             qr_side,
             &tp_emis,
         )
+    }
+}
+
+/// Alíquota a imprimir (NT 2026.010 §4.3): a efetiva (`pAliqEfet`) quando há `gRed`, a vigente
+/// sem ele.
+fn aliquota_exibida(vigente: Option<&String>, g_red: Option<&GRedItem>) -> String {
+    g_red
+        .and_then(|r| r.p_aliq_efet.clone())
+        .filter(|p| !p.trim().is_empty())
+        .or_else(|| vigente.cloned())
+        .unwrap_or_default()
+}
+
+/// IBS/CBS/IS do item, quando o XML traz algum dos grupos.
+fn rtc_do_item(imposto: &Imposto) -> Option<PdfItemRtcA4> {
+    if imposto.ibs_cbs.is_none() && imposto.is.is_none() {
+        return None;
+    }
+    let mut r = PdfItemRtcA4::default();
+    if let Some(ib) = &imposto.ibs_cbs {
+        r.tem_ibs_cbs = true;
+        r.c_class_trib = ib.c_class_trib.clone().unwrap_or_default();
+        if let Some(g) = &ib.g_ibs_cbs {
+            r.v_bc = g.v_bc.clone().unwrap_or_default();
+            if let Some(uf) = &g.g_ibs_uf {
+                r.p_ibs_uf = aliquota_exibida(uf.p_ibs_uf.as_ref(), uf.g_red.as_ref());
+                r.v_ibs_uf = uf.v_ibs_uf.clone().unwrap_or_default();
+            }
+            if let Some(mun) = &g.g_ibs_mun {
+                r.p_ibs_mun = aliquota_exibida(mun.p_ibs_mun.as_ref(), mun.g_red.as_ref());
+                r.v_ibs_mun = mun.v_ibs_mun.clone().unwrap_or_default();
+            }
+            if let Some(cbs) = &g.g_cbs {
+                r.p_cbs = aliquota_exibida(cbs.p_cbs.as_ref(), cbs.g_red.as_ref());
+                r.v_cbs = cbs.v_cbs.clone().unwrap_or_default();
+            }
+        }
+    }
+    if let Some(is) = &imposto.is {
+        r.tem_is = true;
+        r.v_bc_is = is.v_bc_is.clone().unwrap_or_default();
+        r.p_is = is.p_is.clone().unwrap_or_default();
+        r.v_is = is.v_is.clone().unwrap_or_default();
+    }
+    Some(r)
+}
+
+/// Totais de IBS/CBS/IS do XML; campo ausente fica vazio (a NT proíbe inventar valor).
+fn rtc_dos_totais(total: &Total) -> PdfTotRtcA4 {
+    let ib = total.ibs_cbs_tot.as_ref();
+    let g_ibs = ib.and_then(|t| t.g_ibs.as_ref());
+    PdfTotRtcA4 {
+        v_cbs: ib.and_then(|t| t.g_cbs.as_ref()).and_then(|g| g.v_cbs.clone()).unwrap_or_default(),
+        v_ibs_uf: g_ibs.and_then(|g| g.g_ibs_uf.as_ref()).and_then(|g| g.v_ibs_uf.clone()).unwrap_or_default(),
+        v_ibs_mun: g_ibs.and_then(|g| g.g_ibs_mun.as_ref()).and_then(|g| g.v_ibs_mun.clone()).unwrap_or_default(),
+        v_is: total.is_tot.as_ref().and_then(|t| t.v_is.clone()).unwrap_or_default(),
+        mono: ib.and_then(|t| t.g_mono.as_ref()).map(|m| PdfMonoA4 {
+            v_ibs_mono: m.v_ibs_mono.clone().unwrap_or_default(),
+            v_cbs_mono: m.v_cbs_mono.clone().unwrap_or_default(),
+            v_ibs_mono_reten: m.v_ibs_mono_reten.clone().unwrap_or_default(),
+            v_cbs_mono_reten: m.v_cbs_mono_reten.clone().unwrap_or_default(),
+        }),
+    }
+}
+
+#[cfg(test)]
+mod tests_rtc_xml {
+    use super::*;
+
+    #[test]
+    fn aliquota_efetiva_com_gred_e_vigente_sem() {
+        let vig = "0.1000".to_string();
+        let red = GRedItem { p_red_aliq: Some("60.0000".into()), p_aliq_efet: Some("0.0400".into()) };
+        assert_eq!(aliquota_exibida(Some(&vig), Some(&red)), "0.0400");
+        assert_eq!(aliquota_exibida(Some(&vig), None), "0.1000");
+        assert_eq!(aliquota_exibida(None, None), "");
+    }
+
+    #[test]
+    fn item_do_xml_vira_sublinha_com_a_aliquota_efetiva() {
+        let xml = "<imposto><IBSCBS><CST>200</CST><cClassTrib>200003</cClassTrib><gIBSCBS><vBC>100.00</vBC>\
+            <gIBSUF><pIBSUF>0.1000</pIBSUF><gRed><pRedAliq>60.0000</pRedAliq><pAliqEfet>0.0400</pAliqEfet></gRed><vIBSUF>0.04</vIBSUF></gIBSUF>\
+            <gIBSMun><pIBSMun>0.0000</pIBSMun><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>0.04</vIBS>\
+            <gCBS><pCBS>0.9000</pCBS><gRed><pRedAliq>60.0000</pRedAliq><pAliqEfet>0.3600</pAliqEfet></gRed><vCBS>0.36</vCBS></gCBS></gIBSCBS></IBSCBS></imposto>";
+        let imp: Imposto = quick_xml::de::from_str(xml).unwrap();
+        let r = rtc_do_item(&imp).unwrap();
+        assert_eq!((r.p_ibs_uf.as_str(), r.p_cbs.as_str(), r.p_ibs_mun.as_str()), ("0.0400", "0.3600", "0.0000"));
+        assert!(r.tem_ibs_cbs && !r.tem_is);
+    }
+
+    #[test]
+    fn item_sem_reforma_nao_tem_sublinha() {
+        let imp: Imposto = quick_xml::de::from_str("<imposto><vTotTrib>0.00</vTotTrib></imposto>").unwrap();
+        assert!(rtc_do_item(&imp).is_none());
     }
 }

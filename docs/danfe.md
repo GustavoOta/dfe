@@ -63,6 +63,27 @@ let b64 = DanfeBuilder::new()
 | `"80mm"` | ✅ | ✅ (suporta `.qr_side()`) |
 | `"54mm"` | ❌ | ❌ |
 
+## Modelo da Reforma Tributária no A4 (NT 2026.010)
+
+A partir de 01/12/2026 o DANFE A4 traz o **CRT** no quadro do emitente, o bloco **"TOTAL DO
+IBS / CBS / IS"** (com a linha da monofasia só quando o XML tem `gMono`) e, em cada item com
+IBS/CBS ou IS, uma **sublinha** com cClassTrib, base, alíquota (a efetiva quando há `gRed`) e
+valor. Campo ausente no XML sai em branco — nota sem IBS/CBS fica com o bloco vazio e sem
+sublinhas.
+
+### Ver o resultado sem certificado
+
+```bash
+cargo test --test danfe_a4_amostras -- --nocapture
+```
+
+Gera seis PDFs de NF-e fictícias em `target/tmp/danfe-a4/` (ou na pasta de `DFE_DANFE_SAIDA`) e
+imprime o caminho de cada um: Simples sem IBS/CBS, regime normal com IBS/CBS, redução de alíquota
+com Imposto Seletivo, monofasia, 60 itens e MEI. Não precisa de certificado nem de rede.
+
+> **Limite conhecido:** nota com muitos itens não é quebrada em várias folhas A4 — a página
+> cresce em altura (a amostra de 60 itens sai com ~485 mm).
+
 ## Colunas de ICMS dos itens (A4)
 
 A base, a alíquota e o valor do ICMS de cada item vêm do grupo que o item tiver no XML —

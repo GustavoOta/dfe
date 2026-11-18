@@ -228,6 +228,86 @@ pub struct Imposto {
     pub pis: Option<PIS>,
     #[serde(rename = "COFINS")]
     pub cofins: Option<COFINS>,
+    /// IBS/CBS do item (Reforma Tributária) — o DANFE A4 da NT 2026.010 imprime classificação,
+    /// base, alíquotas e valores. Ausente na nota sem IBS/CBS.
+    #[serde(rename = "IBSCBS", default)]
+    pub ibs_cbs: Option<IBSCBSItem>,
+    /// Imposto Seletivo do item.
+    #[serde(rename = "IS", default)]
+    pub is: Option<ISItem>,
+}
+
+/// Grupo `det/imposto/IBSCBS` — só o que vai para o documento auxiliar.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct IBSCBSItem {
+    #[serde(rename = "CST", default)]
+    pub cst: Option<String>,
+    #[serde(rename = "cClassTrib", default)]
+    pub c_class_trib: Option<String>,
+    #[serde(rename = "gIBSCBS", default)]
+    pub g_ibs_cbs: Option<GIBSCBSItem>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct GIBSCBSItem {
+    #[serde(rename = "vBC", default)]
+    pub v_bc: Option<String>,
+    #[serde(rename = "gIBSUF", default)]
+    pub g_ibs_uf: Option<GIBSUFItem>,
+    #[serde(rename = "gIBSMun", default)]
+    pub g_ibs_mun: Option<GIBSMunItem>,
+    #[serde(rename = "gCBS", default)]
+    pub g_cbs: Option<GCBSItem>,
+}
+
+/// Redução de alíquota (`gRed`): com ela o DANFE imprime a alíquota efetiva.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct GRedItem {
+    #[serde(rename = "pRedAliq", default)]
+    pub p_red_aliq: Option<String>,
+    #[serde(rename = "pAliqEfet", default)]
+    pub p_aliq_efet: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct GIBSUFItem {
+    #[serde(rename = "pIBSUF", default)]
+    pub p_ibs_uf: Option<String>,
+    #[serde(rename = "gRed", default)]
+    pub g_red: Option<GRedItem>,
+    #[serde(rename = "vIBSUF", default)]
+    pub v_ibs_uf: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct GIBSMunItem {
+    #[serde(rename = "pIBSMun", default)]
+    pub p_ibs_mun: Option<String>,
+    #[serde(rename = "gRed", default)]
+    pub g_red: Option<GRedItem>,
+    #[serde(rename = "vIBSMun", default)]
+    pub v_ibs_mun: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct GCBSItem {
+    #[serde(rename = "pCBS", default)]
+    pub p_cbs: Option<String>,
+    #[serde(rename = "gRed", default)]
+    pub g_red: Option<GRedItem>,
+    #[serde(rename = "vCBS", default)]
+    pub v_cbs: Option<String>,
+}
+
+/// Grupo `det/imposto/IS` (Imposto Seletivo).
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct ISItem {
+    #[serde(rename = "vBCIS", default)]
+    pub v_bc_is: Option<String>,
+    #[serde(rename = "pIS", default)]
+    pub p_is: Option<String>,
+    #[serde(rename = "vIS", default)]
+    pub v_is: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -379,6 +459,21 @@ pub struct IBSCBSTot {
     pub g_ibs: Option<GIBSTot>,
     #[serde(rename = "gCBS")]
     pub g_cbs: Option<GCBSTot>,
+    /// Totais da monofasia — o DANFE só mostra quando o grupo existe.
+    #[serde(rename = "gMono", default)]
+    pub g_mono: Option<GMonoTot>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+pub struct GMonoTot {
+    #[serde(rename = "vIBSMono", default)]
+    pub v_ibs_mono: Option<String>,
+    #[serde(rename = "vCBSMono", default)]
+    pub v_cbs_mono: Option<String>,
+    #[serde(rename = "vIBSMonoReten", default)]
+    pub v_ibs_mono_reten: Option<String>,
+    #[serde(rename = "vCBSMonoReten", default)]
+    pub v_cbs_mono_reten: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -544,5 +639,47 @@ mod tests_icms_grupo {
         }
         let sem: ICMS = quick_xml::de::from_str("<ICMS><ICMSSN102><orig>0</orig><CSOSN>102</CSOSN></ICMSSN102></ICMS>").unwrap();
         assert!(sem.grupo().is_none());
+    }
+}
+
+#[cfg(test)]
+mod tests_ibscbs_item {
+    use super::{Imposto, Total};
+
+    /// O DANFE A4 da Reforma (NT 2026.010) lê classificação, base, alíquotas e `gRed` do item.
+    #[test]
+    fn le_ibscbs_e_is_do_item() {
+        let xml = "<imposto><IBSCBS><CST>200</CST><cClassTrib>200003</cClassTrib><gIBSCBS><vBC>100.00</vBC>\
+            <gIBSUF><pIBSUF>0.1000</pIBSUF><gRed><pRedAliq>60.0000</pRedAliq><pAliqEfet>0.0400</pAliqEfet></gRed><vIBSUF>0.04</vIBSUF></gIBSUF>\
+            <gIBSMun><pIBSMun>0.0000</pIBSMun><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>0.04</vIBS>\
+            <gCBS><pCBS>0.9000</pCBS><vCBS>0.90</vCBS></gCBS></gIBSCBS></IBSCBS>\
+            <IS><CSTIS>000</CSTIS><cClassTribIS>000001</cClassTribIS><vBCIS>100.00</vBCIS><pIS>2.0000</pIS><uTrib>UN</uTrib><qTrib>1.0000</qTrib><vIS>2.00</vIS></IS></imposto>";
+        let imp: Imposto = quick_xml::de::from_str(xml).unwrap();
+        let ib = imp.ibs_cbs.unwrap();
+        assert_eq!(ib.c_class_trib.as_deref(), Some("200003"));
+        let g = ib.g_ibs_cbs.unwrap();
+        assert_eq!(g.v_bc.as_deref(), Some("100.00"));
+        let uf = g.g_ibs_uf.unwrap();
+        assert_eq!(uf.g_red.unwrap().p_aliq_efet.as_deref(), Some("0.0400"));
+        assert_eq!(uf.v_ibs_uf.as_deref(), Some("0.04"));
+        assert!(g.g_ibs_mun.unwrap().g_red.is_none());
+        assert_eq!(g.g_cbs.unwrap().v_cbs.as_deref(), Some("0.90"));
+        let is = imp.is.unwrap();
+        assert_eq!((is.v_bc_is.as_deref(), is.p_is.as_deref(), is.v_is.as_deref()), (Some("100.00"), Some("2.0000"), Some("2.00")));
+    }
+
+    #[test]
+    fn item_sem_reforma_continua_lendo() {
+        let imp: Imposto = quick_xml::de::from_str("<imposto><vTotTrib>1.00</vTotTrib></imposto>").unwrap();
+        assert!(imp.ibs_cbs.is_none() && imp.is.is_none());
+    }
+
+    #[test]
+    fn le_gmono_dos_totais() {
+        let xml = "<total><IBSCBSTot><vBCIBSCBS>0.00</vBCIBSCBS><gMono><vIBSMono>1.10</vIBSMono><vCBSMono>2.20</vCBSMono>\
+            <vIBSMonoReten>0.00</vIBSMonoReten><vCBSMonoReten>0.00</vCBSMonoReten><vIBSMonoRet>0.00</vIBSMonoRet><vCBSMonoRet>0.00</vCBSMonoRet></gMono></IBSCBSTot></total>";
+        let t: Total = quick_xml::de::from_str(xml).unwrap();
+        let mono = t.ibs_cbs_tot.unwrap().g_mono.unwrap();
+        assert_eq!((mono.v_ibs_mono.as_deref(), mono.v_cbs_mono.as_deref()), (Some("1.10"), Some("2.20")));
     }
 }
