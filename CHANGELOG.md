@@ -5,6 +5,31 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 
 ## [Unreleased]
 
+### Changed
+- **Validação XSD no Pacote de Liberação PL_010h v1.03** (13/11/2026), no lugar do PL_010d
+  (`src/schemas_pl010h/`). O pacote traz as NT 2025.002 v1.50, 2026.002/003 (`tpImp=6`),
+  2026.005 (IBS/CBS do Simples: `cAtivSN`, `tpRegimeIBSCBS`, `gTribSN`), 2026.006 (split,
+  `gPgtoVinc`), 2026.007 (IE do emitente opcional) e 2026.008 (`vProdLiq`). Os campos novos
+  são opcionais: a nota de hoje, sem eles, passa igual. Validado em homologação na SEFAZ-SP
+  (18-11-2026): NF-e 55, NFC-e 65 e NFC-e com destinatário CNPJ autorizadas (100). A crate
+  ainda **não emite** nenhum campo novo. O PL_010d fica em `src/schemas_nt2026_004/` para
+  rollback. Os XSD extraídos vão para `dfe_schemas_nfe_PL_010h` no temp, uma pasta por pacote.
+  - `leiauteNFe`: só campos opcionais novos (`cIndOp`, `tpRegimeIBSCBS`, `ISUFEmit`,
+    `vUnComLiq`/`vProdLiq`, `cAtivSN`, `vProdLiqTot`, `gPgtoVinc`, alternativa
+    `ICMSPrevistoPagtoAntecip`) e restrições afrouxadas (`tpImp` aceita `6`, `emit/IE`
+    opcional, `vNFTot` aceita `0`, até 5 `reboque`, `xMsg` com 255).
+  - `DFeTiposBasicos`: `gIBSCBS` vira `TCIBS_NFe` (+ `gALCZFMCBS`), entra `gTribSN`, monofasia
+    reorganizada, `pISEspec` → `adRemIS`. Nada disso muda o `IBSCBS` que a crate monta hoje.
+  - Testes: pacote embutido, fixtures 55/65 sem campo novo, `tpImp=6`, `cAtivSN` no lugar certo
+    e fora dele.
+  - Detalhe completo, hashes, rollback e roteiro do próximo pacote:
+    [`docs/xsd_pacotes.md`](docs/xsd_pacotes.md).
+
+### Known issues
+- **CC-e em homologação na SEFAZ-SP volta `999 — Erro não catalogado`** (18-11-2026), no ciclo
+  `live_ciclo_nfe_55_homologacao`. Rodando com o PL_010d dá o mesmo resultado, e o evento não passa
+  pelo validador de NF-e. Ainda sem causa identificada.
+
 ### Added
 - **DANFE A4 no modelo da Reforma Tributária** (NT 2026.010, vigente a partir de 01/12/2026):
   CRT no quadro do emitente; bloco "TOTAL DO IBS / CBS / IS" (com a linha da monofasia só

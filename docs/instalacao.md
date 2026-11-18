@@ -5,7 +5,8 @@
 dfe = "0.8"
 ```
 
-> **Schemas XSD** (`PL_010b_NT2025_002_v1.21`) estão embutidos no binário via `include_bytes!`.
+> **Schemas XSD** (`PL_010h` v1.03, de 13/11/2026) estão embutidos no binário via `include_bytes!`.
+> Pacotes, troca e rollback: [`xsd_pacotes.md`](xsd_pacotes.md).
 
 ---
 

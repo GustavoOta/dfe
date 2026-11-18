@@ -4,16 +4,20 @@ use libxml::schemas::{SchemaParserContext, SchemaValidationContext};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
-// XSDs do leiaute NT2026.004 (PL_010d) — CNPJ e chave de acesso ALFANUMÉRICOS.
-// Os patterns novos são retrocompatíveis: [0-9A-Z]{12}[0-9]{2} aceita CNPJ numérico
-// e a chave [0-9]{6}[0-9A-Z]{12}[0-9]{26} aceita chave numérica.
-// A pasta anterior (../schemas, leiaute numérico) é mantida intacta para rollback.
+// XSDs do Pacote de Liberação PL_010h v1.03 (13/11/2026): NT 2026.004 (CNPJ alfanumérico),
+// 2025.002 v1.50 (monofásico), 2026.002/003 (`tpImp=6`), 2026.006 (split), 2026.007 (IE do
+// emitente opcional), 2026.008 (valor líquido) e 2026.005 (IBS/CBS do Simples).
+// Os campos novos do leiaute são opcionais: XML sem eles valida igual ao do PL_010d.
+// Pastas anteriores mantidas intactas para rollback: ../schemas_nt2026_004 (PL_010d) e
+// ../schemas (leiaute numérico). Trocar de pacote = trocar a pasta aqui e o `PACOTE_XSD`.
+pub(crate) const PACOTE_XSD: &str = "PL_010h";
+
 static XSD_FILES: &[(&str, &[u8])] = &[
-    ("nfe_v4.00.xsd",                 include_bytes!("../schemas_nt2026_004/nfe_v4.00.xsd")),
-    ("tiposBasico_v4.00.xsd",         include_bytes!("../schemas_nt2026_004/tiposBasico_v4.00.xsd")),
-    ("leiauteNFe_v4.00.xsd",          include_bytes!("../schemas_nt2026_004/leiauteNFe_v4.00.xsd")),
-    ("xmldsig-core-schema_v1.01.xsd", include_bytes!("../schemas_nt2026_004/xmldsig-core-schema_v1.01.xsd")),
-    ("DFeTiposBasicos_v1.00.xsd",     include_bytes!("../schemas_nt2026_004/DFeTiposBasicos_v1.00.xsd")),
+    ("nfe_v4.00.xsd",                 include_bytes!("../schemas_pl010h/nfe_v4.00.xsd")),
+    ("tiposBasico_v4.00.xsd",         include_bytes!("../schemas_pl010h/tiposBasico_v4.00.xsd")),
+    ("leiauteNFe_v4.00.xsd",          include_bytes!("../schemas_pl010h/leiauteNFe_v4.00.xsd")),
+    ("xmldsig-core-schema_v1.01.xsd", include_bytes!("../schemas_pl010h/xmldsig-core-schema_v1.01.xsd")),
+    ("DFeTiposBasicos_v1.00.xsd",     include_bytes!("../schemas_pl010h/DFeTiposBasicos_v1.00.xsd")),
 ];
 
 static SCHEMA_DIR: OnceLock<std::result::Result<PathBuf, String>> = OnceLock::new();
@@ -27,7 +31,9 @@ fn schema_dir() -> Result<&'static Path> {
 }
 
 fn extract_schemas() -> Result<PathBuf> {
-    let dir = std::env::temp_dir().join("dfe_schemas_nfe");
+    // Uma pasta por pacote: o schema é relido do disco a cada validação, e um processo com a
+    // dfe de outro pacote (gravisServer em dev, teste em paralelo) sobrescreveria os arquivos.
+    let dir = std::env::temp_dir().join(format!("dfe_schemas_nfe_{PACOTE_XSD}"));
     std::fs::create_dir_all(&dir)?;
     for (name, bytes) in XSD_FILES {
         std::fs::write(dir.join(name), bytes)?;
@@ -187,6 +193,75 @@ mod tests {
         assert!(validar_fragmento("ICMS", certo).is_ok(), "{:?}", validar_fragmento("ICMS", certo));
         let fora = "<ICMS><ICMS00><orig>0</orig><CST>00</CST><vBC>10.00</vBC><modBC>3</modBC><pICMS>18.0000</pICMS><vICMS>1.80</vICMS></ICMS00></ICMS>";
         assert!(validar_fragmento("ICMS", fora).is_err());
+    }
+
+    /// A `<NFe>` de dentro do `nfeProc` da fixture (o XSD valida a `NFe`, não o `nfeProc`).
+    fn nfe_da_fixture(xml: &str) -> String {
+        let ini = xml.find("<NFe").expect("fixture sem <NFe>");
+        let fim = xml.find("</NFe>").expect("fixture sem </NFe>") + "</NFe>".len();
+        format!(r#"<?xml version="1.0" encoding="UTF-8"?>{}"#, &xml[ini..fim])
+    }
+
+    #[test]
+    fn pacote_embutido_e_o_pl010h() {
+        // Trava a troca de pacote: os campos do PL_010h existem no leiaute embutido.
+        assert_eq!(PACOTE_XSD, "PL_010h");
+        let leiaute = String::from_utf8_lossy(
+            XSD_FILES.iter().find(|(n, _)| *n == "leiauteNFe_v4.00.xsd").unwrap().1,
+        );
+        for campo in ["cAtivSN", "tpRegimeIBSCBS", "vProdLiq", "vProdLiqTot", "gPgtoVinc", "cIndOp"] {
+            assert!(leiaute.contains(&format!(r#"name="{campo}""#)), "{campo} fora do leiaute");
+        }
+        let tipos = String::from_utf8_lossy(
+            XSD_FILES.iter().find(|(n, _)| *n == "DFeTiposBasicos_v1.00.xsd").unwrap().1,
+        );
+        assert!(tipos.contains(r#"name="gTribSN""#) && tipos.contains(r#"name="TCIBS_NFe""#));
+        assert!(schema_dir().unwrap().ends_with("dfe_schemas_nfe_PL_010h"));
+    }
+
+    #[test]
+    fn nota_sem_campos_novos_continua_valida_no_pacote_novo() {
+        // O PL_010h só acrescenta campos opcionais: NF-e 55 com IBSCBS (CRT 3) e NFC-e 65 do
+        // Simples, montadas no leiaute anterior, passam sem mudança.
+        for (nome, xml) in [
+            ("nfe55", include_str!("../../tests/fixtures/xml/nfe55_autorizada.xml")),
+            ("nfce65", include_str!("../../tests/fixtures/xml/nfce65_autorizada.xml")),
+        ] {
+            let nfe = nfe_da_fixture(xml);
+            if let Err(e) = is_xml_valid(&nfe) {
+                panic!("{nome} reprovou no {PACOTE_XSD}: {e}");
+            }
+        }
+    }
+
+    #[test]
+    fn tp_imp_6_da_nfe_simplificada_tipo_2_passa_no_xsd() {
+        // NT 2026.002/003 (PL_010e em diante): `tpImp=6` = DANFE Simplificado Tipo 2. No PL_010d
+        // o domínio era 0..5 e a NF-e Tipo 2 reprovava aqui, antes de chegar à SEFAZ.
+        let nfe = nfe_da_fixture(include_str!("../../tests/fixtures/xml/nfe55_autorizada.xml"));
+        let tipo2 = nfe.replacen("<tpImp>1</tpImp>", "<tpImp>6</tpImp>", 1);
+        assert_ne!(tipo2, nfe);
+        if let Err(e) = is_xml_valid(&tipo2) {
+            panic!("tpImp=6 reprovou no {PACOTE_XSD}: {e}");
+        }
+        let fora = nfe.replacen("<tpImp>1</tpImp>", "<tpImp>7</tpImp>", 1);
+        assert!(is_xml_valid(&fora).is_err(), "tpImp=7 não existe");
+    }
+
+    #[test]
+    fn c_ativ_sn_vale_no_lugar_certo_e_reprova_fora_dele() {
+        // NT 2026.005, I17d: `cAtivSN` fica no <prod>, depois de indTot (e de indBemMovelUsado).
+        // O validador continua estrito: logo depois de xProd é ordem errada.
+        let nfe = nfe_da_fixture(include_str!("../../tests/fixtures/xml/nfce65_autorizada.xml"));
+        let certo = nfe.replacen("</indTot>", "</indTot><cAtivSN>01</cAtivSN>", 1);
+        assert_ne!(certo, nfe);
+        if let Err(e) = is_xml_valid(&certo) {
+            panic!("cAtivSN no lugar certo reprovou: {e}");
+        }
+        let fora = nfe.replacen("</xProd>", "</xProd><cAtivSN>01</cAtivSN>", 1);
+        assert!(is_xml_valid(&fora).is_err());
+        let codigo_invalido = nfe.replacen("</indTot>", "</indTot><cAtivSN>05</cAtivSN>", 1);
+        assert!(is_xml_valid(&codigo_invalido).is_err(), "05 fora do domínio 01-04/90");
     }
 
     #[test]
