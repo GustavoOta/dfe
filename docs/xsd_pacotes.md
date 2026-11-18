@@ -29,7 +29,9 @@ Portal Nacional da NF-e → Documentos → Esquemas XML → *"Schemas XML NF-e -
 13/11/2026)"*. Copiados de `PL_010h_v1.03/NFe/` **sem nenhuma edição**. A pasta `Evento/` do zip
 (eventos 110001, 110300 e 412140) não entra, porque a crate não valida evento contra XSD.
 
-SHA-256 dos arquivos embutidos:
+SHA-256 dos arquivos do zip, com finais de linha LF como estão no repositório. O checkout no Windows
+com `core.autocrlf=true` converte para CRLF e muda o hash. Para conferir, use `git show
+HEAD:src/schemas_pl010h/<arquivo> | sha256sum`. A libxml2 lê os dois iguais.
 
 ```
 22cc19e1bb09808ec475d0ad830303699cbf167d630e57023f7d7f1e7c2cb1cc  DFeTiposBasicos_v1.00.xsd
