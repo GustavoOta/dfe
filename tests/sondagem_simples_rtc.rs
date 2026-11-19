@@ -196,3 +196,82 @@ async fn sondagem_nfe_55_simples_ibscbs_de_hoje() {
         }
     }
 }
+
+/// Formato da NT 2026.005 para CRT 1 sem regime regular: `IBSCBS` só com CST + cClassTrib, sem
+/// `gIBSCBS` (via `ibscbs_sem_grupo`). Mede se a regra UB13 / rejeição 1022 (CST que exige o
+/// grupo) barra o Simples. Sem `cAtivSN`: a crate ainda não o emite.
+async fn sondar_sem_grupo(mod_: u32) {
+    let (Some(env), Some(em)) = (common::live_env(), common::live_emitente()) else {
+        eprintln!("skip: .env incompleto");
+        return;
+    };
+    let mut b = NFeBuilder::new()
+        .cert(&env.cert_path, &env.cert_pass)
+        .emitente(emitente(&env, &em))
+        .itens(vec![item()])
+        .total(Total::default())
+        .transporte(Transp { mod_frete: 9, ..Default::default() })
+        .pagamento(Pag { ind_pag: 0, t_pag: "01".into(), v_pag: 10.0, ..Default::default() })
+        .ibscbs_sem_grupo(&["000"]);
+    if mod_ == 65 {
+        let Some((id_csc, csc)) = common::live_csc() else { return };
+        b = b
+            .ide(Ide {
+                c_uf: 35, mod_: 65, serie: em.serie, n_nf: n_nf() + 13,
+                c_mun_fg: em.cod_municipio.clone(), tp_amb: common::HOMOLOGACAO,
+                tp_imp: 4, ind_final: 1, ind_pres: 1, ..Default::default()
+            })
+            .id_csc(&id_csc)
+            .csc(&csc);
+    } else {
+        b = b
+            .ide(Ide {
+                c_uf: 35, mod_: 55, serie: em.serie, n_nf: n_nf() + 19,
+                c_mun_fg: em.cod_municipio.clone(), tp_amb: common::HOMOLOGACAO, ..Default::default()
+            })
+            .destinatario(Dest {
+                cpf: Some("11144477735".into()),
+                x_nome: Some("NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL".into()),
+                x_lgr: Some(em.logradouro.clone()),
+                nro: Some(em.numero.clone()),
+                x_bairro: Some(em.bairro.clone()),
+                c_mun: Some(em.cod_municipio.clone()),
+                x_mun: Some(em.municipio.clone()),
+                uf: Some(env.uf.clone()),
+                cep: Some(em.cep.clone()),
+                ind_ie_dest: Some(9),
+                ..Default::default()
+            });
+    }
+    match b.emitir().await {
+        Err(e) => println!("mod {mod_} SEM gIBSCBS — erro: {e:?}"),
+        Ok(r) => {
+            let p = &r.protocolo.inf_prot;
+            println!("mod {mod_} SEM gIBSCBS — cStat {} — {}", p.c_stat, p.x_motivo);
+            println!("IBSCBS item: {}", trecho(&r.xml, "<IBSCBS>", "</IBSCBS>"));
+            println!("IBSCBSTot:   {}", trecho(&r.xml, "<IBSCBSTot>", "</IBSCBSTot>"));
+            if dfe::cstat_autorizado(p.c_stat) {
+                let c = CancelarBuilder::new()
+                    .cert(&env.cert_path, &env.cert_pass)
+                    .tp_amb(common::HOMOLOGACAO)
+                    .chave(&p.ch_nfe)
+                    .protocolo(p.n_prot.as_deref().unwrap_or_default())
+                    .justificativa("Sondagem IBS CBS Simples em homologacao")
+                    .mod_(mod_)
+                    .send()
+                    .await;
+                println!("cancelamento: {:?}", c.map(|c| (c.response.c_stat, c.response.x_motivo)));
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn sondagem_nfce_65_simples_sem_gibscbs() {
+    sondar_sem_grupo(65).await;
+}
+
+#[tokio::test]
+async fn sondagem_nfe_55_simples_sem_gibscbs() {
+    sondar_sem_grupo(55).await;
+}
