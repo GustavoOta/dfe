@@ -42,7 +42,7 @@ Situação em **19-11-2026** (versão 0.8.x). Legenda: ✅ pronto · 🟡 parcia
 | **CNPJ alfanumérico** e validação de CNPJ/CPF | ✅ |
 | XSD **PL_010h** embutido | ✅ |
 | DANFE A4 no modelo da reforma (NT 2026.010) | ✅ |
-| **IBS/CBS do Simples Nacional** no formato da NT 2026.005 (`cAtivSN` por item, sem `gIBSCBS`) — obrigatório em 01/2027 | 🔜 |
+| **IBS/CBS do Simples Nacional** no formato da NT 2026.005 (`cAtivSN` por item, sem `gIBSCBS`) — leiaute em produção em 14/12/2026; obrigatório na NF-e/NFC-e do Simples a partir de 01/03/2027 | 🔜 |
 | **Nota de crédito e nota de débito** (`finNFe` 5/6, `tpNFCredito`/`tpNFDebito`) | 🔜 |
 | Compras governamentais (`gCompraGov`) | 🔜 |
 | Valor líquido do item (`vProdLiq`, `vItem`, `vProdLiqTot` — NT 2026.008) | 🔜 |
