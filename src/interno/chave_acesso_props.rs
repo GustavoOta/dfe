@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+#[cfg(any(test, feature = "emissao"))]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ChaveAcessoProps {
     /// Federal Unit code from IBGE

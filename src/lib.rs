@@ -14,7 +14,7 @@
 //!
 //! | Módulo | Responsabilidade |
 //! |---|---|
-//! | [`emissao`] | Emissão de NF-e e NFC-e via [`NFeBuilder`] |
+//! | `emissao` | Emissão de NF-e e NFC-e via `NFeBuilder` |
 //! | [`cancelar`] | Cancelamento via [`CancelarBuilder`] |
 //! | [`substituicao`] | Cancelamento por substituição de NFC-e (110112) via [`SubstituicaoBuilder`] |
 //! | [`carta_correcao`] | Carta de Correção Eletrônica (110110) via [`CartaCorrecaoBuilder`] |
@@ -35,13 +35,16 @@
 //! | macOS | não testado | não testado |
 //!
 //! A API é a mesma nos dois sistemas suportados, e o resultado também (a assinatura sai idêntica
-//! byte a byte). No Linux, compile com `pkg-config`, `libssl-dev` e `libxml2-dev`. Como cada parte
+//! byte a byte). No Linux, compile com `pkg-config` e `libssl-dev`. A feature `validacao-xsd`
+//! também requer `libxml2-dev`. Como cada parte
 //! funciona e por quê:
 //! [Certificado digital e plataformas](https://github.com/GustavoOta/dfe/blob/main/docs/certificado-e-plataformas.md).
 //!
 //! ## Exemplo — Emissão de NF-e
 //!
 //! ```no_run
+//! # #[cfg(feature = "emissao")]
+//! # mod exemplo {
 //! use dfe::{NFeBuilder, DfeError};
 //! use dfe::tipos::{Det, Emit, Icms, Ide, Pag, Pis, Cofins, Total, Transp};
 //!
@@ -66,6 +69,7 @@
 //!
 //! println!("cStat: {}", resp.protocolo.inf_prot.c_stat);
 //! # Ok(())
+//! # }
 //! # }
 //! ```
 //!
@@ -95,11 +99,14 @@ pub mod consulta_situacao;
 pub mod danfe;
 #[cfg(feature = "distribuicao")]
 pub mod distribuicao;
+#[cfg(feature = "emissao")]
 pub mod emissao;
 pub mod error;
 pub mod inutilizacao;
-#[cfg(feature = "escpos")]
+#[cfg(feature = "escpos-base")]
 pub mod escpos;
+#[cfg(feature = "nfse")]
+pub mod nfse;
 #[cfg(feature = "distribuicao")]
 pub mod manifestacao;
 pub mod status;
@@ -111,12 +118,13 @@ mod interno;
 
 pub use arredondamento::{arred, arred2, arred_decimal, fmt_dec, fmt_dec_ate};
 pub use autorizacao::{cstat_autorizado, cstat_autorizado_str, CSTAT_AUTORIZADO};
+#[cfg(feature = "emissao")]
 pub use emissao::Alerta as AlertaAutorizacao;
 pub use cancelar::CancelarBuilder;
 pub use consulta_situacao::ConsultaSituacaoBuilder;
 #[cfg(feature = "danfe")]
 pub use danfe::DanfeBuilder;
-#[cfg(feature = "escpos")]
+#[cfg(feature = "escpos-base")]
 pub use escpos::EscPosBuilder;
 #[cfg(feature = "escpos")]
 pub use escpos::EscPosNFCeBuilder;
@@ -124,20 +132,22 @@ pub use escpos::EscPosNFCeBuilder;
 pub use escpos::EscPosDanfeNFeBuilder;
 pub use interno::cert::CertInfo;
 pub use interno::cnpj_cpf::{format_cnpj, sanitize_cnpj, validate_cnpj, validate_cpf};
+#[cfg(feature = "validacao-xsd")]
 pub use interno::validation::is_xml_valid;
 #[cfg(feature = "distribuicao")]
 pub use manifestacao::ManifestacaoBuilder;
 pub use substituicao::SubstituicaoBuilder;
 pub use carta_correcao::CartaCorrecaoBuilder;
+#[cfg(feature = "emissao")]
 pub use emissao::NFeBuilder;
+#[cfg(feature = "emissao")]
 pub use emissao::referencia_cupom::{
     chave_e_de_cupom, finalidade_sujeita_a_vedacao, vedacao_referencia_cupom_ativa,
     MSG_REFERENCIA_CUPOM_VEDADA, VEDACAO_REFERENCIA_CUPOM_PRODUCAO,
 };
 pub use inutilizacao::InutilizacaoBuilder;
-pub use emissao::NFeAssinada;
-pub use emissao::Response as EmissaoResponse;
-pub use emissao::transmitir_xml_assinado;
+#[cfg(feature = "emissao")]
+pub use emissao::{transmitir_xml_assinado, NFeAssinada, Response as EmissaoResponse};
 pub use error::DfeError;
 pub use status::NFeService;
 pub use status::NFeServiceResponse;

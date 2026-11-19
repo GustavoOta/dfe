@@ -21,10 +21,12 @@ fn format_sao_paulo_year(date_time_utc: DateTime<Utc>, digits: u8) -> String {
 }
 
 /// Get the current month in the format MM.
+#[cfg(any(test, feature = "emissao"))]
 pub fn get_current_month() -> String {
     format_sao_paulo_month(Utc::now())
 }
 
+#[cfg(any(test, feature = "emissao"))]
 fn format_sao_paulo_month(date_time_utc: DateTime<Utc>) -> String {
     let current_month = date_time_utc.with_timezone(&Sao_Paulo).month();
     let current_month = current_month.to_string();

@@ -167,22 +167,42 @@ let base64_pdf = dfe::DanfeBuilder::new()
 
 ## Features de compilação
 
-Todas as features são ligadas por padrão. Para reduzir o build e as dependências, desligue as que não
-usar:
+As funcionalidades atuais de NF-e/NFC-e continuam ligadas por padrão.
+Use `default-features = false` para selecionar as camadas opcionais:
 
 | Feature | Liga | Padrão |
 |---|---|:--:|
+| `emissao` | Montagem, assinatura e transmissão de NF-e/NFC-e com validação XSD | ✅ |
+| `validacao-xsd` | Validação pública via `is_xml_valid` e dependência nativa `libxml2` | Via `emissao` |
 | `danfe` | Geração de DANFE em PDF | ✅ |
-| `escpos` | Impressão ESC/POS | ✅ |
+| `escpos` | ESC/POS genérico e cupons fiscais de NF-e/NFC-e | ✅ |
+| `escpos-base` | Builder ESC/POS genérico (`EscPosBuilder`) | Via `escpos` |
 | `distribuicao` | Distribuição de DF-e + manifestação | ✅ |
+| `nfse` | Builder da DPS v1.01 para a NFS-e Nacional | Opt-in |
 
 ```toml
 # Só emissão/cancelamento + DANFE, sem ESC/POS nem distribuição:
-dfe = { version = "0.8", default-features = false, features = ["danfe"] }
+dfe = { version = "0.8", default-features = false, features = ["emissao", "danfe"] }
 ```
 
-O núcleo — emissão, cancelamento, substituição, carta de correção, status, extração de XML, assinatura
-e validação — está sempre disponível, independente das features.
+Para gerar PDF e cupons fiscais a partir de XML, selecione apenas `["danfe", "escpos"]`
+com `default-features = false`. Esse perfil dispensa `libxml2` na `dfe`.
+Cancelamento, substituição, carta de correção, status, tipos fiscais e extração de XML
+continuam disponíveis em todos os perfis.
+
+Se você já usa `default-features = false`, acrescente `emissao` para continuar usando
+`NFeBuilder` e as APIs de emissão, ou `validacao-xsd` para usar apenas `is_xml_valid`.
+
+Com `nfse`, `dfe::nfse::NfseBuilder` gera a DPS regular de serviço nacional para
+prestadores MEI ou do Simples Nacional sem retenção de ISSQN. `gerar_dps()`
+retorna o ID, o ambiente e o XML para assinatura posterior. Os testes contra
+os XSDs oficiais também usam a feature `validacao-xsd`. O pacote de produção
+v1.01-20260209 tem uma rejeição conhecida no campo `serie`, registrada nas
+[fixtures de NFS-e](tests/fixtures/nfse/README.md).
+
+O builder exige série da API entre 1 e 49.999, valor de serviço positivo e
+competência até a data local de emissão. Use `desconto_incondicionado(Decimal)` para declarar um desconto
+menor que o valor bruto. Com zero, o grupo de desconto é omitido.
 
 ---
 

@@ -1,7 +1,11 @@
 mod commands;
+#[cfg(feature = "escpos")]
 pub mod nfce;
+#[cfg(feature = "escpos")]
 pub mod nfe;
+#[cfg(feature = "escpos")]
 pub use nfce::EscPosNFCeBuilder;
+#[cfg(feature = "escpos")]
 pub use nfe::EscPosDanfeNFeBuilder;
 
 use image::{io::Reader as ImageReader, DynamicImage, GenericImageView, GrayImage, Luma};

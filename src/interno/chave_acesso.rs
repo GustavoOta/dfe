@@ -1,14 +1,23 @@
-use crate::error::{DfeError, Result};
-use crate::interno::chave_acesso_props::{ChaveAcessoProps, ExtractComposition};
+use crate::error::Result;
+#[cfg(any(test, feature = "emissao"))]
+use crate::error::DfeError;
+use crate::interno::chave_acesso_props::ExtractComposition;
+#[cfg(any(test, feature = "emissao"))]
+use crate::interno::chave_acesso_props::ChaveAcessoProps;
+#[cfg(any(test, feature = "emissao"))]
 use crate::interno::dates::{get_current_month, get_current_year};
+#[cfg(feature = "emissao")]
 use rand::Rng;
 
 pub struct ChaveAcesso {
+    #[cfg(any(test, feature = "emissao"))]
     pub chave: String,
+    #[cfg(feature = "emissao")]
     pub dv: u8,
 }
 
 impl ChaveAcesso {
+    #[cfg(any(test, feature = "emissao"))]
     pub fn gerar_chave_acesso(props: ChaveAcessoProps) -> Result<ChaveAcesso> {
         let serie = format!("{:0>3}", props.serie);
         let numero = format!("{:0>9}", props.numero);
@@ -34,9 +43,14 @@ impl ChaveAcesso {
 
         let dv = ChaveAcesso::gerar_dv(&chave)?;
         chave.push_str(&dv.to_string());
-        Ok(ChaveAcesso { chave, dv })
+        Ok(ChaveAcesso {
+            chave,
+            #[cfg(feature = "emissao")]
+            dv,
+        })
     }
 
+    #[cfg(any(test, feature = "emissao"))]
     pub fn gerar_dv(chave_sem_dv: &str) -> Result<u8> {
         let pesos = [2, 3, 4, 5, 6, 7, 8, 9];
         let mut soma = 0;
@@ -63,6 +77,7 @@ impl ChaveAcesso {
         Ok(dv as u8)
     }
 
+    #[cfg(feature = "emissao")]
     pub fn gerar_codigo_numerico(c_nf: Option<String>) -> String {
         if c_nf.is_some() {
             return c_nf.unwrap_or("Erro: c_nf não é String".to_string());

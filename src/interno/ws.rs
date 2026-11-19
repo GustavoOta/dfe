@@ -47,6 +47,7 @@ pub fn nfe_status_servico(ambiente: u8, uf: &str, modelo: u32, svn: bool) -> Res
     lookup("NfeStatusServico", ambiente, uf, modelo, svn)
 }
 
+#[cfg(any(test, feature = "emissao"))]
 pub fn nfe_autorizacao(ambiente: u8, uf: &str, modelo: u32, svn: bool) -> Result<&'static str> {
     lookup("NFeAutorizacao", ambiente, uf, modelo, svn)
 }

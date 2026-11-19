@@ -8,11 +8,14 @@ pub mod chave_acesso_props;
 pub mod cleaner;
 pub mod connection;
 pub mod dates;
+#[cfg(feature = "emissao")]
 pub mod dest_xml;
+#[cfg(feature = "emissao")]
 pub mod entrega_xml;
 pub mod evento;
 pub mod extract;
 pub mod transporte;
 pub mod uf;
+#[cfg(feature = "validacao-xsd")]
 pub mod validation;
 pub mod ws;

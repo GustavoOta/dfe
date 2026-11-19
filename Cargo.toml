@@ -40,18 +40,24 @@ x86_64-pc-windows-msvc = { triplet = "x64-windows-static", install = ["libxml2"]
 debug = false
 
 [features]
-# Opt-out: `default` liga tudo → consumidores atuais (gravisServer/gravis-pdv) não mudam.
-# Desligar `danfe`+`escpos` dropa a stack de renderização (printpdf/image/barcoders/qrcodegen/font8x8);
-# desligar `distribuicao` dropa flate2. Ver planning/ARQUITETURA_REFACTOR.md §A8.
-default = ["danfe", "escpos", "distribuicao"]
+# Mantém o conjunto histórico de funcionalidades de NF-e/NFC-e.
+# Sem `danfe` e `escpos-base`, a dfe deixa de pedir as dependências de renderização.
+default = ["emissao", "danfe", "escpos", "distribuicao"]
+# Montagem, assinatura e emissão de NF-e/NFC-e com validação obrigatória.
+emissao = ["validacao-xsd"]
+validacao-xsd = ["dep:libxml"]
 # DANFE em PDF (NF-e A4/80mm, NFC-e 80mm).
 danfe = ["dep:printpdf", "dep:image", "dep:barcoders", "dep:qrcodegen"]
-# Impressão via ESC/POS (cupom).
-escpos = ["dep:font8x8", "dep:image", "dep:barcoders", "dep:qrcodegen"]
+# Impressão via ESC/POS (builder genérico e cupons fiscais).
+escpos = ["escpos-base"]
+# Builder ESC/POS genérico, sem os builders de DANFE de NF-e/NFC-e.
+escpos-base = ["dep:font8x8", "dep:image", "dep:barcoders", "dep:qrcodegen"]
 # Distribuição de DF-e (AN) + manifestação do destinatário (fluxo inbound; gzip via flate2).
 distribuicao = ["dep:flate2"]
+# Entrada para NFS-e Nacional (DPS e resposta XML em gzip).
+nfse = ["dep:flate2"]
 # Liga a camada de testes que bate na SEFAZ (homologação). Fora do `cargo test` padrão.
-sefaz-live = []
+sefaz-live = ["emissao"]
 
 [dev-dependencies]
 # Golden/snapshot dos XMLs no refactor — só em `cargo test`, não vai no binário do consumidor.
@@ -69,7 +75,7 @@ flate2 = { version = "1.0", optional = true }
 font8x8 = { version = "0.2", optional = true }
 hex = "0.4.3"
 image = { version = "0.24", default-features = false, features = ["png", "jpeg"], optional = true }
-libxml = "=0.3.3"
+libxml = { version = "=0.3.3", optional = true }
 printpdf = { version = "0.7.0", optional = true }
 quick-xml = { version = "0.37.1", features = ["encoding", "serialize"] }
 qrcodegen = { version = "1.8", optional = true }
