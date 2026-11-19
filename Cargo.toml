@@ -20,6 +20,7 @@ exclude = [
     "testes/**",
     ".claude/**",
     ".vscode/**",
+    "src/assets/**",
     "sample55.xml",
     "sample65.xml"
 ]

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/GustavoOta/dfe/main/src/assets/dfe-logo.jpg" alt="Logo da crate dfe" width="280">
+</p>
+
 # dfe
 
 **Documentos Fiscais Eletrônicos Brasileiros** — crate Rust para integração com os webservices da SEFAZ.
@@ -9,6 +13,7 @@ uma única biblioteca Rust `async`, com roteamento para as 27 UFs.
 [![Docs.rs](https://docs.rs/dfe/badge.svg)](https://docs.rs/dfe)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 [![Sponsor GustavoOta](https://img.shields.io/badge/sponsor-GustavoOta-%23EA4AAA?style=flat&logo=github)](https://github.com/sponsors/GustavoOta)
+[![Comunidade no WhatsApp](https://img.shields.io/badge/comunidade-WhatsApp-25D366?style=flat&logo=whatsapp&logoColor=white)](https://chat.whatsapp.com/GYV2d62n46k7vYaZg5zRBb)
 
 ---
 
@@ -226,6 +231,16 @@ menor que o valor bruto. Com zero, o grupo de desconto é omitido.
 
 Referência completa dos *builders* (incluindo `SubstituicaoBuilder`, `CartaCorrecaoBuilder` e as
 features) em [API.md](API.md).
+
+---
+
+## Comunidade
+
+Dúvidas, sugestões e troca de experiência com quem integra a SEFAZ em Rust: entre na
+[comunidade do dfe no WhatsApp](https://chat.whatsapp.com/GYV2d62n46k7vYaZg5zRBb).
+
+Bugs e pedidos de funcionalidade continuam em
+[issues do GitHub](https://github.com/GustavoOta/dfe/issues).
 
 ---
 
