@@ -5,6 +5,8 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-11-23
+
 ### Changed
 - **Validação XSD no Pacote de Liberação PL_010h v1.03** (13/11/2026), no lugar do PL_010d
   (`src/schemas_pl010h/`). O pacote traz as NT 2025.002 v1.50, 2026.002/003 (`tpImp=6`),
