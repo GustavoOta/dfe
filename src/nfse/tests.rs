@@ -403,6 +403,56 @@ async fn sem_resposta_conclusiva_e_indeterminado() {
     );
 }
 
+/// O Swagger oficial do ADN publica as respostas em PascalCase; a SEFIN pode responder igual.
+#[tokio::test]
+async fn respostas_em_pascal_case_sao_lidas() {
+    let a = assinada(Ambiente::ProducaoRestrita).await;
+    let nfse = "<NFSe>ok</NFSe>";
+    let autorizada = serde_json::json!({
+        "TipoAmbiente": "HOMOLOGACAO",
+        "IdDps": a.id(),
+        "ChaveAcesso": chave(),
+        "NfseXmlGZipB64": compactar(nfse).unwrap(),
+        "DataHoraProcessamento": "2026-11-23T17:49:21-03:00",
+        "Alertas": [{ "Codigo": "A1", "Descricao": "alerta" }],
+        "Erros": []
+    });
+    let rejeitada = r#"{"StatusProcessamento":"REJEICAO","Erros":[{"Codigo":"E0714","Descricao":"Assinatura"}],"Alertas":[]}"#;
+    let (c, _) = cliente(
+        Ambiente::ProducaoRestrita,
+        vec![
+            http(201, &autorizada.to_string()),
+            http(400, rejeitada),
+            http(
+                200,
+                &serde_json::json!({ "ChaveAcesso": chave() }).to_string(),
+            ),
+        ],
+    );
+
+    let ResultadoEmissao::Autorizada(r) = c.transmitir(&a).await.unwrap() else {
+        panic!("esperava autorizada")
+    };
+    assert_eq!((r.chave_acesso, r.xml.as_str()), (chave(), nfse));
+    assert_eq!(r.alertas[0].codigo.as_deref(), Some("A1"));
+    assert_eq!(
+        r.data_hora_processamento.as_deref(),
+        Some("2026-11-23T17:49:21-03:00")
+    );
+
+    let ResultadoEmissao::Rejeitada(r) = c.transmitir(&a).await.unwrap() else {
+        panic!("esperava rejeitada")
+    };
+    assert_eq!(r.erros[0].codigo.as_deref(), Some("E0714"));
+
+    assert_eq!(
+        c.consultar_dps(a.id()).await.unwrap(),
+        ConsultaDps::Encontrada {
+            chave_acesso: chave()
+        }
+    );
+}
+
 #[tokio::test]
 async fn falha_antes_do_envio_e_local() {
     let a = assinada(Ambiente::ProducaoRestrita).await;

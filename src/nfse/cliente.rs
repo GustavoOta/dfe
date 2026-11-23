@@ -394,21 +394,25 @@ async fn mtls(
     Ok(RespostaHttp { status, corpo })
 }
 
-/// Campos das respostas da SEFIN (emissão e consultas).
+/// Campos das respostas da SEFIN (emissão e consultas). Os clientes abertos leem camelCase; o
+/// Swagger oficial do ADN (mesma plataforma) publica PascalCase (`Erros`, `Alertas`,
+/// `ChaveAcesso`) — as duas grafias valem.
 #[derive(Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct RespostaJson {
-    #[serde(alias = "idDPS")]
+    #[serde(alias = "idDPS", alias = "IdDps", alias = "IdDPS")]
     id_dps: Option<String>,
+    #[serde(alias = "ChaveAcesso")]
     chave_acesso: Option<String>,
-    #[serde(rename = "nfseXmlGZipB64")]
+    #[serde(rename = "nfseXmlGZipB64", alias = "NfseXmlGZipB64")]
     nfse_xml_gzip_b64: Option<String>,
+    #[serde(alias = "DataHoraProcessamento")]
     data_hora_processamento: Option<String>,
-    #[serde(default)]
+    #[serde(default, alias = "Alertas")]
     alertas: Option<Vec<MensagemJson>>,
-    #[serde(default)]
+    #[serde(default, alias = "Erros")]
     erros: Option<Vec<MensagemJson>>,
-    #[serde(default)]
+    #[serde(default, alias = "Erro")]
     erro: Option<MensagemJson>,
 }
 

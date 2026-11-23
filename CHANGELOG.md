@@ -47,7 +47,10 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
     do lxml e do `xml.etree` (Python), assinatura por `openssl dgst -sha1 -verify` — `Verified OK`.
     Mesmo XML no Windows (CAPI) e no Linux (OpenSSL).
   - Ciclo real opt-in em produção restrita: `tests/nfse_live.rs` (`sefaz-live` + `nfse`,
-    `DFE_TEST_NFSE_*` no `.env`), ambiente fixo em `common::HOMOLOGACAO_NFSE`.
+    `DFE_TEST_NFSE_*` no `.env`, certificado e documento do prestador próprios, separados dos
+    `DFE_TEST_CERT_*` da NF-e; serviço de R$ 1,00), ambiente fixo em `common::HOMOLOGACAO_NFSE`.
+  - Respostas lidas em camelCase e em PascalCase (`ChaveAcesso`, `Erros`, `Alertas`…), a
+    grafia do Swagger oficial do ADN.
 - **XSDs da DPS embutidos** (`src/nfse/schemas/`, antes só em `tests/fixtures/nfse/`). O de
   produção tem `TSSerieDPS` corrigido (`^`/`$` literais reprovavam toda série no libxml2);
   hashes e motivo no `README.md` da pasta.

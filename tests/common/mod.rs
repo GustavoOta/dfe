@@ -40,9 +40,14 @@ pub const HOMOLOGACAO: u8 = 2;
 pub const HOMOLOGACAO_NFSE: dfe::nfse::Ambiente = dfe::nfse::Ambiente::ProducaoRestrita;
 
 /// Prestador habilitado no Emissor Nacional para o ciclo de NFS-e em produção restrita
-/// (`DFE_TEST_NFSE_*` no `.env`, ver `env.example`). `None` = teste pulado.
+/// (`DFE_TEST_NFSE_*` no `.env`, ver `env.example`). `None` = teste pulado. Certificado próprio,
+/// separado do `DFE_TEST_CERT_*` da NF-e: o prestador de serviço não é o emitente da NF-e.
 #[cfg(feature = "nfse")]
 pub struct LiveNfse {
+    pub cert_path: String,
+    pub cert_pass: String,
+    /// CNPJ (14) ou CPF (11) do prestador, só os caracteres.
+    pub documento: String,
     pub municipio: String,
     pub inscricao_municipal: Option<String>,
     pub mei: bool,
@@ -53,7 +58,9 @@ pub struct LiveNfse {
 
 #[cfg(feature = "nfse")]
 pub fn live_nfse() -> Option<LiveNfse> {
-    live_env()?;
+    if let Err(e) = dotenvy::dotenv() {
+        assert!(e.not_found(), ".env inválido: {e} — use `/` no caminho ou aspas simples");
+    }
     let v = |k: &str| {
         std::env::var(k)
             .ok()
@@ -61,6 +68,13 @@ pub fn live_nfse() -> Option<LiveNfse> {
             .filter(|s| !s.is_empty())
     };
     Some(LiveNfse {
+        cert_path: caminho_da_plataforma(&v("DFE_TEST_NFSE_CERT_PATH")?),
+        cert_pass: std::env::var("DFE_TEST_NFSE_CERT_PASS").unwrap_or_default(),
+        documento: v("DFE_TEST_NFSE_DOC")?
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric())
+            .map(|c| c.to_ascii_uppercase())
+            .collect(),
         municipio: v("DFE_TEST_NFSE_MUNICIPIO")?,
         inscricao_municipal: v("DFE_TEST_NFSE_IM"),
         mei: v("DFE_TEST_NFSE_MEI").is_some_and(|s| s == "1"),

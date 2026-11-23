@@ -1,7 +1,7 @@
 //! Ciclo real da NFS-e na **produção restrita** da SEFIN Nacional (opt-in).
 //!
-//! Precisa de um prestador habilitado no Emissor Nacional, com o A1 de `DFE_TEST_CERT_PATH` e os
-//! `DFE_TEST_NFSE_*` do `.env` (ver `env.example`). Sem eles, pula. O ambiente é
+//! Precisa de um prestador habilitado no Emissor Nacional, com o A1 e os dados em
+//! `DFE_TEST_NFSE_*` no `.env` (ver `env.example`). Sem eles, pula. O ambiente é
 //! `common::HOMOLOGACAO_NFSE`, fixo no código.
 //!
 //! `cargo test --features "sefaz-live nfse" --test nfse_live -- --nocapture --test-threads=1`
@@ -18,14 +18,14 @@ use rust_decimal::Decimal;
 
 #[tokio::test]
 async fn live_nfse_emite_e_consulta_na_producao_restrita() {
-    let (Some(env), Some(nfse)) = (common::live_env(), common::live_nfse()) else {
-        eprintln!("SKIP: DFE_TEST_CERT_PATH/DFE_TEST_NFSE_* não configurados");
+    let Some(nfse) = common::live_nfse() else {
+        eprintln!("SKIP: DFE_TEST_NFSE_* não configurados");
         return;
     };
-    let documento = if env.cnpj.len() == 11 {
-        Documento::Cpf(env.cnpj.clone())
+    let documento = if nfse.documento.len() == 11 {
+        Documento::Cpf(nfse.documento.clone())
     } else {
-        Documento::Cnpj(env.cnpj.clone())
+        Documento::Cnpj(nfse.documento.clone())
     };
     let agora = Utc::now().with_timezone(&FixedOffset::west_opt(3 * 3600).unwrap());
     let agora = agora - chrono::Duration::nanoseconds(agora.timestamp_subsec_nanos().into());
@@ -56,7 +56,8 @@ async fn live_nfse_emite_e_consulta_na_producao_restrita() {
             codigo_tributacao_municipal: nfse.codigo_tributacao_municipal.clone(),
             codigo_nbs: None,
             descricao: "Servico de teste \"dfe\" em producao restrita".into(),
-            valor: Decimal::new(1000, 2),
+            // Teste com prestador real: no máximo R$ 1,00.
+            valor: Decimal::new(100, 2),
         })
         .tributacao(Tributacao {
             total: TotalTributos::NaoInformado,
@@ -66,7 +67,7 @@ async fn live_nfse_emite_e_consulta_na_producao_restrita() {
 
     let cliente = NfseClient::builder()
         .ambiente(common::HOMOLOGACAO_NFSE)
-        .cert(env.cert_path.clone(), env.cert_pass.clone())
+        .cert(nfse.cert_path.clone(), nfse.cert_pass.clone())
         .build()
         .unwrap();
     let assinada = cliente.assinar(&dps).await.expect("assinatura");
