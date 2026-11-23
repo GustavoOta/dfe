@@ -55,6 +55,10 @@ let b64 = DanfeBuilder::new()
 
 ¹ Use `.as_file()` **ou** `.as_base64()` — nunca os dois.
 
+`build()` é `async` e devolve `Result<String, String>`: o caminho do arquivo ou o base64 do PDF;
+no erro, a mensagem. Numa função que devolve `DfeError`, converta com `.map_err(DfeError::Validacao)`
+ou equivalente.
+
 ## Formatos implementados
 
 | Tamanho | Modelo 55 (NF-e) | Modelo 65 (NFC-e) |
@@ -80,6 +84,26 @@ cargo test --test danfe_a4_amostras -- --nocapture
 Gera seis PDFs de NF-e fictícias em `target/tmp/danfe-a4/` (ou na pasta de `DFE_DANFE_SAIDA`) e
 imprime o caminho de cada um: Simples sem IBS/CBS, regime normal com IBS/CBS, redução de alíquota
 com Imposto Seletivo, monofasia, 60 itens e MEI. Não precisa de certificado nem de rede.
+
+Para gravar em outra pasta:
+
+```bash
+# Linux/macOS
+DFE_DANFE_SAIDA=./amostras cargo test --test danfe_a4_amostras -- --nocapture
+# Windows (PowerShell)
+$env:DFE_DANFE_SAIDA = ".mostras"; cargo test --test danfe_a4_amostras -- --nocapture
+```
+
+| Arquivo | O que mostra |
+|---|---|
+| `01-simples-sem-ibs-cbs.pdf` | Simples Nacional (CRT 1) sem IBS/CBS: bloco "TOTAL DO IBS / CBS / IS" em branco e itens sem sublinha |
+| `02-regime-normal-ibs-cbs.pdf` | Regime normal (CRT 3) com IBS/CBS em todos os itens |
+| `03-reducao-e-imposto-seletivo.pdf` | Redução de alíquota (`gRed`: sai a alíquota efetiva) e Imposto Seletivo |
+| `04-monofasico.pdf` | Totais com `gMono`: aparece a linha da monofasia |
+| `05-muitos-itens.pdf` | 60 itens, metade com IBS/CBS |
+| `06-mei.pdf` | MEI (CRT 4) |
+
+As notas são fictícias (dados e valores ilustrativos).
 
 > **Limite conhecido:** nota com muitos itens não é quebrada em várias folhas A4 — a página
 > cresce em altura (a amostra de 60 itens sai com ~485 mm).

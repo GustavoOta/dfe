@@ -27,6 +27,8 @@ exclude = [
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
+# A página do docs.rs mostra também a NFS-e (opt-in).
+features = ["nfse"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [package.metadata.vcpkg]

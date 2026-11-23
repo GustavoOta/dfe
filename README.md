@@ -4,10 +4,9 @@
 
 # dfe
 
-**Documentos Fiscais Eletrônicos Brasileiros** — crate Rust para integração com os webservices da SEFAZ.
-
-Cobre o ciclo fiscal de NF-e e NFC-e — emissão, eventos, assinatura, validação, DANFE e impressão — em
-uma única biblioteca Rust `async`, com roteamento para as 27 UFs.
+**Documentos Fiscais Eletrônicos Brasileiros em Rust** — NF-e, NFC-e e NFS-e Nacional: emissão,
+eventos, assinatura, validação, DANFE e impressão, numa única biblioteca `async`, com as 27 UFs,
+no Windows e no Linux.
 
 [![Crates.io](https://img.shields.io/crates/v/dfe)](https://crates.io/crates/dfe)
 [![Docs.rs](https://docs.rs/dfe/badge.svg)](https://docs.rs/dfe)
@@ -17,63 +16,36 @@ uma única biblioteca Rust `async`, com roteamento para as 27 UFs.
 
 ---
 
-## Características
+## Por que a dfe
 
-- **API `async` em Rust.** Cada operação é um *builder* fluente que retorna a resposta da SEFAZ tipada.
-- **Roteamento multi-UF.** Seleciona o webservice a partir da UF do documento (autorizadores próprios e
-  compartilhados), em produção e homologação, para as 27 UFs.
-- **Certificado A1 (.pfx).** Assinatura XML-DSig (RSA-SHA1) e TLS mútuo resolvidos internamente,
-  inclusive para os PFX ICP-Brasil antigos (RC2/3DES).
-- **Windows e Linux.** No Windows usa a CryptoAPI do próprio sistema (sem OpenSSL, `libxml2`
-  estático); no Linux, o OpenSSL do sistema com o provider `legacy` e a cadeia ICP-Brasil embutida
-  para confiar nos servidores da SEFAZ — mesmo resultado, byte a byte. Detalhes em
-  [Certificado digital e plataformas](docs/certificado-e-plataformas.md).
-- **Validação XSD.** Schemas oficiais da SEFAZ embutidos no binário, sem arquivos externos.
-- **Erros tipados.** Todas as operações retornam `Result<T, DfeError>`; o caminho de request não dá
-  `panic`.
-- **Build modular.** As camadas de DANFE, ESC/POS e distribuição são *features* opcionais (ligadas por
-  padrão) — veja [Features de compilação](#features-de-compilação).
+- **Builders fluentes e tipados.** Você monta a nota com structs Rust; a crate calcula os totais,
+  assina, valida no XSD, escolhe o webservice da UF e devolve a resposta da SEFAZ tipada.
+- **Reforma Tributária pronta.** IBS/CBS por item e nos totais, DANFE A4 no modelo da NT 2026.010
+  e CNPJ alfanumérico.
+- **Certificado A1 sem dor de cabeça.** Assinatura XML-DSig e TLS mútuo resolvidos por dentro,
+  inclusive com os PFX ICP-Brasil antigos (RC2/3DES).
+- **Windows e Linux, mesmo resultado.** CryptoAPI no Windows (sem OpenSSL), OpenSSL no Linux — a
+  assinatura sai idêntica byte a byte.
+- **Testada contra a SEFAZ de verdade.** NF-e e NFC-e autorizadas, corrigidas e canceladas em
+  homologação nos dois sistemas; testes que falam com a SEFAZ ficam travados em homologação.
+- **Só o que você usar.** DANFE, ESC/POS, distribuição e NFS-e são *features* de compilação.
+- **Erros tipados, sem `panic`.** Toda operação devolve `Result<T, DfeError>`.
 
 ---
 
-## Plataformas
+## O que cobre
 
-| Sistema | Certificado e assinatura | TLS com a SEFAZ | Situação |
-|---|---|---|---|
-| **Windows** | CryptoAPI do sistema (sem OpenSSL) | SChannel | ✅ em produção |
-| **Linux** | OpenSSL do sistema + provider `legacy` (PFX ICP-Brasil em RC2/3DES) | OpenSSL + cadeia ICP-Brasil embutida | ✅ desde a 0.8 — NF-e e NFC-e autorizadas, corrigidas e canceladas em homologação com A1 real |
-| **macOS** | — | — | ⚠️ não testado |
-
-A API é a mesma nos dois sistemas suportados, e o resultado também: a assinatura sai idêntica byte a
-byte. Como cada parte funciona, por que o provider `legacy` é necessário, a cadeia ICP-Brasil, o
-build no Linux e os testes: **[Certificado digital e plataformas](docs/certificado-e-plataformas.md)**.
-
----
-
-## Funcionalidades
-
-### Documentos e eventos fiscais
-| Funcionalidade | Descrição |
+| Área | O que faz |
 |---|---|
-| **Emissão NF-e / NFC-e** | Autorização via SOAP (modelos 55 e 65), com totais calculados automaticamente |
-| **Cancelamento** | Evento 110111 (NF-e e NFC-e) |
-| **Cancelamento por substituição** | Evento 110112 para NFC-e (NT 2018.004) |
-| **Carta de Correção (CC-e)** | Evento 110110, com `nSeqEvento` acumulativo |
-| **Manifestação do destinatário** | Ciência, confirmação, desconhecimento e operação não realizada |
-| **Distribuição de DF-e** | Consulta ao Ambiente Nacional por NSU ou chave de acesso |
-| **Status do webservice** | Disponibilidade por UF e ambiente |
+| **NF-e (55)** | Emissão (direta ou em duas etapas, com a chave antes do envio), cancelamento, carta de correção, inutilização, consulta de situação, status do serviço |
+| **NFC-e (65)** | Emissão (inclusive contingência off-line), cancelamento, cancelamento por substituição, QR Code |
+| **NFS-e Nacional** | DPS v1.01 de MEI e Simples Nacional, assinatura, envio e consulta na SEFIN Nacional (*feature* `nfse`) |
+| **Ambiente Nacional** | Distribuição de DF-e por NSU ou chave, manifestação do destinatário |
+| **Tributos** | Todos os grupos de ICMS (Simples e regime normal, ST, DIFAL, partilha, monofásico), IPI, PIS/COFINS de qualquer CST, IBS/CBS |
+| **Impressão** | DANFE em PDF (A4 e 80 mm, com logotipo), cupom da NFC-e e DANFE simplificado em ESC/POS |
+| **Infraestrutura** | 27 UFs em produção e homologação, XSD oficiais embutidos, validação de CNPJ/CPF, leitura de XML autorizado |
 
-### Fiscal, impressão e infraestrutura
-| Funcionalidade | Descrição |
-|---|---|
-| **Roteamento multi-UF** | 27 UFs (autorizadores próprios e compartilhados), produção e homologação |
-| **IBS/CBS (Reforma Tributária)** | Grupo IBS/CBS por item e nos totais (omitido quando não aplicável) |
-| **CNPJ alfanumérico** | Suporte ao novo formato de CNPJ (letras e dígitos) |
-| **DANFE em PDF** | A4 e 80mm, NF-e e NFC-e, com suporte a logotipo; A4 no modelo da Reforma Tributária (NT 2026.010: CRT, totais e itens de IBS/CBS/IS) |
-| **ESC/POS** | `EscPosBuilder` (layout livre) e `EscPosNFCeBuilder` (NFC-e pronto) |
-| **Validação XSD** | Schemas oficiais da SEFAZ embutidos no binário |
-| **Validação CNPJ/CPF** | Dígito verificador (inclui CNPJ alfanumérico) |
-| **Extração de XML** | Leitura de campos de XML autorizado |
+Referência completa: [API.md](API.md). Próximos passos: [roadmap](docs/notas-roadmap.md).
 
 ---
 
@@ -84,7 +56,7 @@ build no Linux e os testes: **[Certificado digital e plataformas](docs/certifica
 dfe = "0.8"
 ```
 
-```rust
+```rust no_run
 use dfe::{NFeBuilder, DfeError};
 use dfe::tipos::{Det, Emit, Icms, Ide, Pag, Pis, Cofins, Total, Transp};
 
@@ -112,126 +84,108 @@ async fn emitir() -> Result<(), DfeError> {
 }
 ```
 
-> **Windows:** antes de compilar, leia [docs/instalacao.md](docs/instalacao.md) — é necessário
-> configurar o vcpkg para linking estático do `libxml2`. OpenSSL **não** é uma dependência.
->
-> **Linux:** instale `pkg-config`, `libssl-dev` e `libxml2-dev` (Debian/Ubuntu). Como o certificado
-> funciona em cada sistema — CAPI no Windows, OpenSSL no Linux, provider `legacy` e cadeia
-> ICP-Brasil — está em [Certificado digital e plataformas](docs/certificado-e-plataformas.md).
-> macOS não foi testado.
+> **Windows:** configure o vcpkg para o `libxml2` estático — [Instalação](docs/instalacao.md).
+> OpenSSL não é dependência. **Linux:** `pkg-config`, `libssl-dev` e `libxml2-dev`.
+
+### DANFE
+
+```rust no_run
+async fn danfe(xml_autorizado: &str) -> Result<String, String> {
+    dfe::DanfeBuilder::new()
+        .xml(xml_autorizado)   // conteúdo do nfeProc ou caminho de um .xml
+        .paper_size("a4")      // ou "80mm"
+        .as_base64()           // ou .as_file("danfe.pdf")
+        .build()
+        .await
+}
+```
+
+Quer ver o resultado sem certificado? `cargo test --test danfe_a4_amostras -- --nocapture` gera
+seis DANFEs A4 de exemplo no modelo da Reforma — detalhes em [DANFE](docs/danfe.md).
+
+### NFS-e Nacional
+
+```toml
+dfe = { version = "0.8", features = ["nfse"] }
+```
+
+```rust no_run
+use dfe::nfse::{Ambiente, DpsGerada, NfseClient, ResultadoEmissao};
+
+async fn emitir_nfse(dps: DpsGerada) -> Result<(), Box<dyn std::error::Error>> {
+    // dps = NfseBuilder::new()…gerar_dps()? — ver docs/nfse.md
+    let cliente = NfseClient::builder()
+        .ambiente(Ambiente::ProducaoRestrita)
+        .cert("./cert.pfx", "senha")
+        .build()?;
+    let assinada = cliente.assinar(&dps).await?; // guarde assinada.id() antes do envio
+    match cliente.transmitir(&assinada).await? {
+        ResultadoEmissao::Autorizada(nfse) => println!("chave {}", nfse.chave_acesso),
+        ResultadoEmissao::Rejeitada(r) => println!("rejeitada: {:?}", r.erros),
+    }
+    Ok(())
+}
+```
+
+Ambientes, adesão do município e problemas conhecidos: [NFS-e Nacional](docs/nfse.md).
 
 ---
 
-## Ver o DANFE A4 sem certificado
+## Plataformas
 
-A crate traz amostras do DANFE A4 da NF-e (modelo 55) no padrão da Reforma Tributária
-(NT 2026.010, vigente a partir de 01/12/2026). Elas rodam no `cargo test` normal, **sem
-certificado e sem acesso à SEFAZ**, e gravam os PDFs para você abrir e conferir:
+| Sistema | Certificado e assinatura | TLS com a SEFAZ | Situação |
+|---|---|---|---|
+| **Windows** | CryptoAPI do sistema | SChannel | ✅ em produção |
+| **Linux** | OpenSSL do sistema + provider `legacy` | OpenSSL + cadeia ICP-Brasil embutida | ✅ desde a 0.8 |
+| **macOS** | — | — | ⚠️ não testado |
 
-```bash
-git clone https://github.com/GustavoOta/dfe
-cd dfe
-cargo test --test danfe_a4_amostras -- --nocapture
-```
-
-Cada teste imprime o caminho do arquivo gerado. Os PDFs ficam em `target/tmp/danfe-a4/`; para
-gravar em outra pasta, defina `DFE_DANFE_SAIDA`:
-
-```bash
-# Linux/macOS
-DFE_DANFE_SAIDA=./amostras cargo test --test danfe_a4_amostras -- --nocapture
-# Windows (PowerShell)
-$env:DFE_DANFE_SAIDA = ".\amostras"; cargo test --test danfe_a4_amostras -- --nocapture
-```
-
-| Arquivo | O que mostra |
-|---|---|
-| `01-simples-sem-ibs-cbs.pdf` | Simples Nacional (CRT 1) sem IBS/CBS: bloco "TOTAL DO IBS / CBS / IS" em branco e itens sem sublinha |
-| `02-regime-normal-ibs-cbs.pdf` | Regime normal (CRT 3) com IBS/CBS em todos os itens |
-| `03-reducao-e-imposto-seletivo.pdf` | Redução de alíquota (`gRed`: sai a alíquota efetiva) e Imposto Seletivo |
-| `04-monofasico.pdf` | Totais com `gMono`: aparece a linha da monofasia |
-| `05-muitos-itens.pdf` | 60 itens, metade com IBS/CBS |
-| `06-mei.pdf` | MEI (CRT 4) |
-
-As notas são fictícias (dados e valores ilustrativos). Para gerar o DANFE de uma nota sua, use o
-`DanfeBuilder` com o XML autorizado (`nfeProc`) — ver [DANFE](docs/danfe.md):
-
-```rust
-let base64_pdf = dfe::DanfeBuilder::new()
-    .xml(xml_autorizado)   // conteúdo do nfeProc ou caminho de um arquivo .xml
-    .paper_size("a4")
-    .as_base64()           // ou .as_file("danfe.pdf")
-    .build()
-    .await?;
-```
-
-> **Limite conhecido:** NF-e com muitos itens não é quebrada em várias folhas A4 — a página
-> cresce em altura (a amostra de 60 itens sai com ~485 mm).
+Como cada parte funciona e por quê: [Certificado digital e plataformas](docs/certificado-e-plataformas.md).
 
 ---
 
 ## Features de compilação
 
-As funcionalidades atuais de NF-e/NFC-e continuam ligadas por padrão.
-Use `default-features = false` para selecionar as camadas opcionais:
-
 | Feature | Liga | Padrão |
 |---|---|:--:|
 | `emissao` | Montagem, assinatura e transmissão de NF-e/NFC-e com validação XSD | ✅ |
-| `validacao-xsd` | Validação pública via `is_xml_valid` e dependência nativa `libxml2` | Via `emissao` |
-| `danfe` | Geração de DANFE em PDF | ✅ |
-| `escpos` | ESC/POS genérico e cupons fiscais de NF-e/NFC-e | ✅ |
-| `escpos-base` | Builder ESC/POS genérico (`EscPosBuilder`) | Via `escpos` |
-| `distribuicao` | Distribuição de DF-e + manifestação | ✅ |
-| `nfse` | Builder da DPS v1.01 para a NFS-e Nacional | Opt-in |
+| `danfe` | DANFE em PDF | ✅ |
+| `escpos` | ESC/POS genérico e cupons fiscais | ✅ |
+| `distribuicao` | Distribuição de DF-e e manifestação | ✅ |
+| `nfse` | NFS-e Nacional | opt-in |
+| `validacao-xsd` | Só a validação XSD (`is_xml_valid`) | via `emissao` / `nfse` |
+| `escpos-base` | Só o `EscPosBuilder` genérico | via `escpos` |
 
 ```toml
-# Só emissão/cancelamento + DANFE, sem ESC/POS nem distribuição:
+# Só emissão + DANFE, sem ESC/POS nem distribuição:
 dfe = { version = "0.8", default-features = false, features = ["emissao", "danfe"] }
 ```
 
-Para gerar PDF e cupons fiscais a partir de XML, selecione apenas `["danfe", "escpos"]`
-com `default-features = false`. Esse perfil dispensa `libxml2` na `dfe`.
-Cancelamento, substituição, carta de correção, status, tipos fiscais e extração de XML
-continuam disponíveis em todos os perfis.
-
-Se você já usa `default-features = false`, acrescente `emissao` para continuar usando
-`NFeBuilder` e as APIs de emissão, ou `validacao-xsd` para usar apenas `is_xml_valid`.
-
-Com `nfse`, `dfe::nfse::NfseBuilder` gera a DPS regular de serviço nacional para
-prestadores MEI ou do Simples Nacional sem retenção de ISSQN. `gerar_dps()`
-retorna o ID, o ambiente e o XML para assinatura posterior. Os testes contra
-os XSDs oficiais também usam a feature `validacao-xsd`. O pacote de produção
-v1.01-20260209 tem uma rejeição conhecida no campo `serie`, registrada nas
-[fixtures de NFS-e](tests/fixtures/nfse/README.md).
-
-O builder exige série da API entre 1 e 49.999, valor de serviço positivo e
-competência até a data local de emissão. Use `desconto_incondicionado(Decimal)` para declarar um desconto
-menor que o valor bruto. Com zero, o grupo de desconto é omitido.
+Perfis (inclusive um sem `libxml2`) e o que fica sempre disponível: [Instalação](docs/instalacao.md#features-de-compilação).
 
 ---
 
 ## Documentação
 
-| Seção | Descrição |
+| Página | Conteúdo |
 |---|---|
-| [Instalação](docs/instalacao.md) | Plataformas suportadas, libxml2/vcpkg (linking estático no Windows) |
-| [Certificado digital e plataformas](docs/certificado-e-plataformas.md) | CAPI no Windows × OpenSSL no Linux, provider `legacy` (PFX RC2/3DES) e por quê, cadeia ICP-Brasil para o TLS com a SEFAZ, macOS, testes |
+| [Instalação](docs/instalacao.md) | Plataformas, `libxml2`/vcpkg no Windows, perfis de *features* |
+| [Certificado digital e plataformas](docs/certificado-e-plataformas.md) | CAPI × OpenSSL, provider `legacy`, cadeia ICP-Brasil, macOS |
 | [Emissão NF-e / NFC-e](docs/emissao-nfe-nfce.md) | `NFeBuilder`, métodos, totais automáticos |
+| [ICMS, PIS, COFINS](docs/icms-pis-cofins.md) | Grupos de ICMS, PIS/COFINS, IPI, validação de CNPJ/CPF |
 | [Cancelamento](docs/cancelamento.md) | `CancelarBuilder` |
-| [Manifestação do Destinatário](docs/manifestacao.md) | Ciência, confirmação, desconhecimento, op. não realizada |
+| [Manifestação do destinatário](docs/manifestacao.md) | Ciência, confirmação, desconhecimento, operação não realizada |
 | [Distribuição de DF-e](docs/distribuicao.md) | Consulta por NSU e chave de acesso |
-| [NFS-e Nacional](docs/nfse.md) | Feature `nfse`: ambientes, convênio do município por ambiente, exceção do MEI e o 403 da produção restrita (diagnóstico) |
-| [DANFE](docs/danfe.md) | Geração de PDF A4 e 80mm |
-| [ESC/POS](docs/escpos.md) | `EscPosBuilder` e `EscPosNFCeBuilder` |
-| [Status do Webservice](docs/status-webservice.md) | Disponibilidade por UF e modelo (NF-e 55 / NFC-e 65), códigos e limite de consulta |
-| [Tratamento de Erros](docs/erros.md) | `DfeError` — variantes e quando ocorrem |
-| [ICMS, PIS, COFINS](docs/icms-pis-cofins.md) | Todos os grupos de ICMS do leiaute (modalidades, partilha, repasse, monofásico, gCred/comb), PIS/COFINS de qualquer CST, IPI e validação CNPJ/CPF |
-| [Testes](docs/testes.md) | Suites disponíveis, requisitos e testes de grupo contra o XSD |
-| [Notas e Roadmap](docs/notas-roadmap.md) | Boas práticas e funcionalidades planejadas |
+| [NFS-e Nacional](docs/nfse.md) | Ambientes, adesão do município, exceção do MEI, diagnóstico de acesso |
+| [DANFE](docs/danfe.md) | PDF A4 e 80 mm, modelo da Reforma, amostras |
+| [ESC/POS](docs/escpos.md) | `EscPosBuilder`, `EscPosNFCeBuilder` |
+| [Status do webservice](docs/status-webservice.md) | Disponibilidade por UF e modelo |
+| [Tratamento de erros](docs/erros.md) | `DfeError`: variantes e quando ocorrem |
+| [Testes](docs/testes.md) | Suítes, requisitos, homologação ao vivo |
+| [Pacotes XSD](docs/xsd_pacotes.md) | Pacote em uso, troca e rollback |
+| [Notas e roadmap](docs/notas-roadmap.md) | Boas práticas e o que vem por aí |
+| [API.md](API.md) | Referência de todos os *builders* |
 
-Referência completa dos *builders* (incluindo `SubstituicaoBuilder`, `CartaCorrecaoBuilder` e as
-features) em [API.md](API.md).
+Os exemplos em Rust deste README são compilados no `cargo test --features nfse`.
 
 ---
 
@@ -239,11 +193,7 @@ features) em [API.md](API.md).
 
 Dúvidas, sugestões e troca de experiência com quem integra a SEFAZ em Rust: entre na
 [comunidade do dfe no WhatsApp](https://chat.whatsapp.com/GYV2d62n46k7vYaZg5zRBb).
-
-Bugs e pedidos de funcionalidade continuam em
-[issues do GitHub](https://github.com/GustavoOta/dfe/issues).
-
----
+Bugs e pedidos de funcionalidade: [issues do GitHub](https://github.com/GustavoOta/dfe/issues).
 
 ## Licença
 

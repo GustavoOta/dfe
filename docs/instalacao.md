@@ -152,3 +152,40 @@ vcpkg install libxml2:x64-windows
 ```
 
 Ou baixando o MinGW e copiando `libxml2-2.dll` da pasta `bin/`.
+
+---
+
+## Features de compilação
+
+Por padrão ficam ligadas `emissao`, `danfe`, `escpos` e `distribuicao` — o conjunto histórico de
+NF-e/NFC-e. A NFS-e Nacional é opt-in.
+
+| Feature | Liga | Padrão |
+|---|---|:--:|
+| `emissao` | Montagem, assinatura e transmissão de NF-e/NFC-e com validação XSD | ✅ |
+| `validacao-xsd` | Validação pública via `is_xml_valid` e dependência nativa `libxml2` | via `emissao` / `nfse` |
+| `danfe` | DANFE em PDF (`DanfeBuilder`) | ✅ |
+| `escpos` | ESC/POS genérico e cupons fiscais de NF-e/NFC-e | ✅ |
+| `escpos-base` | Só o builder ESC/POS genérico (`EscPosBuilder`) | via `escpos` |
+| `distribuicao` | Distribuição de DF-e + manifestação do destinatário | ✅ |
+| `nfse` | NFS-e Nacional: DPS v1.01, assinatura, XSD e cliente REST da SEFIN ([NFS-e Nacional](nfse.md)) | opt-in |
+| `sefaz-live` | Testes que falam com a SEFAZ (homologação) — só para desenvolvimento da crate | — |
+
+### Perfis comuns
+
+```toml
+# Tudo de NF-e/NFC-e (padrão) + NFS-e Nacional
+dfe = { version = "0.8", features = ["nfse"] }
+
+# Só emissão + DANFE, sem ESC/POS nem distribuição
+dfe = { version = "0.8", default-features = false, features = ["emissao", "danfe"] }
+
+# Só PDF e cupons a partir de XML já autorizado — dispensa o libxml2 na dfe
+dfe = { version = "0.8", default-features = false, features = ["danfe", "escpos"] }
+```
+
+- **Sempre disponíveis**, em qualquer perfil: cancelamento, cancelamento por substituição, carta de
+  correção, inutilização, consulta de situação, status, tipos fiscais, validação de CNPJ/CPF e
+  extração de XML.
+- **Quem já usa `default-features = false`:** acrescente `emissao` para continuar com o
+  `NFeBuilder` e as APIs de emissão, ou `validacao-xsd` para usar só o `is_xml_valid`.

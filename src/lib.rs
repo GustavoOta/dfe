@@ -1,7 +1,8 @@
 //! # dfe
 //!
-//! Crate Rust para integração com os webservices da **SEFAZ** brasileira.
-//! Emite, cancela e distribui NF-e e NFC-e; gera DANFE em PDF e imprime via ESC/POS.
+//! Crate Rust para integração com os webservices da **SEFAZ** brasileira e da **SEFIN Nacional**.
+//! Emite, cancela e distribui NF-e e NFC-e, emite NFS-e Nacional (feature `nfse`), gera DANFE em
+//! PDF e imprime via ESC/POS.
 //!
 //! ## Início rápido
 //!
@@ -18,6 +19,8 @@
 //! | [`cancelar`] | Cancelamento via [`CancelarBuilder`] |
 //! | [`substituicao`] | Cancelamento por substituição de NFC-e (110112) via [`SubstituicaoBuilder`] |
 //! | [`carta_correcao`] | Carta de Correção Eletrônica (110110) via [`CartaCorrecaoBuilder`] |
+//! | [`inutilizacao`] | Inutilização de faixa de numeração via [`InutilizacaoBuilder`] |
+//! | [`consulta_situacao`] | Situação da NF-e/NFC-e pela chave via [`ConsultaSituacaoBuilder`] |
 //! | [`danfe`] | Geração de DANFE em PDF via [`DanfeBuilder`] |
 //! | [`escpos`] | Impressão ESC/POS via [`EscPosBuilder`] e [`EscPosNFCeBuilder`] |
 //! | [`distribuicao`] | Distribuição de DF-e (Ambiente Nacional) |
@@ -25,6 +28,7 @@
 //! | [`manifestacao`] | Manifestação do destinatário |
 //! | [`xml_extractor`] | Extração de campos de XML autorizado |
 //! | [`tipos`] | Structs e enums de domínio (`Icms`, `Det`, `Ide`, …) |
+//! | `nfse` | NFS-e Nacional (feature `nfse`): DPS, assinatura, envio e consulta na SEFIN |
 //!
 //! ## Plataformas
 //!
@@ -113,6 +117,11 @@ pub mod status;
 pub mod substituicao;
 pub mod tipos;
 pub mod xml_extractor;
+
+/// Compila os exemplos em Rust do `README.md` (vitrine da crate) a cada `cargo test --features nfse`.
+#[cfg(all(doctest, feature = "emissao", feature = "danfe", feature = "nfse"))]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
 
 mod interno;
 

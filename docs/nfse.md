@@ -11,6 +11,18 @@ dfe = { version = "…", features = ["nfse"] }
 Escopo atual: prestador **MEI** ou **Simples Nacional**, serviço nacional **sem retenção** de ISSQN.
 Ainda não: grupo IBS/CBS, retenções, regime normal, eventos (cancelamento/substituição) e DANFSe.
 
+### Regras que o builder confere antes de gerar a DPS
+
+- série de emissão por API entre **1 e 49.999** (E0010);
+- número da DPS de 1 a 999.999.999.999.999;
+- valor do serviço **maior que zero**, com no máximo duas casas;
+- competência **até a data local de emissão** (E0015);
+- `desconto_incondicionado(Decimal)` menor que o valor bruto — zero omite o grupo de desconto;
+- CNPJ alfanumérico só na produção restrita (a produção ainda não aceita).
+
+O XSD de produção publicado tem um defeito no padrão da série (`^`/`$` literais); a crate embute
+a versão corrigida dessa única linha — detalhe em `src/nfse/schemas/README.md`.
+
 ---
 
 ## Ambientes

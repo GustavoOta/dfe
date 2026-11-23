@@ -18,6 +18,11 @@ Além dos testes de unidade dentro de `src/`, os testes de integração ficam em
 
 ¹ Só com a feature `sefaz-live` e um `.env` com o certificado (ver abaixo).
 
+## Exemplos do README
+
+Os blocos em Rust do `README.md` são compilados como doctest (`src/lib.rs`, `ReadmeDoctests`)
+em `cargo test --features nfse`. Exemplo do README que deixa de compilar derruba a suíte.
+
 ## Certificado e plataformas
 
 Os testes de certificado rodam no `cargo test` padrão, no Windows e no Linux, com os **PFX

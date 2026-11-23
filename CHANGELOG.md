@@ -8,6 +8,12 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 ## [0.8.2] — 2026-11-23
 
 ### Changed
+- **README reescrito como vitrine** (NF-e, NFC-e e NFS-e Nacional): curto, com o detalhe nas
+  páginas de `docs/` (perfis de *features* em `instalacao.md`, amostras em `danfe.md`, regras do
+  builder em `nfse.md`). O exemplo do DANFE no README não compilava (`xml()` recebe `&str` e
+  `build()` devolve `Result<String, String>`); os exemplos em Rust do README agora são **doctests**
+  (`ReadmeDoctests`, `cargo test --features nfse`). A página do docs.rs passa a documentar a
+  feature `nfse` e lista inutilização e consulta de situação.
 - **Validação XSD no Pacote de Liberação PL_010h v1.03** (13/11/2026), no lugar do PL_010d
   (`src/schemas_pl010h/`). O pacote traz as NT 2025.002 v1.50, 2026.002/003 (`tpImp=6`),
   2026.005 (IBS/CBS do Simples: `cAtivSN`, `tpRegimeIBSCBS`, `gTribSN`), 2026.006 (split,
