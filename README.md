@@ -8,6 +8,9 @@
 eventos, assinatura, validação, DANFE e impressão, numa única biblioteca `async`, com as 27 UFs,
 no Windows e no Linux.
 
+*Brazilian electronic fiscal documents for Rust: NF-e, NFC-e and NFS-e — issuing, events,
+XML signing, schema validation, DANFE and ESC/POS printing against SEFAZ.*
+
 [![Crates.io](https://img.shields.io/crates/v/dfe)](https://crates.io/crates/dfe)
 [![Docs.rs](https://docs.rs/dfe/badge.svg)](https://docs.rs/dfe)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)

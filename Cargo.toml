@@ -2,11 +2,11 @@
 name = "dfe"
 version = "0.8.2"
 edition = "2021"
-description = "DFE - Documentos Fiscais Eletrônicos Brasileiros"
+description = "NF-e, NFC-e e NFS-e Nacional em Rust: emissão, eventos, assinatura, XSD, DANFE e ESC/POS na SEFAZ (27 UFs). Brazilian electronic invoices (nota fiscal) for SEFAZ."
 license = "MIT"
 readme = "README.md"
-keywords = ["rust", "nfe", "dfe"]
-categories = ["api-bindings", "parsing"]
+keywords = ["nfe", "nfce", "nfse", "sefaz", "nota-fiscal"]
+categories = ["api-bindings", "finance", "web-programming::http-client"]
 
 homepage = "https://github.com/GustavoOta/dfe"
 repository = "https://github.com/GustavoOta/dfe"
