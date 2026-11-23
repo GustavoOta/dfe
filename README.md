@@ -221,6 +221,7 @@ menor que o valor bruto. Com zero, o grupo de desconto é omitido.
 | [Cancelamento](docs/cancelamento.md) | `CancelarBuilder` |
 | [Manifestação do Destinatário](docs/manifestacao.md) | Ciência, confirmação, desconhecimento, op. não realizada |
 | [Distribuição de DF-e](docs/distribuicao.md) | Consulta por NSU e chave de acesso |
+| [NFS-e Nacional](docs/nfse.md) | Feature `nfse`: ambientes, convênio do município por ambiente, exceção do MEI e o 403 da produção restrita (diagnóstico) |
 | [DANFE](docs/danfe.md) | Geração de PDF A4 e 80mm |
 | [ESC/POS](docs/escpos.md) | `EscPosBuilder` e `EscPosNFCeBuilder` |
 | [Status do Webservice](docs/status-webservice.md) | Disponibilidade por UF e modelo (NF-e 55 / NFC-e 65), códigos e limite de consulta |

@@ -699,3 +699,5 @@ match cliente.transmitir(&assinada).await {
 - **Texto:** quebra de linha sai como LF; `&`, `<` e `>` viram entidade e aspas vão literais
   (forma canônica do C14N, sem a qual o digest diverge — rejeição E0714).
 - **Fora desta versão:** grupo IBS/CBS, retenções, eventos (cancelamento/substituição) e DANFSe.
+- **Ambientes, convênio do município e problemas conhecidos** (adesão separada por ambiente,
+  exceção do MEI, 403 da produção restrita): [`docs/nfse.md`](docs/nfse.md).

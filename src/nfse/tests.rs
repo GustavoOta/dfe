@@ -514,6 +514,35 @@ async fn consulta_dps_encontrada_ausente_e_negada() {
     );
 }
 
+/// Corpo literal devolvido pela SEFIN de **produção** em 23-11-2026 a um `GET /dps/{id}` de DPS
+/// inexistente (HTTP 404, `application/json`), com A1 de contribuinte. Trava o contrato real:
+/// camelCase, `erro` no singular, código E2404.
+const DPS_INEXISTENTE_PRODUCAO: &str = r#"{
+  "tipoAmbiente": 0,
+  "dataHoraProcessamento": "2026-11-23T18:21:21.6638409-03:00",
+  "erro": {
+    "codigo": "E2404",
+    "descricao": "Não foi gerada uma NFS-e com o identificador de DPS informado"
+  }
+}"#;
+
+#[tokio::test]
+async fn consulta_dps_inexistente_com_a_resposta_real_da_sefin() {
+    let a = assinada(Ambiente::Producao).await;
+    let (c, falso) = cliente(
+        Ambiente::Producao,
+        vec![http(404, DPS_INEXISTENTE_PRODUCAO)],
+    );
+    assert_eq!(
+        c.consultar_dps(a.id()).await.unwrap(),
+        ConsultaDps::NaoEncontrada
+    );
+    assert_eq!(
+        falso.pedidos.lock().unwrap()[0].url,
+        format!("https://sefin.nfse.gov.br/SefinNacional/dps/{}", a.id())
+    );
+}
+
 #[tokio::test]
 async fn consulta_recusa_id_e_chave_fora_do_formato_sem_enviar() {
     let (c, falso) = cliente(Ambiente::ProducaoRestrita, vec![]);

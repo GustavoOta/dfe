@@ -26,6 +26,9 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
     [`docs/xsd_pacotes.md`](docs/xsd_pacotes.md).
 
 ### Known issues
+- **NFS-e: produção restrita responde 403 do IIS a todo pedido** (23-11-2026), sem pedir o
+  certificado de cliente; a produção, com o mesmo certificado e rede, atende. Detalhe e diagnóstico
+  em [`docs/nfse.md`](docs/nfse.md#problema-conhecido-produção-restrita-respondendo-403-a-todo-pedido).
 - **CC-e em homologação na SEFAZ-SP volta `999 — Erro não catalogado`** (18-11-2026), no ciclo
   `live_ciclo_nfe_55_homologacao`. Rodando com o PL_010d dá o mesmo resultado, e o evento não passa
   pelo validador de NF-e. Ainda sem causa identificada.
@@ -51,6 +54,12 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
     `DFE_TEST_CERT_*` da NF-e; serviço de R$ 1,00), ambiente fixo em `common::HOMOLOGACAO_NFSE`.
   - Respostas lidas em camelCase e em PascalCase (`ChaveAcesso`, `Erros`, `Alertas`…), a
     grafia do Swagger oficial do ADN.
+  - Contrato real conferido na SEFIN de **produção** (só leitura, 23-11-2026): base
+    `…/SefinNacional`, `GET /dps/{id}` de DPS inexistente → HTTP 404 com `erro.codigo = E2404`
+    (travado em teste com o corpo literal).
+  - [`docs/nfse.md`](docs/nfse.md): ambientes, convênio do município por ambiente, exceção do MEI
+    (Anexo I) e o **403 da produção restrita** com o diagnóstico passo a passo.
+
 - **XSDs da DPS embutidos** (`src/nfse/schemas/`, antes só em `tests/fixtures/nfse/`). O de
   produção tem `TSSerieDPS` corrigido (`^`/`$` literais reprovavam toda série no libxml2);
   hashes e motivo no `README.md` da pasta.
