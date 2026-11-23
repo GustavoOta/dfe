@@ -20,6 +20,21 @@ fn constante_de_homologacao_vale_2() {
     );
 }
 
+/// NFS-e: `HOMOLOGACAO_NFSE` (que também começa com `common::HOMOLOGACAO`, e por isso passa na
+/// varredura abaixo) tem de ser a produção restrita.
+#[test]
+fn constante_de_homologacao_da_nfse_e_producao_restrita() {
+    let common = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/common/mod.rs")).unwrap();
+    assert!(
+        common.contains(
+            "pub const HOMOLOGACAO_NFSE: dfe::nfse::Ambiente = dfe::nfse::Ambiente::ProducaoRestrita;"
+        ),
+        "tests/common/mod.rs: HOMOLOGACAO_NFSE tem de ser Ambiente::ProducaoRestrita"
+    );
+    let constantes = common.matches("pub const HOMOLOGACAO").count();
+    assert_eq!(constantes, 2, "constante HOMOLOGACAO* nova precisa de trava própria aqui");
+}
+
 #[test]
 fn nenhum_teste_escolhe_o_ambiente_por_conta_propria() {
     let pasta = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests");

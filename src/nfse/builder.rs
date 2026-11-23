@@ -1,6 +1,7 @@
 use crate::error::{DfeError, Result};
 use crate::{validate_cnpj, validate_cpf};
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate};
+use quick_xml::escape::partial_escape;
 use quick_xml::events::{BytesDecl, BytesText, Event};
 use quick_xml::Writer;
 use rust_decimal::Decimal;
@@ -74,9 +75,9 @@ pub struct Tributacao {
 
 #[derive(Clone, Debug)]
 pub struct DpsGerada {
-    ambiente: Ambiente,
-    id: String,
-    xml: String,
+    pub(super) ambiente: Ambiente,
+    pub(super) id: String,
+    pub(super) xml: String,
 }
 
 impl DpsGerada {
@@ -393,9 +394,13 @@ fn escrever_valores(
     Ok(())
 }
 
+/// Escreve o texto já na forma canônica (C14N): só `&`, `<` e `>` viram entidade, e a quebra
+/// de linha sai como LF. O digest da assinatura é calculado sobre este texto; o `&quot;` do
+/// escape padrão do `quick-xml` divergiria do C14N que a SEFIN aplica (rejeição E0714).
 fn tag(xml: &mut Writer<Vec<u8>>, nome: &str, valor: &str) -> io::Result<()> {
+    let valor = valor.replace("\r\n", "\n").replace('\r', "\n");
     xml.create_element(nome)
-        .write_text_content(BytesText::new(valor))?;
+        .write_text_content(BytesText::from_escaped(partial_escape(valor.as_str())))?;
     Ok(())
 }
 

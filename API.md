@@ -18,6 +18,7 @@ toda a API (comportamento recomendado para o consumidor completo).
 | `danfe` (default) | DANFE em PDF (`DanfeBuilder`) | `printpdf`, `image`, `barcoders`, `qrcodegen` |
 | `escpos` (default) | Impressão ESC/POS (`EscPosBuilder`, `EscPosNFCeBuilder`, `EscPosDanfeNFeBuilder`) | `font8x8`, `image`, `barcoders`, `qrcodegen` |
 | `distribuicao` (default) | Distribuição do AN + manifestação (`ManifestacaoBuilder`) | `flate2` |
+| `nfse` (opt-in) | NFS-e Nacional: DPS, assinatura, XSD e SEFIN (`dfe::nfse`) | `flate2`, `libxml` |
 
 O **core** (emissão, cancelamento, substituição, CC-e, status, extração de XML, tipos) está **sempre
 disponível**, independente de features. Para um build enxuto, desligue o que não usar:
@@ -646,3 +647,55 @@ let bytes = EscPosDanfeNFeBuilder::new()
   leva aviso.
 - **Limitação atual:** a emissão (`NFeBuilder`) só gera `infNFeSupl` para o modelo 65, então a
   NF-e 55 emitida pela crate ainda sai sem QR.
+
+---
+
+## NFS-e Nacional — `dfe::nfse` (feature `nfse`)
+
+DPS v1.01 de serviço nacional sem retenção de ISSQN, prestador MEI ou Simples Nacional. A
+assinatura segue o Manual Integrado do SN NFS-e (§6.1.4): mesmo perfil da NF-e (RSA-SHA1,
+SHA-1, C14N, enveloped). A DPS assinada é conferida no XSD do ambiente, embutido na crate.
+
+```rust
+use dfe::nfse::{Ambiente, ConsultaDps, ErroEnvio, NfseBuilder, NfseClient, ResultadoEmissao};
+
+let cliente = NfseClient::builder()
+    .ambiente(Ambiente::ProducaoRestrita)   // obrigatório; Producao = https://sefin.nfse.gov.br
+    .cert("empresa.pfx", "senha")           // A1 do prestador, lido a cada operação
+    .build()?;
+
+let dps = NfseBuilder::new()
+    .ambiente(Ambiente::ProducaoRestrita)
+    .identificacao(identificacao)           // série, número, dhEmi, competência, cLocEmi
+    .prestador(prestador)
+    .tomador(tomador)                       // opcional
+    .servico(servico)
+    .tributacao(tributacao)
+    .gerar_dps()?;
+
+let assinada = cliente.assinar(&dps).await?;
+// Persistir assinada.id() e assinada.xml() ANTES do envio.
+
+match cliente.transmitir(&assinada).await {
+    Ok(ResultadoEmissao::Autorizada(n)) => { n.chave_acesso; n.xml; n.alertas; }
+    Ok(ResultadoEmissao::Rejeitada(r))  => { r.erros; }   // Mensagem { codigo, descricao, complemento }
+    Err(ErroEnvio::Local(e))            => { /* não chegou à SEFIN: pode reenviar */ }
+    Err(ErroEnvio::Indeterminado { id_dps, .. }) => {
+        // Pode ter sido processada. Consultar antes de qualquer reenvio:
+        match cliente.consultar_dps(&id_dps).await? {
+            ConsultaDps::Encontrada { chave_acesso } => { cliente.consultar_nfse(&chave_acesso).await?; }
+            ConsultaDps::NaoEncontrada => { /* reenviar o MESMO XML: DpsAssinada::from_xml */ }
+        }
+    }
+}
+```
+
+- **Retomar depois de reiniciar:** `DpsAssinada::from_xml(&xml_guardado)` confere estrutura, XSD
+  e se o `DigestValue` ainda corresponde ao `<infDPS>` (XML alterado é recusado).
+- **Ambiente travado:** assinar ou transmitir DPS de um ambiente num cliente de outro é
+  `DfeError::Validacao`, sem envio.
+- **`consultar_dps`** só devolve a chave a um ator da nota (prestador, tomador, intermediário).
+  `NaoEncontrada` é o HTTP 404.
+- **Texto:** quebra de linha sai como LF; `&`, `<` e `>` viram entidade e aspas vão literais
+  (forma canônica do C14N, sem a qual o digest diverge — rejeição E0714).
+- **Fora desta versão:** grupo IBS/CBS, retenções, eventos (cancelamento/substituição) e DANFSe.

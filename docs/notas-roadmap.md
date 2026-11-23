@@ -22,7 +22,7 @@ Situação em **19-11-2026** (versão 0.8.x). Legenda: ✅ pronto · 🟡 parcia
 |---|:---:|:---:|
 | **NF-e** — emissão, cancelamento, CC-e, inutilização, consulta, status, distribuição, manifestação, DANFE A4/80 mm | 55 | ✅ |
 | **NFC-e** — emissão (inclusive contingência off-line), cancelamento, cancelamento por substituição, DANFE 80 mm, ESC/POS | 65 | ✅ |
-| **NFS-e Nacional** — a DPS v1.01 já é montada (feature `nfse`); faltam assinatura, envio à SEFIN, consulta e eventos | — | 🟡 |
+| **NFS-e Nacional** — DPS v1.01 montada, assinada e enviada à SEFIN Nacional, com consulta pela DPS e pela chave (feature `nfse`); faltam IBS/CBS, eventos e DANFSe | — | 🟡 |
 | **NF-e Simplificada** (NT 2026.002/003) — leiaute PL_010h pronto; faltam `tpImp=6`, QR Code na NF-e e URL por UF | 55 | 🟡 |
 | **MDF-e** | 58 | 🔜 |
 | **CT-e** | 57 | 🔜 |

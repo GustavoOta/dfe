@@ -55,8 +55,8 @@ escpos = ["escpos-base"]
 escpos-base = ["dep:font8x8", "dep:image", "dep:barcoders", "dep:qrcodegen"]
 # Distribuição de DF-e (AN) + manifestação do destinatário (fluxo inbound; gzip via flate2).
 distribuicao = ["dep:flate2"]
-# Entrada para NFS-e Nacional (DPS e resposta XML em gzip).
-nfse = ["dep:flate2"]
+# NFS-e Nacional: DPS, assinatura, XSD embutido e cliente REST da SEFIN (XML em gzip).
+nfse = ["dep:flate2", "validacao-xsd"]
 # Liga a camada de testes que bate na SEFAZ (homologação). Fora do `cargo test` padrão.
 sefaz-live = ["emissao"]
 

@@ -34,6 +34,44 @@ pub fn read_xml_fixture(nome: &str) -> String {
 /// `tests/homologacao_travada.rs` (nenhum `ambiente(1)`/`tp_amb: 1` passa).
 pub const HOMOLOGACAO: u8 = 2;
 
+/// O mesmo para a NFS-e: a SEFIN Nacional chama a homologação de **produção restrita**.
+/// Travado junto com o [`HOMOLOGACAO`] por `tests/homologacao_travada.rs`.
+#[cfg(feature = "nfse")]
+pub const HOMOLOGACAO_NFSE: dfe::nfse::Ambiente = dfe::nfse::Ambiente::ProducaoRestrita;
+
+/// Prestador habilitado no Emissor Nacional para o ciclo de NFS-e em produção restrita
+/// (`DFE_TEST_NFSE_*` no `.env`, ver `env.example`). `None` = teste pulado.
+#[cfg(feature = "nfse")]
+pub struct LiveNfse {
+    pub municipio: String,
+    pub inscricao_municipal: Option<String>,
+    pub mei: bool,
+    pub codigo_tributacao_nacional: String,
+    pub codigo_tributacao_municipal: Option<String>,
+    pub serie: u32,
+}
+
+#[cfg(feature = "nfse")]
+pub fn live_nfse() -> Option<LiveNfse> {
+    live_env()?;
+    let v = |k: &str| {
+        std::env::var(k)
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+    };
+    Some(LiveNfse {
+        municipio: v("DFE_TEST_NFSE_MUNICIPIO")?,
+        inscricao_municipal: v("DFE_TEST_NFSE_IM"),
+        mei: v("DFE_TEST_NFSE_MEI").is_some_and(|s| s == "1"),
+        codigo_tributacao_nacional: v("DFE_TEST_NFSE_CTRIBNAC")?,
+        codigo_tributacao_municipal: v("DFE_TEST_NFSE_CTRIBMUN"),
+        serie: v("DFE_TEST_NFSE_SERIE")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(900),
+    })
+}
+
 /// Credenciais/parâmetros para a **camada `sefaz-live`** (Camada 3), lidos do `.env`
 /// (ver `env.example`). Retorna `None` quando `DFE_TEST_CERT_PATH` não está definido →
 /// o teste live deve ser **ignorado (skip)**, nunca falhar por falta de segredo.

@@ -31,6 +31,29 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
   pelo validador de NF-e. Ainda sem causa identificada.
 
 ### Added
+- **NFS-e Nacional: assinatura, envio e consulta na SEFIN** (feature `nfse`, que passa a ligar
+  `validacao-xsd`). `NfseClient::builder().ambiente().cert().build()` com:
+  - `assinar(&DpsGerada) -> DpsAssinada`: XMLDSig no perfil do Manual Integrado do SN NFS-e
+    §6.1.4 (o mesmo da NF-e: RSA-SHA1, SHA-1, C14N, enveloped, `Reference URI="#DPS…"`),
+    reusando a assinatura CAPI/OpenSSL da crate, e conferência no XSD do ambiente.
+    `DpsAssinada::from_xml` reabre a DPS guardada e recusa XML alterado depois de assinado.
+  - `transmitir` (`POST /nfse`, `dpsXmlGZipB64`): `Autorizada` (chave, XML, alertas) ou
+    `Rejeitada` (erros, nas grafias `codigo`/`Codigo`); `ErroEnvio::Local` quando nada saiu e
+    `ErroEnvio::Indeterminado` quando a DPS pode ter sido processada (timeout, 5xx, resposta
+    ilegível).
+  - `consultar_dps` (`GET /dps/{id}`: `Encontrada`/`NaoEncontrada`) e `consultar_nfse`
+    (`GET /nfse/{chave}`). Descompressão com teto de 8 MiB.
+  - Conferência independente da DPS assinada do teste (`src/nfse/snapshots/`): digest pelo C14N
+    do lxml e do `xml.etree` (Python), assinatura por `openssl dgst -sha1 -verify` — `Verified OK`.
+    Mesmo XML no Windows (CAPI) e no Linux (OpenSSL).
+  - Ciclo real opt-in em produção restrita: `tests/nfse_live.rs` (`sefaz-live` + `nfse`,
+    `DFE_TEST_NFSE_*` no `.env`), ambiente fixo em `common::HOMOLOGACAO_NFSE`.
+- **XSDs da DPS embutidos** (`src/nfse/schemas/`, antes só em `tests/fixtures/nfse/`). O de
+  produção tem `TSSerieDPS` corrigido (`^`/`$` literais reprovavam toda série no libxml2);
+  hashes e motivo no `README.md` da pasta.
+- **Correção no `NfseBuilder` (DPS com aspas ou CR no texto)**: escrevia `&quot;`/`&apos;` e CR,
+  divergindo da forma canônica sobre a qual a SEFIN confere o digest (rejeição E0714). Agora só
+  `&`, `<` e `>` viram entidade e a quebra de linha sai como LF.
 - **DANFE A4 no modelo da Reforma Tributária** (NT 2026.010, vigente a partir de 01/12/2026):
   CRT no quadro do emitente; bloco "TOTAL DO IBS / CBS / IS" (com a linha da monofasia só
   quando há `gMono`); sublinha por item com cClassTrib, base, alíquotas (efetiva com `gRed`) e

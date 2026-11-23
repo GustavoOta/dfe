@@ -210,13 +210,14 @@ fn mei_omite_grupos_opcionais() {
     }
 }
 
-#[cfg(feature = "validacao-xsd")]
 #[test]
 fn dps_de_cada_ambiente_confere_com_o_xsd_oficial() {
     use libxml::parser::Parser;
     use libxml::schemas::{SchemaParserContext, SchemaValidationContext};
     use std::path::Path;
 
+    // XSDs embutidos na crate (src/nfse/schemas). O de produção tem só a série corrigida
+    // (`^`/`$` literais em TSSerieDPS reprovavam toda DPS no libxml); ver o README da pasta.
     for (ambiente, municipio, pacote, documento) in [
         (Ambiente::Producao, "3526100", "prod", "11222333000181"),
         (
@@ -233,28 +234,14 @@ fn dps_de_cada_ambiente_confere_com_o_xsd_oficial() {
             .gerar_dps()
             .unwrap();
         let arquivo = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("tests/fixtures/nfse")
+            .join("src/nfse/schemas")
             .join(pacote)
             .join("DPS_v1.01.xsd");
         let mut parser = SchemaParserContext::from_file(arquivo.to_str().unwrap());
         let mut contexto = SchemaValidationContext::from_parser(&mut parser).unwrap();
         let doc = Parser::default().parse_string(dps.xml()).unwrap();
-        let resultado = contexto.validate_document(&doc);
-        match ambiente {
-            Ambiente::ProducaoRestrita => {
-                resultado.expect("DPS conforme o XSD de produção restrita")
-            }
-            Ambiente::Producao => {
-                // O XSD de produção usa ^ e $ literais em TSSerieDPS.
-                // O schema original deve apontar apenas esse erro.
-                let erros = resultado.expect_err("revisar o teste se o XSD corrigir TSSerieDPS");
-                assert_eq!(erros.len(), 1, "erros adicionais no XSD: {erros:?}");
-                let mensagem = erros[0].message.as_deref().unwrap_or_default();
-                assert!(
-                    mensagem.contains("}serie'") && mensagem.contains(r"^0{0,4}\d{1,5}$"),
-                    "erro inesperado no XSD: {mensagem}"
-                );
-            }
-        }
+        contexto
+            .validate_document(&doc)
+            .unwrap_or_else(|e| panic!("{ambiente:?}: DPS fora do XSD: {e:?}"));
     }
 }
