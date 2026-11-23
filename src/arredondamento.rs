@@ -2,7 +2,7 @@
 //! `gravis-retaguarda` reusam `dfe::arred2`; o JS tem o espelho `arredondamento.js`).
 //!
 //! Regra: meio para cima, afastando do zero (`MidpointAwayFromZero`), sobre o valor
-//! DECIMAL — o mesmo `round(..., 2, PHP_ROUND_HALF_UP)` do NFePHP.
+//! DECIMAL — o arredondamento comercial da conta feita à mão: 1,005 → 1,01 e −1,005 → −1,01.
 //!
 //! Por que não `format!("{:.2}", f64)` nem `(v * 100.0).round() / 100.0`: os dois operam no
 //! binário. 1.005 é 1.00499999999999989… em f64, então os dois dão 1.00; e o `format!` ainda

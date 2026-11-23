@@ -110,8 +110,8 @@ impl CartaCorrecaoBuilder {
         if n_seq_evento < 1 {
             return Err(DfeError::Validacao("n_seq_evento deve ser >= 1".to_string()));
         }
-        // Quebras de linha → espaço (o clear_xml_string, como o sped-nfe, não preserva \n; assim
-        // evitamos juntar palavras). Single-line, seguro para a assinatura.
+        // Quebras de linha → espaço: a limpeza que antecede a assinatura (`clear_xml_string`)
+        // remove o \n, o que juntaria as palavras. Texto numa linha só, seguro para a assinatura.
         let correcao = normalize_correcao(&correcao);
         let corr_len = correcao.chars().count();
         // MOC: xCorrecao 15–1000.

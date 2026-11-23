@@ -1012,7 +1012,7 @@ mod tests {
     #[test]
     fn cst_200_com_reducao_total_manda_gred_e_zera_os_valores() {
         // Rejeição 1033/1074: CST 200 (ind_gRed = 1) exige gRed em gIBSUF, gIBSMun e gCBS.
-        // 200014 (hortícolas, Anexo XV) = 100% → pAliqEfet 0 e valores zerados (Flexdocs/ACBr).
+        // 200014 (hortícolas, Anexo XV) = redução de 100% → pAliqEfet 0 e valores zerados.
         let (dets, xml) = xml_do_item(ibs_reduzido("200", "100"), 50.0);
         assert!(xml.contains(
             "<gIBSUF><pIBSUF>0.1000</pIBSUF><gRed><pRedAliq>100.0000</pRedAliq><pAliqEfet>0.0000</pAliqEfet></gRed><vIBSUF>0.00</vIBSUF></gIBSUF>"
