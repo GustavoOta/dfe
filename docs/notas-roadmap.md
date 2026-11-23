@@ -48,6 +48,8 @@ Situação em **19-11-2026** (versão 0.8.x). Legenda: ✅ pronto · 🟡 parcia
 | Valor líquido do item (`vProdLiq`, `vItem`, `vProdLiqTot` — NT 2026.008) | 🔜 |
 | Split payment (`gPgtoVinc` — NT 2026.006) | 🔜 |
 | QR Code v3 da NFC-e (sem CSC) | 🔜 |
+| Grupos do leiaute ainda não montados: importação (II no item, DI), exportação, veículos, medicamentos, armas, rastreabilidade, RECOPI, ISSQN no item, local de retirada, veículo/reboque/volumes no transporte, cobrança (fatura/duplicatas), `autXML`, responsável técnico, intermediador, compra, cana — ver [Cobertura](cobertura.md) | 🔜 |
+| Mais de uma forma de pagamento na mesma nota (vários `detPag`) e outros documentos referenciados (modelo 1/1A, produtor rural, ECF, CT-e) | 🟡 |
 
 ### Eventos
 
@@ -74,6 +76,7 @@ Situação em **19-11-2026** (versão 0.8.x). Legenda: ✅ pronto · 🟡 parcia
 | Contingência **SVC-AN / SVC-RS** da NF-e (`tpEmis 6/7`) — endpoints já cadastrados, falta o roteamento | 🟡 |
 | Contingência **EPEC** (`tpEmis 4`) | 🔜 |
 | **Consulta Cadastro** (`CadConsultaCadastro4`) | 🔜 |
+| Lote de manifestações/eventos (até 20 por envio), conferência de NF-e recebida (assinatura + protocolo), manutenção do CSC | 🔜 |
 | Consulta GTIN (Cadastro Centralizado de GTIN) | 🔜 |
 
 ### Impressão e plataformas

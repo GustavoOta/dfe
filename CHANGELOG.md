@@ -5,6 +5,11 @@ Fases do refactor de arquitetura em `planning/ARQUITETURA_REFACTOR.md`.
 
 ## [Unreleased]
 
+### Added
+- [`docs/cobertura.md`](docs/cobertura.md): cobertura da NF-e/NFC-e item por item — serviços da
+  SEFAZ, grupos do leiaute, protocolo e contingência —, com as lacunas à vista; resumo no README e
+  lacunas do leiaute no roadmap.
+
 ## [0.8.2] — 2026-11-23
 
 ### Changed

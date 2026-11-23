@@ -48,6 +48,12 @@ XML signing, schema validation, DANFE and ESC/POS printing against SEFAZ.*
 | **Impressão** | DANFE em PDF (A4 e 80 mm, com logotipo), cupom da NFC-e e DANFE simplificado em ESC/POS |
 | **Infraestrutura** | 27 UFs em produção e homologação, XSD oficiais embutidos, validação de CNPJ/CPF, leitura de XML autorizado |
 
+**Cobertura:** todos os serviços do dia a dia da SEFAZ (autorização, consulta, inutilização,
+status, distribuição, cancelamento, substituição, CC-e e manifestação) e os grupos do leiaute do
+varejo, com DANFE, ESC/POS e NFS-e na mesma crate. Ainda faltam EPEC, consulta cadastro, eventos
+de entrega e da Reforma e grupos como importação, exportação e cobrança — tabela item por item
+em [Cobertura](docs/cobertura.md).
+
 Referência completa: [API.md](API.md). Próximos passos: [roadmap](docs/notas-roadmap.md).
 
 ---
@@ -183,6 +189,7 @@ Perfis (inclusive um sem `libxml2`) e o que fica sempre disponível: [Instalaç�
 | [ESC/POS](docs/escpos.md) | `EscPosBuilder`, `EscPosNFCeBuilder` |
 | [Status do webservice](docs/status-webservice.md) | Disponibilidade por UF e modelo |
 | [Tratamento de erros](docs/erros.md) | `DfeError`: variantes e quando ocorrem |
+| [Cobertura](docs/cobertura.md) | Serviços da SEFAZ, grupos do leiaute e contingência, item por item |
 | [Testes](docs/testes.md) | Suítes, requisitos, homologação ao vivo |
 | [Pacotes XSD](docs/xsd_pacotes.md) | Pacote em uso, troca e rollback |
 | [Notas e roadmap](docs/notas-roadmap.md) | Boas práticas e o que vem por aí |
