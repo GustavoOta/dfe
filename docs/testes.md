@@ -9,8 +9,8 @@ Além dos testes de unidade dentro de `src/`, os testes de integração ficam em
 | Suite | Arquivo | Descrição |
 |---|---|---|
 | DANFE NFC-e 80mm | `tests/danfe.rs` | Geração 80mm modelo 65 (multi-pagamento, CPF, qr_side, erros) |
-| DANFE NF-e A4 | `tests/danfe_a4.rs` | Geração A4 modelo 55 (base64, arquivo, erro modelo 65, IBS/CBS da NT 2026.010) |
-| Amostras do DANFE A4 | `tests/danfe_a4_amostras.rs` | Seis PDFs para conferir a olho (Simples, regime normal com IBS/CBS, `gRed` + IS, monofasia, 60 itens, MEI) — rode com `cargo test --test danfe_a4_amostras -- --nocapture` e abra os arquivos de `target/tmp/danfe-a4/` (ou de `DFE_DANFE_SAIDA`) |
+| DANFE NF-e A4 | `tests/danfe_a4.rs` | Geração em base64 e em arquivo, erro do modelo 65, IBS/CBS da NT 2026.010, dimensões e numeração das folhas, ordem dos itens e continuação de informações complementares |
+| Amostras do DANFE A4 | `tests/danfe_a4_amostras.rs` | Seis PDFs para inspeção visual, incluindo uma nota de 60 itens em duas folhas A4. Rode `cargo test --test danfe_a4_amostras -- --nocapture` e abra os arquivos em `target/tmp/danfe-a4/` ou no diretório indicado por `DFE_DANFE_SAIDA`. |
 | ESC/POS | `tests/escpos.rs` | Bytes do cupom NFC-e |
 | XML Extractor | `tests/xml_extractor.rs` | Parsing de `nfeProc` (snapshots `insta` em `tests/snapshots/`) |
 | Homologação travada | `tests/homologacao_travada.rs` | Nenhum teste escolhe o ambiente por conta própria (ver abaixo) |

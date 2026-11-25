@@ -568,6 +568,10 @@ A resposta pode conter `docZip` — base64 + GZIP, decodificado automaticamente.
 
 ## DANFE (PDF)
 
+No formato A4, o `DanfeBuilder` pagina automaticamente a NF-e em folhas de 210 × 297 mm.
+O resultado é um único PDF com todas as folhas, tanto em `.as_file()` quanto em
+`.as_base64()`. [Detalhes da paginação](docs/danfe.md#paginação-da-nf-e-em-a4).
+
 > **A4 no modelo da Reforma (NT 2026.010, a partir de 01/12/2026):** o quadro do emitente traz o
 > **CRT** (faixa de baixo, ao lado das datas); depois do "Cálculo do imposto" vem o bloco
 > **"TOTAL DO IBS / CBS / IS"** (CBS, IBS UF, IBS Município, IS — e a linha da monofasia só quando o

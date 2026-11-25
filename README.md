@@ -45,7 +45,7 @@ XML signing, schema validation, DANFE and ESC/POS printing against SEFAZ.*
 | **NFS-e Nacional** | DPS v1.01 de MEI e Simples Nacional, assinatura, envio e consulta na SEFIN Nacional (*feature* `nfse`) |
 | **Ambiente Nacional** | Distribuição de DF-e por NSU ou chave, manifestação do destinatário |
 | **Tributos** | Todos os grupos de ICMS (Simples e regime normal, ST, DIFAL, partilha, monofásico), IPI, PIS/COFINS de qualquer CST, IBS/CBS |
-| **Impressão** | DANFE em PDF (A4 e 80 mm, com logotipo), cupom da NFC-e e DANFE simplificado em ESC/POS |
+| **Impressão** | DANFE em PDF (A4 paginado com logotipo opcional, ou 80 mm), cupom da NFC-e e DANFE simplificado em ESC/POS |
 | **Infraestrutura** | 27 UFs em produção e homologação, XSD oficiais embutidos, validação de CNPJ/CPF, leitura de XML autorizado |
 
 **Cobertura:** todos os serviços do dia a dia da SEFAZ (autorização, consulta, inutilização,

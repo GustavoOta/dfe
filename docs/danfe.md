@@ -67,6 +67,17 @@ ou equivalente.
 | `"80mm"` | ✅ | ✅ (suporta `.qr_side()`) |
 | `"54mm"` | ❌ | ❌ |
 
+## Paginação da NF-e em A4
+
+O `DanfeBuilder` gera um único PDF com folhas de 210 × 297 mm, numeradas no cabeçalho
+como `FOLHA 1/1` ou `FOLHA 1/2`, conforme o total. Cada folha repete o cabeçalho
+fiscal, incluindo a chave de acesso e o código de barras.
+
+A quebra depende da altura disponível. A sublinha de IBS/CBS/IS acompanha o respectivo
+item e a tabela conserva as mesmas colunas nas folhas seguintes. As informações
+complementares (`infCpl`) continuam em outra folha quando ultrapassam o espaço
+disponível. O quadro reservado ao Fisco fica na primeira folha.
+
 ## Modelo da Reforma Tributária no A4 (NT 2026.010)
 
 A partir de 01/12/2026 o DANFE A4 traz o **CRT** no quadro do emitente, o bloco **"TOTAL DO
@@ -91,7 +102,7 @@ Para gravar em outra pasta:
 # Linux/macOS
 DFE_DANFE_SAIDA=./amostras cargo test --test danfe_a4_amostras -- --nocapture
 # Windows (PowerShell)
-$env:DFE_DANFE_SAIDA = ".mostras"; cargo test --test danfe_a4_amostras -- --nocapture
+$env:DFE_DANFE_SAIDA = "./amostras"; cargo test --test danfe_a4_amostras -- --nocapture
 ```
 
 | Arquivo | O que mostra |
@@ -100,13 +111,10 @@ $env:DFE_DANFE_SAIDA = ".mostras"; cargo test --test danfe_a4_amostras -- --noc
 | `02-regime-normal-ibs-cbs.pdf` | Regime normal (CRT 3) com IBS/CBS em todos os itens |
 | `03-reducao-e-imposto-seletivo.pdf` | Redução de alíquota (`gRed`: sai a alíquota efetiva) e Imposto Seletivo |
 | `04-monofasico.pdf` | Totais com `gMono`: aparece a linha da monofasia |
-| `05-muitos-itens.pdf` | 60 itens, metade com IBS/CBS |
+| `05-muitos-itens.pdf` | Duas folhas A4 com 60 itens, metade com IBS/CBS |
 | `06-mei.pdf` | MEI (CRT 4) |
 
 As notas são fictícias (dados e valores ilustrativos).
-
-> **Limite conhecido:** nota com muitos itens não é quebrada em várias folhas A4 — a página
-> cresce em altura (a amostra de 60 itens sai com ~485 mm).
 
 ## Colunas de ICMS dos itens (A4)
 

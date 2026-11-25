@@ -5,7 +5,9 @@
 
 #![cfg(feature = "danfe")]
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use dfe::DanfeBuilder;
+use printpdf::lopdf::Document;
 
 /// XML mínimo de NF-e (modelo 55) válido para testes de geração de DANFE A4.
 const NFE_XML_55: &str = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -316,6 +318,123 @@ fn nfe_xml_55_com_rtc() -> String {
 <gIBSMun><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vIBSMun>0.00</vIBSMun></gIBSMun><vIBS>0.21</vIBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gIBS>\
 <gCBS><vDif>0.00</vDif><vDevTrib>0.00</vDevTrib><vCBS>0.76</vCBS><vCredPres>0.00</vCredPres><vCredPresCondSus>0.00</vCredPresCondSus></gCBS></IBSCBSTot>";
     NFE_XML_55.replacen("</COFINS>", ibscbs, 1).replacen("</ICMSTot>", tot, 1)
+}
+
+fn nfe_com_itens(quantidade: usize, alternar_rtc: bool) -> String {
+    let inicio = NFE_XML_55.find("<det nItem=").unwrap();
+    let fim = NFE_XML_55.rfind("</det>").unwrap() + "</det>".len();
+    let rtc = nfe_xml_55_com_rtc();
+    let item = |xml: &str| {
+        let inicio = xml.find("<det nItem=").unwrap();
+        let fim = xml.find("</det>").unwrap() + "</det>".len();
+        inicio..fim
+    };
+    let normal = &NFE_XML_55[item(NFE_XML_55)];
+    let com_rtc = &rtc[item(&rtc)];
+    let mut xml = NFE_XML_55[..inicio].to_owned();
+    for numero in 1..=quantidade {
+        let modelo = if alternar_rtc && numero % 2 == 0 {
+            com_rtc
+        } else {
+            normal
+        };
+        xml.push_str(
+            &modelo
+                .replacen("nItem=\"1\"", &format!("nItem=\"{numero}\""), 1)
+                .replacen("P001", &format!("P{numero:03}"), 1)
+                .replacen("200003", &format!("{:06}", 200000 + numero), 1),
+        );
+    }
+    xml.push_str(&NFE_XML_55[fim..]);
+    xml
+}
+
+async fn pdf_a4(xml: &str) -> Document {
+    let base64 = DanfeBuilder::new()
+        .xml(xml)
+        .paper_size("a4")
+        .as_base64()
+        .build()
+        .await
+        .expect("gerar DANFE A4");
+    Document::load_mem(&STANDARD.decode(base64).unwrap()).expect("ler o PDF gerado")
+}
+
+fn verificar_folhas(pdf: &Document, total: u32) -> Vec<String> {
+    let paginas = pdf.get_pages();
+    assert_eq!(paginas.len(), total as usize, "quantidade de folhas");
+    paginas
+        .into_iter()
+        .map(|(numero, id)| {
+            let pagina = pdf.get_dictionary(id).unwrap();
+            let caixa = pagina.get(b"MediaBox").unwrap().as_array().unwrap();
+            assert_eq!(caixa.len(), 4);
+            for (medida, mm) in caixa.iter().zip([0.0, 0.0, 210.0, 297.0]) {
+                assert!((medida.as_float().unwrap() - mm * 72.0 / 25.4).abs() < 0.01);
+            }
+            let texto = pdf.extract_text(&[numero]).unwrap();
+            assert!(texto.contains(&format!("FOLHA {numero}/{total}")), "{texto}");
+            assert!(texto.contains("VENDA DE MERCADORIA"), "{texto}");
+            assert!(texto.contains("3524 0111 2223 3300 0181 5500 1000 0000 0110 0000 0011"));
+            texto
+        })
+        .collect()
+}
+
+fn verificar_itens(folha: &str, numeros: std::ops::RangeInclusive<usize>) {
+    let impressos: Vec<_> = folha
+        .lines()
+        .filter_map(|linha| linha.trim().strip_prefix('P')?.parse::<usize>().ok())
+        .collect();
+    assert_eq!(impressos, numeros.collect::<Vec<_>>());
+}
+
+#[tokio::test]
+async fn danfe_a4_respeita_o_limite_da_primeira_folha() {
+    verificar_folhas(&pdf_a4(NFE_XML_55).await, 1);
+    let folhas = verificar_folhas(&pdf_a4(&nfe_com_itens(35, false)).await, 1);
+    verificar_itens(&folhas[0], 1..=35);
+    let folhas = verificar_folhas(&pdf_a4(&nfe_com_itens(36, false)).await, 2);
+    verificar_itens(&folhas[0], 1..=35);
+    verificar_itens(&folhas[1], 36..=36);
+}
+
+#[tokio::test]
+async fn danfe_a4_pagina_60_itens_e_mantem_as_sublinhas_ibs_cbs_juntas() {
+    let folhas = verificar_folhas(&pdf_a4(&nfe_com_itens(60, true)).await, 2);
+    for (folha, numeros) in folhas.iter().zip([1..=25, 26..=60]) {
+        assert!(folha.contains("NCM/SH") && folha.contains("CFOP"));
+        verificar_itens(folha, numeros.clone());
+        let sublinhas: Vec<_> = folha
+            .lines()
+            .filter(|linha| linha.contains("cClassTrib"))
+            .collect();
+        let esperadas: Vec<_> = numeros.filter(|n| n % 2 == 0).collect();
+        assert_eq!(sublinhas.len(), esperadas.len());
+        for (linha, numero) in sublinhas.iter().zip(esperadas) {
+            assert!(linha.contains(&format!("{:06}", 200000 + numero)), "{linha}");
+        }
+    }
+}
+
+#[tokio::test]
+async fn danfe_a4_continua_informacoes_complementares_em_folha_adicional() {
+    let observacoes: Vec<_> = (1..=250).map(|n| format!("OBS{n:03}")).collect();
+    let xml = nfe_com_itens(35, false);
+    let inicio = xml.find("<infCpl>").unwrap() + "<infCpl>".len();
+    let fim = xml.find("</infCpl>").unwrap();
+    let xml = format!("{}{}{}", &xml[..inicio], observacoes.join(" "), &xml[fim..]);
+    let folhas = verificar_folhas(&pdf_a4(&xml).await, 2);
+    verificar_itens(&folhas[0], 1..=35);
+    assert!(!folhas[1].contains("DADOS DOS PRODUTOS"));
+    assert!(folhas[1].contains("COMPLEMENTARES (CONTINUA"));
+    assert!(folhas[0].contains("OBS001") && folhas[1].contains("OBS250"));
+    let impressas: Vec<_> = folhas
+        .iter()
+        .flat_map(|texto| texto.split_whitespace())
+        .filter(|palavra| palavra.starts_with("OBS"))
+        .collect();
+    assert_eq!(impressas, observacoes);
 }
 
 #[tokio::test]

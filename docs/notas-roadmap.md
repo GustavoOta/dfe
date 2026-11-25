@@ -84,7 +84,7 @@ Situação em **19-11-2026** (versão 0.8.x). Legenda: ✅ pronto · 🟡 parcia
 | Item | Situação |
 |---|:---:|
 | ESC/POS `EscPosBuilder`, `EscPosNFCeBuilder`, `EscPosDanfeNFeBuilder` | ✅ |
-| DANFE A4 com quebra em várias folhas (hoje a página cresce em altura) | 🔜 |
+| DANFE A4 com [paginação automática](danfe.md#paginação-da-nf-e-em-a4) | ✅ |
 | **Windows** — CryptoAPI + SChannel | ✅ |
 | **Linux** — OpenSSL do sistema com provider `legacy` + cadeia ICP-Brasil embutida ([detalhes](certificado-e-plataformas.md)); NF-e e NFC-e autorizadas, corrigidas e canceladas em homologação com A1 real | ✅ |
 | Impressão ESC/POS direta (`print()`) fora do Windows | 🔜 |

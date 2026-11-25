@@ -78,7 +78,7 @@ Legenda: ✅ tem · 🟡 parcial · 🔜 ainda não (no [roadmap](notas-roadmap.
 
 | Recurso | dfe |
 |---|:---:|
-| DANFE em PDF (A4 e 80 mm), DANFE da NFC-e, modelo da Reforma (NT 2026.010) | ✅ `DanfeBuilder` |
+| DANFE em PDF (A4 paginado e 80 mm), DANFE da NFC-e, modelo da Reforma (NT 2026.010) | ✅ `DanfeBuilder` |
 | Cupom da NFC-e e DANFE simplificado em impressora térmica (ESC/POS) | ✅ `EscPosNFCeBuilder`, `EscPosDanfeNFeBuilder` |
 | NFS-e Nacional (DPS, assinatura, envio e consulta na SEFIN) | ✅ feature `nfse` |
 | Windows (CryptoAPI) e Linux (OpenSSL) com a mesma assinatura byte a byte | ✅ |

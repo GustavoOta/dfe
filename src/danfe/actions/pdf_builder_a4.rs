@@ -1,5 +1,6 @@
 use barcoders::sym::code128::Code128;
 use printpdf::*;
+use std::ops::Range;
 
 // ── Layout constants (ABNT/NFe spec) ────────────
 
@@ -37,7 +38,10 @@ const H_ITEM_RTC: f32 = 3.0;
 const H_RTC_TOT: f32 = 13.0;
 const H_RTC_MONO: f32 = 9.5;
 const H_ADIC_MIN: f32 = 18.0;
-const H_PROT: f32 = 5.0;
+const H_RODAPE: f32 = 5.0;
+const ADIC_W_CPL: f32 = BODY_W * 0.66;
+const ADIC_PRIMEIRA_LINHA: f32 = 5.5;
+const ADIC_MARGEM_INFERIOR: f32 = 1.0;
 
 // Font sizes (pt)
 const FS_LBL: f32 = 5.5;
@@ -111,6 +115,443 @@ pub struct PdfMonoA4 {
     pub v_cbs_mono_reten: String,
 }
 
+struct LinhaItem<'a> {
+    item: &'a PdfItemA4,
+    rtc: Option<String>,
+}
+
+impl<'a> LinhaItem<'a> {
+    fn new(item: &'a PdfItemA4) -> Self {
+        let rtc = item
+            .rtc
+            .as_ref()
+            .map(linha_rtc_item)
+            .filter(|linha| !linha.is_empty());
+        Self { item, rtc }
+    }
+
+    fn altura(&self) -> f32 {
+        H_ITEM + if self.rtc.is_some() { H_ITEM_RTC } else { 0.0 }
+    }
+}
+
+struct PaginaA4 {
+    itens: Range<usize>,
+    altura_tabela: f32,
+    complementares: Range<usize>,
+}
+
+fn capacidade_dados_adicionais(altura: f32) -> usize {
+    let restante = altura - ADIC_PRIMEIRA_LINHA - ADIC_MARGEM_INFERIOR;
+    if restante < 0.0 {
+        return 0;
+    }
+    1 + (restante / LH) as usize
+}
+
+fn paginar(
+    itens: &[LinhaItem<'_>],
+    altura_rtc: f32,
+    linhas_cpl: usize,
+    linhas_fisco: usize,
+) -> Vec<PaginaA4> {
+    let altura_apos_cabecalho = PAGE_H - 2.0 * M - H_CAB;
+    let altura_primeira = altura_apos_cabecalho - H_DEST - H_IMP - altura_rtc - H_TRANSP - H_RODAPE;
+    // O campo do fisco fica na primeira folha junto com ao menos um item, quando houver.
+    let altura_fisco = ADIC_PRIMEIRA_LINHA
+        + ADIC_MARGEM_INFERIOR
+        + linhas_fisco.saturating_sub(1) as f32 * LH;
+    let altura_min_tabela = H_ITEMS_HDR + itens.first().map_or(H_ITEM, LinhaItem::altura);
+    let reserva_adic = altura_fisco.clamp(H_ADIC_MIN, altura_primeira - altura_min_tabela);
+
+    let mut paginas = Vec::new();
+    let mut inicio_item = 0;
+    let mut inicio_cpl = 0;
+    loop {
+        let primeira = paginas.is_empty();
+        let (altura_disponivel, reserva) = if primeira {
+            (altura_primeira, reserva_adic)
+        } else {
+            (altura_apos_cabecalho, 0.0)
+        };
+        let mut fim_item = inicio_item;
+        let mut altura_linhas = 0.0;
+        let limite_itens = altura_disponivel - reserva - H_ITEMS_HDR;
+        for item in &itens[inicio_item..] {
+            let altura = item.altura();
+            if altura_linhas + altura > limite_itens {
+                break;
+            }
+            altura_linhas += altura;
+            fim_item += 1;
+        }
+        let altura_tabela = if primeira || fim_item > inicio_item {
+            H_ITEMS_HDR + altura_linhas.max(H_ITEM)
+        } else {
+            0.0
+        };
+
+        // Continue as observações após a tabela de itens, inclusive em folhas só de texto.
+        let fim_cpl = if primeira || fim_item == itens.len() {
+            let capacidade = capacidade_dados_adicionais(altura_disponivel - altura_tabela);
+            (inicio_cpl + capacidade).min(linhas_cpl)
+        } else {
+            inicio_cpl
+        };
+        paginas.push(PaginaA4 {
+            itens: inicio_item..fim_item,
+            altura_tabela,
+            complementares: inicio_cpl..fim_cpl,
+        });
+        if fim_item == itens.len() && fim_cpl == linhas_cpl {
+            return paginas;
+        }
+        inicio_item = fim_item;
+        inicio_cpl = fim_cpl;
+    }
+}
+
+struct CabecalhoA4<'a> {
+    logo_bytes: Option<&'a [u8]>,
+    chave_acesso: &'a str,
+    n_prot: &'a str,
+    dh_recbto: &'a str,
+    tp_nf: &'a str,
+    n_nf: &'a str,
+    serie: &'a str,
+    dh_emi: &'a str,
+    dh_sai_ent: &'a str,
+    nat_op: &'a str,
+    tp_amb: &'a str,
+    emit_x_nome: &'a str,
+    emit_cnpj: &'a str,
+    emit_ie: &'a str,
+    emit_iest: &'a str,
+    emit_x_lgr: &'a str,
+    emit_nro: &'a str,
+    emit_x_bairro: &'a str,
+    emit_x_mun: &'a str,
+    emit_uf: &'a str,
+    emit_cep: &'a str,
+    emit_fone: &'a str,
+    crt: &'a str,
+}
+
+fn desenhar_cabecalho(
+    layer: &PdfLayerReference,
+    font: &IndirectFontRef,
+    font_b: &IndirectFontRef,
+    cabecalho: &CabecalhoA4<'_>,
+    numero: usize,
+    total: usize,
+) -> f32 {
+    let CabecalhoA4 {
+        logo_bytes,
+        chave_acesso,
+        n_prot,
+        dh_recbto,
+        tp_nf,
+        n_nf,
+        serie,
+        dh_emi,
+        dh_sai_ent,
+        nat_op,
+        tp_amb,
+        emit_x_nome,
+        emit_cnpj,
+        emit_ie,
+        emit_iest,
+        emit_x_lgr,
+        emit_nro,
+        emit_x_bairro,
+        emit_x_mun,
+        emit_uf,
+        emit_cep,
+        emit_fone,
+        crt,
+    } = *cabecalho;
+    let cab_top = PAGE_H - M;
+    let cab_bot = cab_top - H_CAB;
+    let subrow_top = cab_bot + H_SUBROW; // separator between main header and sub-row
+
+    draw_rect(layer, M, cab_bot, BODY_W, H_CAB, 0.4);
+
+    // Column positions
+    let x_danfe = M + COL_EMIT;
+    let x_chave = x_danfe + COL_DANFE;
+
+    // As divisórias das três colunas param no topo da faixa de baixo (CNPJ/IE/CRT/datas), que
+    // tem colunas próprias — atravessá-la cortava os rótulos ao meio.
+    vline(layer, x_danfe, subrow_top, H_CAB - H_SUBROW, 0.3);
+    vline(layer, x_chave, subrow_top, H_CAB - H_SUBROW, 0.3);
+    hline(layer, M, subrow_top, BODY_W, 0.3);
+
+    // ── Coluna emitente (0..84 mm) ──
+    {
+        let x = M + 0.8;
+        let max_w = COL_EMIT - 1.6;
+        let logo_max_h = 18.0_f32; // altura máxima reservada para o logo (mm)
+
+        // y inicial: se há logo, renderiza primeiro e empurra texto abaixo
+        let mut yi = cab_top - FLBL;
+        if let Some(bytes) = logo_bytes {
+            match embed_logo(layer, bytes, M + 0.8, max_w, cab_top - 0.5, logo_max_h) {
+                Ok(logo_bot) => yi = logo_bot - 1.5,
+                Err(_) => {} // logo inválido → ignora, mantém posição padrão
+            }
+        }
+
+        t(layer, font, x, yi, FS_LBL, "IDENTIFICAÇÃO DO EMITENTE");
+        yi -= LH;
+        let max_w = COL_EMIT - 1.6;
+        text_wrap_clipped(
+            layer,
+            font_b,
+            x,
+            &mut yi,
+            FS_BD,
+            emit_x_nome,
+            max_w,
+            subrow_top + 1.0,
+        );
+        let ender = format!("{}, {} - {}", emit_x_lgr, emit_nro, emit_x_bairro);
+        text_wrap_clipped(
+            layer,
+            font,
+            x,
+            &mut yi,
+            FS_SM,
+            &ender,
+            max_w,
+            subrow_top + 1.0,
+        );
+        let ciduf = format!("{} - {} CEP: {}", emit_x_mun, emit_uf, format_cep(emit_cep));
+        text_wrap_clipped(
+            layer,
+            font,
+            x,
+            &mut yi,
+            FS_SM,
+            &ciduf,
+            max_w,
+            subrow_top + 1.0,
+        );
+        if !emit_fone.is_empty() && yi > subrow_top + 1.0 {
+            t(layer, font, x, yi, FS_SM, &format!("Fone: {}", emit_fone));
+        }
+    }
+
+    // ── Crachá DANFE (centro) ──
+    {
+        let cx = x_danfe;
+        let cw = COL_DANFE;
+        let x = cx + 0.8;
+
+        // "DANFE" grande centralizado
+        let tw = estimate_text_width("DANFE", FS_DANFE_BIG);
+        let danfe_x = cx + (cw - tw) / 2.0;
+        t(
+            layer,
+            font_b,
+            danfe_x,
+            cab_top - 9.0,
+            FS_DANFE_BIG,
+            "DANFE",
+        );
+
+        // Subtítulo (deslocado para cima para dar espaço ao separador)
+        let sub1 = "Documento Auxiliar da";
+        let sub2 = "Nota Fiscal Eletrônica";
+        let s1w = estimate_text_width(sub1, FS_SUBTIT);
+        let s2w = estimate_text_width(sub2, FS_SUBTIT);
+        t(
+            layer,
+            font,
+            cx + (cw - s1w) / 2.0,
+            cab_top - 13.5,
+            FS_SUBTIT,
+            sub1,
+        );
+        t(
+            layer,
+            font,
+            cx + (cw - s2w) / 2.0,
+            cab_top - 17.0,
+            FS_SUBTIT,
+            sub2,
+        );
+
+        // Separador horizontal no meio da coluna
+        let mid_y = (cab_top + subrow_top) / 2.0;
+        hline(layer, cx, mid_y, cw, 0.2);
+
+        // Tipo operação — ABAIXO do separador (y decresce para baixo no PDF)
+        let tp_lbl = match tp_nf {
+            "0" => "0 - ENTRADA",
+            "1" => "1 - SAÍDA",
+            _ => tp_nf,
+        };
+        t(layer, font, x, mid_y - FLBL, FS_LBL, "TIPO DE OPERAÇÃO");
+        t(layer, font_b, x, mid_y - FVAL, FS_SM, tp_lbl);
+
+        // Número / Série — abaixo do tipo
+        t(
+            layer,
+            font,
+            x,
+            mid_y - FVAL - LH - 1.0,
+            FS_LBL,
+            "Nº NF-e / SÉRIE",
+        );
+        t(
+            layer,
+            font_b,
+            x,
+            mid_y - FVAL - LH - 1.0 - LH,
+            FS_SM,
+            &format!("{} / {}", n_nf, serie),
+        );
+        t(
+            layer,
+            font_b,
+            x,
+            subrow_top + 0.5,
+            10.0,
+            &format!("FOLHA {numero}/{total}"),
+        );
+    }
+
+    // ── Chave de acesso + protocolo + nat. op. ──
+    {
+        let x = x_chave + 0.8;
+        let max_w = COL_CHAVE - 1.6;
+        let mut yi = cab_top - FLBL;
+
+        t(layer, font, x, yi, FS_LBL, "CHAVE DE ACESSO");
+        yi -= LH;
+        let chave_fmt = format_chave_acesso(chave_acesso);
+        text_wrap_clipped(
+            layer,
+            font_b,
+            x,
+            &mut yi,
+            FS_SM,
+            &chave_fmt,
+            max_w,
+            subrow_top + 1.0,
+        );
+
+        // Barcode Code128 da chave de acesso (44 dígitos sem espaços)
+        // text_wrap_clipped já subtrai LH após a última linha (3.5mm);
+        // adicionamos de volta LH e deixamos só 1.5mm de gap visual.
+        let bar_h = 10.0;
+        yi += LH - 1.5;
+        if yi - bar_h > subrow_top + 1.0 {
+            let _ = draw_barcode_a4(
+                layer,
+                chave_acesso,
+                x_chave + 2.0,
+                COL_CHAVE - 4.0,
+                yi,
+                bar_h,
+            );
+            yi -= bar_h;
+        }
+
+        yi -= 0.5;
+        if yi > subrow_top + 4.0 {
+            hline(layer, x_chave, yi, COL_CHAVE, 0.2);
+            yi -= 2.5;
+        }
+
+        if !n_prot.is_empty() && yi > subrow_top + 1.0 {
+            t(
+                layer,
+                font,
+                x,
+                yi,
+                FS_LBL,
+                "PROTOCOLO DE AUTORIZAÇÃO DE USO",
+            );
+            yi -= LH;
+            if yi > subrow_top + 1.0 {
+                t(
+                    layer,
+                    font_b,
+                    x,
+                    yi,
+                    FS_SM,
+                    &format!("{} {}", n_prot, format_datetime(dh_recbto)),
+                );
+                yi -= LH + 1.0;
+            }
+        } else if tp_amb == "2" && yi > subrow_top + 1.0 {
+            t(
+                layer,
+                font_b,
+                x,
+                yi,
+                FS_SM,
+                "HOMOLOGAÇÃO - SEM VALOR FISCAL",
+            );
+            yi -= LH + 1.0;
+        }
+
+        if yi > subrow_top + 4.0 {
+            hline(layer, x_chave, yi, COL_CHAVE, 0.2);
+            yi -= 2.5;
+        }
+
+        if yi > subrow_top + 1.0 {
+            t(layer, font, x, yi, FS_LBL, "NATUREZA DA OPERAÇÃO");
+            yi -= LH;
+            if yi > subrow_top + 1.0 {
+                text_wrap_clipped(
+                    layer,
+                    font,
+                    x,
+                    &mut yi,
+                    FS_SM,
+                    nat_op,
+                    max_w,
+                    subrow_top + 1.0,
+                );
+            }
+        }
+        let _ = yi;
+    }
+
+    // ── Sub-row: CNPJ | IE | IEST | Data Emissão | Data Saída/Entrada ──
+    {
+        // Larguras de referência (somam REF_BODY_W = 206) reprojetadas por SCALE:
+        // CNPJ:42 | IE:33 | IEST:31 | CRT:44 | DtEmi:28 | DtEnt:28 = 206
+        // CRT entrou com a NT 2026.010 (§4.2). O "Tipo de Regime de Apuração do IBS e da CBS"
+        // é campo reservado sem tag publicada: a NT manda não imprimir conteúdo — fica de fora.
+        let crt_txt = crt_label(crt);
+        let subrow_cols: &[(&str, &str, f32)] = &[
+            ("CNPJ", &format_cnpj_cpf(emit_cnpj), 42.0 * SCALE),
+            ("I.E.", emit_ie, 33.0 * SCALE),
+            ("I.E. SUBS. TRIB.", emit_iest, 31.0 * SCALE),
+            ("CÓDIGO DO REGIME TRIBUTÁRIO", &crt_txt, 44.0 * SCALE),
+            ("DATA DE EMISSÃO", &format_date(dh_emi), 28.0 * SCALE),
+            ("DATA SAÍ./ENT.", &format_date(dh_sai_ent), 28.0 * SCALE),
+        ];
+
+        let lbl_y = subrow_top - FLBL;
+        let val_y = subrow_top - FVAL;
+        let mut xi = M;
+        for (i, (lbl, val, w)) in subrow_cols.iter().enumerate() {
+            t(layer, font, xi + 0.8, lbl_y, FS_LBL, lbl);
+            text_truncated(layer, font, xi + 0.8, val_y, FS_SM, val, w - 1.6);
+            xi += w;
+            if i < subrow_cols.len() - 1 {
+                vline(layer, xi, cab_bot, H_SUBROW, 0.2);
+            }
+        }
+    }
+    cab_bot
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn build_pdf_a4(
     logo_bytes: Option<&[u8]>,
@@ -179,306 +620,51 @@ pub fn build_pdf_a4(
     // itens
     items: &[PdfItemA4],
 ) -> Result<Vec<u8>, String> {
-    // Fixed overhead: all sections except items rows
-    let fixed_h = H_CAB
-        + H_DEST
-        + H_IMP
-        + altura_bloco_rtc(rtc_tot)
-        + H_TRANSP
-        + H_ITEMS_HDR
-        + altura_itens(items)
-        + H_ADIC_MIN
-        + H_PROT;
-    let page_h = (2.0 * M + fixed_h).max(PAGE_H);
-
-    let (doc, page1, layer1) = PdfDocument::new("DANFE NF-e A4", Mm(PAGE_W), Mm(page_h), "Layer 1");
+    let linhas_itens: Vec<_> = items.iter().map(LinhaItem::new).collect();
+    let linhas_cpl = wrap_text_by_width(inf_cpl, ADIC_W_CPL - 1.6, FS_SM);
+    let linhas_fisco = wrap_text_by_width(inf_fisco, BODY_W - ADIC_W_CPL - 1.6, FS_SM);
+    let paginas = paginar(
+        &linhas_itens,
+        altura_bloco_rtc(rtc_tot),
+        linhas_cpl.len(),
+        linhas_fisco.len(),
+    );
+    let (doc, page1, layer1) =
+        PdfDocument::new("DANFE NF-e A4", Mm(PAGE_W), Mm(PAGE_H), "DANFE");
     let font = doc
         .add_builtin_font(BuiltinFont::Helvetica)
         .map_err(|e| format!("Erro fonte: {}", e))?;
     let font_b = doc
         .add_builtin_font(BuiltinFont::HelveticaBold)
         .map_err(|e| format!("Erro fonte bold: {}", e))?;
+    let cabecalho = CabecalhoA4 {
+        logo_bytes,
+        chave_acesso,
+        n_prot,
+        dh_recbto,
+        tp_nf,
+        n_nf,
+        serie,
+        dh_emi,
+        dh_sai_ent,
+        nat_op,
+        tp_amb,
+        emit_x_nome,
+        emit_cnpj,
+        emit_ie,
+        emit_iest,
+        emit_x_lgr,
+        emit_nro,
+        emit_x_bairro,
+        emit_x_mun,
+        emit_uf,
+        emit_cep,
+        emit_fone,
+        crt,
+    };
+
     let layer = doc.get_page(page1).get_layer(layer1);
-
-    // y increases upward; start from top of printable area
-    let mut y = page_h - M;
-
-    // ══════════════════════════════════════════════════════════════════════
-    // BLOCO 1 — CABEÇALHO (47 mm)
-    // ══════════════════════════════════════════════════════════════════════
-    let cab_top = y;
-    let cab_bot = cab_top - H_CAB;
-    let subrow_top = cab_bot + H_SUBROW; // separator between main header and sub-row
-
-    draw_rect(&layer, M, cab_bot, BODY_W, H_CAB, 0.4);
-
-    // Column positions
-    let x_danfe = M + COL_EMIT;
-    let x_chave = x_danfe + COL_DANFE;
-
-    // As divisórias das três colunas param no topo da faixa de baixo (CNPJ/IE/CRT/datas), que
-    // tem colunas próprias — atravessá-la cortava os rótulos ao meio.
-    vline(&layer, x_danfe, subrow_top, H_CAB - H_SUBROW, 0.3);
-    vline(&layer, x_chave, subrow_top, H_CAB - H_SUBROW, 0.3);
-    hline(&layer, M, subrow_top, BODY_W, 0.3);
-
-    // ── Coluna emitente (0..84 mm) ──
-    {
-        let x = M + 0.8;
-        let max_w = COL_EMIT - 1.6;
-        let logo_max_h = 18.0_f32; // altura máxima reservada para o logo (mm)
-
-        // y inicial: se há logo, renderiza primeiro e empurra texto abaixo
-        let mut yi = cab_top - FLBL;
-        if let Some(bytes) = logo_bytes {
-            match embed_logo(&layer, bytes, M + 0.8, max_w, cab_top - 0.5, logo_max_h) {
-                Ok(logo_bot) => yi = logo_bot - 1.5,
-                Err(_) => {} // logo inválido → ignora, mantém posição padrão
-            }
-        }
-
-        t(&layer, &font, x, yi, FS_LBL, "IDENTIFICAÇÃO DO EMITENTE");
-        yi -= LH;
-        let max_w = COL_EMIT - 1.6;
-        text_wrap_clipped(
-            &layer,
-            &font_b,
-            x,
-            &mut yi,
-            FS_BD,
-            emit_x_nome,
-            max_w,
-            subrow_top + 1.0,
-        );
-        let ender = format!("{}, {} - {}", emit_x_lgr, emit_nro, emit_x_bairro);
-        text_wrap_clipped(
-            &layer,
-            &font,
-            x,
-            &mut yi,
-            FS_SM,
-            &ender,
-            max_w,
-            subrow_top + 1.0,
-        );
-        let ciduf = format!("{} - {} CEP: {}", emit_x_mun, emit_uf, format_cep(emit_cep));
-        text_wrap_clipped(
-            &layer,
-            &font,
-            x,
-            &mut yi,
-            FS_SM,
-            &ciduf,
-            max_w,
-            subrow_top + 1.0,
-        );
-        if !emit_fone.is_empty() && yi > subrow_top + 1.0 {
-            t(&layer, &font, x, yi, FS_SM, &format!("Fone: {}", emit_fone));
-        }
-    }
-
-    // ── Crachá DANFE (centro) ──
-    {
-        let cx = x_danfe;
-        let cw = COL_DANFE;
-        let x = cx + 0.8;
-
-        // "DANFE" grande centralizado
-        let tw = estimate_text_width("DANFE", FS_DANFE_BIG);
-        let danfe_x = cx + (cw - tw) / 2.0;
-        t(
-            &layer,
-            &font_b,
-            danfe_x,
-            cab_top - 9.0,
-            FS_DANFE_BIG,
-            "DANFE",
-        );
-
-        // Subtítulo (deslocado para cima para dar espaço ao separador)
-        let sub1 = "Documento Auxiliar da";
-        let sub2 = "Nota Fiscal Eletrônica";
-        let s1w = estimate_text_width(sub1, FS_SUBTIT);
-        let s2w = estimate_text_width(sub2, FS_SUBTIT);
-        t(
-            &layer,
-            &font,
-            cx + (cw - s1w) / 2.0,
-            cab_top - 13.5,
-            FS_SUBTIT,
-            sub1,
-        );
-        t(
-            &layer,
-            &font,
-            cx + (cw - s2w) / 2.0,
-            cab_top - 17.0,
-            FS_SUBTIT,
-            sub2,
-        );
-
-        // Separador horizontal no meio da coluna
-        let mid_y = (cab_top + subrow_top) / 2.0;
-        hline(&layer, cx, mid_y, cw, 0.2);
-
-        // Tipo operação — ABAIXO do separador (y decresce para baixo no PDF)
-        let tp_lbl = match tp_nf {
-            "0" => "0 - ENTRADA",
-            "1" => "1 - SAÍDA",
-            _ => tp_nf,
-        };
-        t(&layer, &font, x, mid_y - FLBL, FS_LBL, "TIPO DE OPERAÇÃO");
-        t(&layer, &font_b, x, mid_y - FVAL, FS_SM, tp_lbl);
-
-        // Número / Série — abaixo do tipo
-        t(
-            &layer,
-            &font,
-            x,
-            mid_y - FVAL - LH - 1.0,
-            FS_LBL,
-            "Nº NF-e / SÉRIE",
-        );
-        t(
-            &layer,
-            &font_b,
-            x,
-            mid_y - FVAL - LH - 1.0 - LH,
-            FS_SM,
-            &format!("{} / {}", n_nf, serie),
-        );
-    }
-
-    // ── Chave de acesso + protocolo + nat. op. ──
-    {
-        let x = x_chave + 0.8;
-        let max_w = COL_CHAVE - 1.6;
-        let mut yi = cab_top - FLBL;
-
-        t(&layer, &font, x, yi, FS_LBL, "CHAVE DE ACESSO");
-        yi -= LH;
-        let chave_fmt = format_chave_acesso(chave_acesso);
-        text_wrap_clipped(
-            &layer,
-            &font_b,
-            x,
-            &mut yi,
-            FS_SM,
-            &chave_fmt,
-            max_w,
-            subrow_top + 1.0,
-        );
-
-        // Barcode Code128 da chave de acesso (44 dígitos sem espaços)
-        // text_wrap_clipped já subtrai LH após a última linha (3.5mm);
-        // adicionamos de volta LH e deixamos só 1.5mm de gap visual.
-        let bar_h = 10.0;
-        yi += LH - 1.5;
-        if yi - bar_h > subrow_top + 1.0 {
-            let _ = draw_barcode_a4(
-                &layer,
-                chave_acesso,
-                x_chave + 2.0,
-                COL_CHAVE - 4.0,
-                yi,
-                bar_h,
-            );
-            yi -= bar_h;
-        }
-
-        yi -= 0.5;
-        if yi > subrow_top + 4.0 {
-            hline(&layer, x_chave, yi, COL_CHAVE, 0.2);
-            yi -= 2.5;
-        }
-
-        if !n_prot.is_empty() && yi > subrow_top + 1.0 {
-            t(
-                &layer,
-                &font,
-                x,
-                yi,
-                FS_LBL,
-                "PROTOCOLO DE AUTORIZAÇÃO DE USO",
-            );
-            yi -= LH;
-            if yi > subrow_top + 1.0 {
-                t(
-                    &layer,
-                    &font_b,
-                    x,
-                    yi,
-                    FS_SM,
-                    &format!("{} {}", n_prot, format_datetime(dh_recbto)),
-                );
-                yi -= LH + 1.0;
-            }
-        } else if tp_amb == "2" && yi > subrow_top + 1.0 {
-            t(
-                &layer,
-                &font_b,
-                x,
-                yi,
-                FS_SM,
-                "HOMOLOGAÇÃO - SEM VALOR FISCAL",
-            );
-            yi -= LH + 1.0;
-        }
-
-        if yi > subrow_top + 4.0 {
-            hline(&layer, x_chave, yi, COL_CHAVE, 0.2);
-            yi -= 2.5;
-        }
-
-        if yi > subrow_top + 1.0 {
-            t(&layer, &font, x, yi, FS_LBL, "NATUREZA DA OPERAÇÃO");
-            yi -= LH;
-            if yi > subrow_top + 1.0 {
-                text_wrap_clipped(
-                    &layer,
-                    &font,
-                    x,
-                    &mut yi,
-                    FS_SM,
-                    nat_op,
-                    max_w,
-                    subrow_top + 1.0,
-                );
-            }
-        }
-        let _ = yi;
-    }
-
-    // ── Sub-row: CNPJ | IE | IEST | Data Emissão | Data Saída/Entrada ──
-    {
-        // Larguras de referência (somam REF_BODY_W = 206) reprojetadas por SCALE:
-        // CNPJ:42 | IE:33 | IEST:31 | CRT:44 | DtEmi:28 | DtEnt:28 = 206
-        // CRT entrou com a NT 2026.010 (§4.2). O "Tipo de Regime de Apuração do IBS e da CBS"
-        // é campo reservado sem tag publicada: a NT manda não imprimir conteúdo — fica de fora.
-        let crt_txt = crt_label(crt);
-        let subrow_cols: &[(&str, &str, f32)] = &[
-            ("CNPJ", &format_cnpj_cpf(emit_cnpj), 42.0 * SCALE),
-            ("I.E.", emit_ie, 33.0 * SCALE),
-            ("I.E. SUBS. TRIB.", emit_iest, 31.0 * SCALE),
-            ("CÓDIGO DO REGIME TRIBUTÁRIO", &crt_txt, 44.0 * SCALE),
-            ("DATA DE EMISSÃO", &format_date(dh_emi), 28.0 * SCALE),
-            ("DATA SAÍ./ENT.", &format_date(dh_sai_ent), 28.0 * SCALE),
-        ];
-
-        let lbl_y = subrow_top - FLBL;
-        let val_y = subrow_top - FVAL;
-        let mut xi = M;
-        for (i, (lbl, val, w)) in subrow_cols.iter().enumerate() {
-            t(&layer, &font, xi + 0.8, lbl_y, FS_LBL, lbl);
-            text_truncated(&layer, &font, xi + 0.8, val_y, FS_SM, val, w - 1.6);
-            xi += w;
-            if i < subrow_cols.len() - 1 {
-                vline(&layer, xi, cab_bot, H_SUBROW, 0.2);
-            }
-        }
-    }
-
-    y = cab_bot;
+    let mut y = desenhar_cabecalho(&layer, &font, &font_b, &cabecalho, 1, paginas.len());
 
     // ══════════════════════════════════════════════════════════════════════
     // BLOCO 2 — DESTINATÁRIO / REMETENTE (25 mm)
@@ -948,27 +1134,97 @@ pub fn build_pdf_a4(
 
     y = transp_bot;
 
-    // ══════════════════════════════════════════════════════════════════════
-    // BLOCO 5 — DADOS DOS PRODUTOS / SERVIÇOS
-    // ══════════════════════════════════════════════════════════════════════
-    let items_top = y;
-    let items_rows_h = altura_itens(items);
-    let items_total_h = H_ITEMS_HDR + items_rows_h;
-    let items_bot = items_top - items_total_h;
-    draw_rect(&layer, M, items_bot, BODY_W, items_total_h, 0.4);
+    let primeira = &paginas[0];
+    let adic_top = desenhar_itens(
+        &layer,
+        &font,
+        y,
+        primeira.altura_tabela,
+        &linhas_itens[primeira.itens.clone()],
+    );
+    let rodape_top = M + H_RODAPE;
+    let adic_h = adic_top - rodape_top;
+    quadro_adicional(&layer, &font, adic_top, adic_h, "INFORMAÇÕES COMPLEMENTARES");
+    let split_x = M + ADIC_W_CPL;
+    vline(&layer, split_x, rodape_top, adic_h, 0.3);
+    t(&layer, &font, split_x + 0.8, adic_top - FLBL, FS_LBL, "RESERVADO AO FISCO");
+    desenhar_linhas_adicionais(
+        &layer,
+        &font,
+        M,
+        adic_top,
+        &linhas_cpl[primeira.complementares.clone()],
+    );
+    let qtd_fisco = linhas_fisco.len().min(capacidade_dados_adicionais(adic_h));
+    desenhar_linhas_adicionais(&layer, &font, split_x, adic_top, &linhas_fisco[..qtd_fisco]);
 
+    draw_rect(&layer, M, M, BODY_W, H_RODAPE, 0.4);
+    let footer_msg = "Gerado com dfe crate \u{2022} https://crates.io/crates/dfe";
+    let footer_w = estimate_text_width(footer_msg, FS_SM);
     t(
         &layer,
         &font,
+        M + (BODY_W - footer_w) / 2.0,
+        rodape_top - H_RODAPE / 2.0 - 0.5,
+        FS_SM,
+        footer_msg,
+    );
+
+    for (indice, pagina) in paginas.iter().enumerate().skip(1) {
+        let (page, layer_index) = doc.add_page(Mm(PAGE_W), Mm(PAGE_H), "DANFE");
+        let layer = doc.get_page(page).get_layer(layer_index);
+        let mut y = desenhar_cabecalho(&layer, &font, &font_b, &cabecalho, indice + 1, paginas.len());
+        if !pagina.itens.is_empty() {
+            y = desenhar_itens(
+                &layer,
+                &font,
+                y,
+                pagina.altura_tabela,
+                &linhas_itens[pagina.itens.clone()],
+            );
+        }
+        let complementares = &linhas_cpl[pagina.complementares.clone()];
+        if !complementares.is_empty() {
+            let altura = ADIC_PRIMEIRA_LINHA
+                + ADIC_MARGEM_INFERIOR
+                + (complementares.len() - 1) as f32 * LH;
+            quadro_adicional(
+                &layer,
+                &font,
+                y,
+                altura,
+                "INFORMAÇÕES COMPLEMENTARES (CONTINUAÇÃO)",
+            );
+            desenhar_linhas_adicionais(&layer, &font, M, y, complementares);
+        }
+    }
+
+    doc.save_to_bytes()
+        .map_err(|e| format!("Erro ao gerar PDF: {}", e))
+}
+
+fn desenhar_itens(
+    layer: &PdfLayerReference,
+    font: &IndirectFontRef,
+    items_top: f32,
+    items_total_h: f32,
+    items: &[LinhaItem<'_>],
+) -> f32 {
+    let items_bot = items_top - items_total_h;
+    draw_rect(layer, M, items_bot, BODY_W, items_total_h, 0.4);
+
+    t(
+        layer,
+        font,
         M + 0.8,
         items_top - FLBL,
         FS_LBL,
         "DADOS DOS PRODUTOS / SERVIÇOS",
     );
     let title_sep_y = items_top - 3.5;
-    hline(&layer, M, title_sep_y, BODY_W, 0.2);
+    hline(layer, M, title_sep_y, BODY_W, 0.2);
     let col_hdr_sep_y = items_top - H_ITEMS_HDR;
-    hline(&layer, M, col_hdr_sep_y, BODY_W, 0.3);
+    hline(layer, M, col_hdr_sep_y, BODY_W, 0.3);
 
     // Columns: # | Código | Descrição | NCM | CFOP | UN | Desc | IPI% | Vl IPI | ICMS% | Vl ICMS | Qtde | Vl Unit | Vl Total
     // Larguras de referência somam REF_BODY_W = 206; reprojetadas por SCALE.
@@ -1003,24 +1259,21 @@ pub fn build_pdf_a4(
             } else {
                 xi + ((w - lw) / 2.0).max(0.3)
             };
-            t(&layer, &font, lx, hdr_lbl_y, FS_LBL, lbl);
+            t(layer, font, lx, hdr_lbl_y, FS_LBL, lbl);
             xi += w;
             if xi < M + BODY_W - 0.1 {
-                vline(&layer, xi, items_bot, items_total_h - 3.5, 0.2);
+                vline(layer, xi, items_bot, items_total_h - 3.5, 0.2);
             }
         }
     }
 
     // Data rows
     let mut row_y = col_hdr_sep_y; // top of first data row (abaixo do separador de col-headers)
-    for item in items {
-        let linha_rtc = item.rtc.as_ref().map(linha_rtc_item).filter(|l| !l.is_empty());
-        let h_total = H_ITEM + if linha_rtc.is_some() { H_ITEM_RTC } else { 0.0 };
-        if row_y - h_total < items_bot - 0.1 {
-            break;
-        }
+    for linha in items {
+        let item = linha.item;
+        let h_total = linha.altura();
         let row_bot = row_y - H_ITEM;
-        hline(&layer, M, row_y - h_total, BODY_W, 0.1);
+        hline(layer, M, row_y - h_total, BODY_W, 0.1);
         let text_y = row_bot + H_ITEM * 0.28; // baseline ~28% from bottom of row
 
         let row_vals: &[(&str, bool)] = &[
@@ -1043,112 +1296,56 @@ pub fn build_pdf_a4(
         let mut xi = M;
         for (j, ((val, right_align), (_, w))) in row_vals.iter().zip(cols.iter()).enumerate() {
             if *right_align {
-                text_right_in(&layer, &font, xi, text_y, FS_SM, val, w - 0.5);
+                text_right_in(layer, font, xi, text_y, FS_SM, val, w - 0.5);
             } else if j == 2 {
-                text_truncated(&layer, &font, xi + 0.5, text_y, FS_SM, val, w - 1.0);
+                text_truncated(layer, font, xi + 0.5, text_y, FS_SM, val, w - 1.0);
             } else {
-                t(&layer, &font, xi + 0.5, text_y, FS_SM, val);
+                t(layer, font, xi + 0.5, text_y, FS_SM, val);
             }
             xi += w;
         }
 
         // Sublinha IBS/CBS/IS (NT 2026.010 §4.3): cobre a largura toda, abaixo da linha do item.
-        if let Some(linha) = linha_rtc {
+        if let Some(linha) = &linha.rtc {
             let sub_bot = row_bot - H_ITEM_RTC;
             // apaga as divisórias de coluna atrás da sublinha
             let branco = Color::Rgb(Rgb::new(1.0, 1.0, 1.0, None));
             layer.set_fill_color(branco);
             layer.add_rect(Rect::new(Mm(M + 0.15), Mm(sub_bot + 0.1), Mm(M + BODY_W - 0.15), Mm(row_bot - 0.05)));
             layer.set_fill_color(Color::Rgb(Rgb::new(0.0, 0.0, 0.0, None)));
-            text_truncated(&layer, &font, M + 1.5, sub_bot + H_ITEM_RTC * 0.3, FS_LBL, &linha, BODY_W - 3.0);
+            text_truncated(layer, font, M + 1.5, sub_bot + H_ITEM_RTC * 0.3, FS_LBL, linha, BODY_W - 3.0);
             row_y = sub_bot;
         } else {
             row_y = row_bot;
         }
     }
+    items_bot
+}
 
-    y = items_bot;
+fn quadro_adicional(
+    layer: &PdfLayerReference,
+    font: &IndirectFontRef,
+    y: f32,
+    altura: f32,
+    titulo: &str,
+) {
+    draw_rect(layer, M, y - altura, BODY_W, altura, 0.4);
+    t(layer, font, M + 0.8, y - FLBL, FS_LBL, titulo);
+    hline(layer, M, y - 3.5, BODY_W, 0.2);
+}
 
-    // ══════════════════════════════════════════════════════════════════════
-    // BLOCO 6 — DADOS ADICIONAIS
-    // ══════════════════════════════════════════════════════════════════════
-    let adic_top = y;
-    // Use remaining space above the protocolo bar, minimum H_ADIC_MIN
-    let adic_h = (adic_top - M - H_PROT).max(H_ADIC_MIN);
-    let adic_bot = adic_top - adic_h;
-    draw_rect(&layer, M, adic_bot, BODY_W, adic_h, 0.4);
-
-    // Split 66% complementar | 34% fisco
-    let split_x = M + (BODY_W * 0.66).round();
-    vline(&layer, split_x, adic_bot, adic_h, 0.3);
-
-    t(
-        &layer,
-        &font,
-        M + 0.8,
-        adic_top - FLBL,
-        FS_LBL,
-        "INFORMAÇÕES COMPLEMENTARES",
-    );
-    t(
-        &layer,
-        &font,
-        split_x + 0.8,
-        adic_top - FLBL,
-        FS_LBL,
-        "RESERVADO AO FISCO",
-    );
-    hline(&layer, M, adic_top - 3.5, BODY_W, 0.2);
-
-    {
-        let mut yi = adic_top - 5.5;
-        let max_w = split_x - M - 1.6;
-        for line in wrap_text_by_width(inf_cpl, max_w, FS_SM) {
-            if yi < adic_bot + 1.0 {
-                break;
-            }
-            t(&layer, &font, M + 0.8, yi, FS_SM, &line);
-            yi -= LH;
-        }
+fn desenhar_linhas_adicionais(
+    layer: &PdfLayerReference,
+    font: &IndirectFontRef,
+    x: f32,
+    y: f32,
+    linhas: &[String],
+) {
+    let mut linha_y = y - ADIC_PRIMEIRA_LINHA;
+    for linha in linhas {
+        t(layer, font, x + 0.8, linha_y, FS_SM, linha);
+        linha_y -= LH;
     }
-    {
-        let mut yi = adic_top - 5.5;
-        let max_w = M + BODY_W - split_x - 1.6;
-        for line in wrap_text_by_width(inf_fisco, max_w, FS_SM) {
-            if yi < adic_bot + 1.0 {
-                break;
-            }
-            t(&layer, &font, split_x + 0.8, yi, FS_SM, &line);
-            yi -= LH;
-        }
-    }
-
-    y = adic_bot;
-
-    // ══════════════════════════════════════════════════════════════════════
-    // BLOCO 7 — RODAPÉ (5 mm)
-    // ══════════════════════════════════════════════════════════════════════
-    let prot_top = y;
-    let prot_bot = prot_top - H_PROT;
-    draw_rect(&layer, M, prot_bot, BODY_W, H_PROT, 0.4);
-
-    let footer_y = prot_top - H_PROT / 2.0 - 0.5;
-    let footer_msg = "Gerado com dfe crate \u{2022} https://crates.io/crates/dfe";
-    let footer_w = estimate_text_width(footer_msg, FS_SM);
-    t(
-        &layer,
-        &font,
-        M + (BODY_W - footer_w) / 2.0,
-        footer_y,
-        FS_SM,
-        footer_msg,
-    );
-
-    let _ = y;
-
-    // ── Salvar ────────────────────────────────────────────────────────────
-    doc.save_to_bytes()
-        .map_err(|e| format!("Erro ao gerar PDF: {}", e))
 }
 
 // ── Reforma Tributária (NT 2026.010) — funções puras ──────────────────────
@@ -1247,20 +1444,6 @@ pub(crate) fn campos_totais_rtc(t: &PdfTotRtcA4) -> (Vec<(&'static str, String)>
 
 fn altura_bloco_rtc(t: &PdfTotRtcA4) -> f32 {
     H_RTC_TOT + if t.mono.is_some() { H_RTC_MONO } else { 0.0 }
-}
-
-/// Altura das linhas de itens: cada item ganha a sublinha só quando tem o que imprimir.
-fn altura_itens(items: &[PdfItemA4]) -> f32 {
-    if items.is_empty() {
-        return H_ITEM;
-    }
-    items
-        .iter()
-        .map(|i| {
-            let tem = i.rtc.as_ref().map(|r| !linha_rtc_item(r).is_empty()).unwrap_or(false);
-            H_ITEM + if tem { H_ITEM_RTC } else { 0.0 }
-        })
-        .sum()
 }
 
 // ── Logo ───────────────────────────────────────────────────────────────────
@@ -1710,8 +1893,8 @@ mod tests_rtc {
             v_prod: String::new(), v_desc: String::new(), v_ipi: String::new(), p_icms: String::new(),
             v_icms: String::new(), p_ipi: String::new(), rtc,
         };
-        assert_eq!(altura_itens(&[item(None), item(None)]), 2.0 * H_ITEM);
-        assert_eq!(altura_itens(&[item(Some(rtc_cheio())), item(None)]), 2.0 * H_ITEM + H_ITEM_RTC);
+        assert_eq!(LinhaItem::new(&item(None)).altura(), H_ITEM);
+        assert_eq!(LinhaItem::new(&item(Some(rtc_cheio()))).altura(), H_ITEM + H_ITEM_RTC);
     }
 
     #[test]
