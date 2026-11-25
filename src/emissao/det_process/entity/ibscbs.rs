@@ -17,6 +17,8 @@ pub struct IBSCBSProcess {
     /// `xs:choice minOccurs="0"`), só quando o emissor pede por [`crate::NFeBuilder::ibscbs_sem_grupo`].
     #[serde(rename = "gIBSCBS", skip_serializing_if = "Option::is_none")]
     pub g_ibscbs: Option<GIBSCBS>,
+    #[serde(rename = "gTribSN", skip_serializing_if = "Option::is_none")]
+    pub g_trib_sn: Option<super::super::super::simples_nacional::TribSimplesXml>,
 }
 
 
@@ -41,6 +43,7 @@ impl Default for IBSCBSProcess {
                     ..Default::default()
                 },
             }),
+            g_trib_sn: None,
         }
     }
 }

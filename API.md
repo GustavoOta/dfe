@@ -263,25 +263,46 @@ IbsCbs {
 }
 ```
 
-- **`calcular: true`** — a crate ignora os `v_*` recebidos e calcula
-  `vBC = vProd + vFrete + vSeg + vOutro − vDesc − vPIS − vCOFINS − vICMS − vFCP` do item (já
-  rateados, como impressos; NT 2025.002-RTC, rejeição 1115) e `vIBSUF`/`vIBSMun`/`vCBS = vBC ×
-  alíquota`. **`false`** — valores prontos do chamador, como antes.
+- **`calcular: true`** usa no cálculo `vProd + vFrete + vOutro − vDesc` e deduz os tributos
+  aplicáveis que já constam do item. Deduz ICMS próprio, ICMS monofásico próprio e FCP até 2032, e
+  PIS/COFINS até 2026. Use `.data_fato_gerador(data)` para definir a data de referência. Na ausência
+  dela, vale a data de emissão. Para casos com outros componentes de base, o chamador pode
+  fornecer os valores fiscais em **`calcular: false`**.
+- No regime regular, a base usa duas casas, as alíquotas publicadas usam até quatro e os valores
+  usam duas, com desempate para o par (`HALF_EVEN`). `vIBS` soma as parcelas estadual e municipal
+  publicadas, inclusive no modo de valores prontos. Os totais somam os valores publicados por item.
 - **`p_red_ibs` / `p_red_cbs`** — monta `gRed` (`pRedAliq`, `pAliqEfet`) em `gIBSUF`, `gIBSMun`
   e `gCBS`, com `pAliqEfet = p × (1 − pRedAliq/100)` (4 casas) e valor `vBC × pAliqEfet`.
   Só vai ao XML quando `IbsCbs::cst_exige_reducao(cst)` (CST **200** e **515**, `ind_gRed = 1`):
   nesses é obrigatório (1033/1074); em outro CST a redução é ignorada (gRed lá é a 1032).
   Redução de 100% sai com `pAliqEfet 0.0000` e valores zerados.
-- `IBSCBSTot` só é enviado se algum item tiver IBS/CBS (1118).
+- A presença de `IBSCBS` em algum item exige `IBSCBSTot` (W34-20).
 - **CST sem o grupo de valores (opt-in):** `NFeBuilder::ibscbs_sem_grupo(&["410"])` faz os itens
   desses CSTs saírem só com `CST` + `cClassTrib` (sem `gIBSCBS`, opcional no XSD) — ex.: entrada de
-  produtor rural não contribuinte (410/410014). Esses itens não somam no `IBSCBSTot`. Sem a chamada,
-  nada muda. `vCredPres` e
-  `vCredPresCondSus` saem `0.00` (obrigatórios no XSD; vazio reprovava no pattern).
+  produtor rural não contribuinte (410/410014). Esses itens não somam na base nem nos valores
+  regulares. Nos grupos regulares de total, `vCredPres` e `vCredPresCondSus` saem `0.00`.
+
+### Simples Nacional na NF-e e NFC-e
+
+Passe `.simples_nacional(SimplesNacional { tp_regime_ibs_cbs, itens })` ao `NFeBuilder`. Os tipos
+estão em `dfe::emissao::simples_nacional`. Informe um `ItemSimplesNacional` por `Det`, na mesma
+ordem. O `Det::ibs_cbs` fornece o CST e o cClassTrib. Cada item do Simples informa `c_ativ_sn` e o
+tipo de receita correspondente ao cClassTrib vigente. As alíquotas efetivas são dadas em pontos
+percentuais, conforme os parâmetros obtidos do PGDAS-D.
+
+- No CRT 1 dentro do DAS, informe `tributacao` com os insumos de IBS e CBS do Simples.
+- No CRT 2 sem opção pelo regime regular, informe os insumos de CBS do Simples. O IBS sai no
+  grupo regular e a CBS desse grupo fica zerada.
+- Na opção pelo regime regular, informe `tp_regime_ibs_cbs = Some(1)` e deixe `tributacao` ausente.
+- No CRT 3 com opção pendente, seguem as combinações 2, 3 e 4 da NT 2026.005. Os valores pendentes
+  ou suspensos não entram como devidos nos totais da nota.
+
+O cálculo automático atende fornecimentos com os componentes de receita que o builder suporta.
+Operações com monofasia e devoluções ou retornos por recusa exigem o tratamento fiscal específico.
 
 ## Arredondamento — `dfe::arred2`
 
-Regra única do ecossistema: **meio para cima, afastando do zero, sobre o valor decimal**.
+O helper geral aplica **meio para cima, afastando do zero, sobre o valor decimal**.
 O f64 passa por 15 algarismos significativos
 antes de virar `Decimal`, então `1.005` dá `1.01` — `format!("{:.2}")` e `(v*100).round()/100`
 dão `1.00`. O JS tem o espelho `arredondamento.js` (PDV e retaguarda).

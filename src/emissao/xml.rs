@@ -26,6 +26,9 @@ use super::types::{NFeInterno, SignedNfe};
 
 // Constrói e assina o XML da NF-e sem enviar à SEFAZ.
 pub(super) async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
+    if nfe.emit.crt == 4 && nfe.det.iter().any(|item| item.ibs_cbs.is_some()) {
+        return Err(DfeError::Validacao("MEI (CRT 4) não informa o grupo IBSCBS.".into()));
+    }
     let cert_path = nfe.cert_path.clone();
     let cert_pass = nfe.cert_pass.clone();
     let ide_mod = nfe.ide.mod_;
@@ -59,6 +62,9 @@ pub(super) async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
 
     let dh_emi = nfe.ide.dh_emi.clone().unwrap_or_else(get_current_date_time);
     let dh_emi_para_qrcode = dh_emi.clone();
+    let ano_fato_gerador = nfe.data_fato_gerador.map(|data| data.year()).or_else(|| {
+        DateTime::parse_from_rfc3339(&dh_emi).ok().map(|data| data.year())
+    });
     let dh_sai_ent = nfe.ide.dh_sai_ent.clone().unwrap_or_else(get_current_date_time);
 
     let mut ide_process = IdeProcess {
@@ -124,6 +130,7 @@ pub(super) async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
         },
         ie: nfe.emit.ie.clone(),
         crt: nfe.emit.crt,
+        tp_regime_ibs_cbs: nfe.simples_nacional.as_ref().and_then(|dados| dados.tp_regime_ibs_cbs),
     };
 
     let dest_string = DestTAG::build(&nfe.dest, &nfe.ide)?;
@@ -133,9 +140,12 @@ pub(super) async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
     let mut dets = det_process(
         nfe.det.clone(), nfe.ide.mod_, nfe.ide.tp_amb,
         nfe.desconto_rateio.clone(), nfe.frete_rateio.clone(), nfe.outro_rateio.clone(),
-        nfe.active_ibs_cbs.clone(),
+        ano_fato_gerador,
     )?;
     tirar_grupo_ibscbs(&mut dets, &nfe.ibscbs_sem_grupo);
+    if let Some(simples) = &nfe.simples_nacional {
+        simples.aplicar(nfe.emit.crt, nfe.ide.fin_nfe, &mut dets)?;
+    }
     let dets_total = dets.clone();
 
     let mut det_string = String::new();

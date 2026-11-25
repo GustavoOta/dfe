@@ -66,6 +66,8 @@ pub struct ProdProcess {
     pub v_outro: Option<Decimal>,
     #[serde(rename = "indTot")]
     pub ind_tot: String,
+    #[serde(rename = "cAtivSN", skip_serializing_if = "Option::is_none")]
+    pub c_ativ_sn: Option<String>,
     #[serde(rename = "xPed", skip_serializing_if = "Option::is_none")]
     pub x_ped: Option<String>,
     #[serde(rename = "nItemPed", skip_serializing_if = "Option::is_none")]

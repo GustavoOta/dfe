@@ -1,4 +1,6 @@
 mod det;
+mod rtc;
+pub mod simples_nacional;
 mod det_process;
 mod icms_calc;
 mod emit;
@@ -25,6 +27,8 @@ use rust_decimal::Decimal;
 use types::NFeInterno;
 pub use types::{Alerta, InfProt, NFeAssinada, Response, TagInfProt};
 pub use service::transmitir_xml_assinado;
+/// CSTs de NF-e/NFC-e em que a classificação sai sem o grupo de cálculo regular.
+pub const CSTS_IBSCBS_SEM_GRUPO_REGULAR: [&str; 3] = ["400", "410", "820"];
 
 // Validações de contingência (`tpEmis != 1`), comuns a `gerar_xml()` e `emitir()` — fail-fast,
 // sem I/O, mesmo padrão do `SubstituicaoBuilder` (ver `substituicao/mod.rs`).
@@ -110,6 +114,8 @@ pub struct NFeBuilder {
     entrega: Option<Entrega>,
     referencias: Vec<String>,
     ibscbs_sem_grupo: Vec<String>,
+    data_fato_gerador: Option<chrono::NaiveDate>,
+    simples_nacional: Option<simples_nacional::SimplesNacional>,
 }
 
 impl NFeBuilder {
@@ -121,6 +127,7 @@ impl NFeBuilder {
             pagamento: None, informacoes_adicionais: None, id_csc: None, csc: None,
             active_ibs_cbs: None, desconto_rateio: None, frete_rateio: None, outro_rateio: None,
             entrega: None, referencias: Vec::new(), ibscbs_sem_grupo: Vec::new(),
+            data_fato_gerador: None, simples_nacional: None,
         }
     }
 
@@ -180,6 +187,18 @@ impl NFeBuilder {
         self
     }
 
+    /// Data fiscal das regras do IBS/CBS. Se ausente, usa a data de emissão do XML.
+    pub fn data_fato_gerador(mut self, data: chrono::NaiveDate) -> Self {
+        self.data_fato_gerador = Some(data);
+        self
+    }
+
+    /// Preenche a NF-e/NFC-e conforme a NT 2026.005. Informe um item por `Det`, na mesma ordem.
+    pub fn simples_nacional(mut self, dados: simples_nacional::SimplesNacional) -> Self {
+        self.simples_nacional = Some(dados);
+        self
+    }
+
     /// Gera e valida o XML da NF-e sem enviar à SEFAZ.
     ///
     /// Útil para validação prévia (ex.: NF-e de devolução antes da emissão) e para a
@@ -235,6 +254,8 @@ impl NFeBuilder {
             entrega: self.entrega,
             referencias: self.referencias,
             ibscbs_sem_grupo: self.ibscbs_sem_grupo,
+            data_fato_gerador: self.data_fato_gerador,
+            simples_nacional: self.simples_nacional,
         })
     }
 

@@ -26,6 +26,8 @@ pub(super) struct NFeInterno {
     pub referencias: Vec<String>,
     /// CSTs de IBS/CBS que saem sem o grupo `gIBSCBS` (opt-in, `NFeBuilder::ibscbs_sem_grupo`).
     pub ibscbs_sem_grupo: Vec<String>,
+    pub data_fato_gerador: Option<chrono::NaiveDate>,
+    pub simples_nacional: Option<super::simples_nacional::SimplesNacional>,
 }
 
 /// Resposta da emissão de NF-e ou NFC-e retornada por [`super::NFeBuilder::emitir`].

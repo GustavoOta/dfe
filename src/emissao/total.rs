@@ -1,4 +1,5 @@
 use super::det_process::entity::{COFINSProcess, DetProcess, ICMSProcess, PISProcess};
+use super::rtc::{arred_rtc, fmt_rtc};
 use crate::arredondamento::{arred2, fmt_dec};
 use crate::tipos::Total;
 use crate::error::Result;
@@ -23,11 +24,21 @@ pub struct IBSCBSTot {
     #[serde(rename = "vBCIBSCBS")]
     pub v_bc_ibs_cbs: String,
     /// Grupo total do IBS
-    #[serde(rename = "gIBS")]
-    pub g_ibs: GIBS,
+    #[serde(rename = "gIBS", skip_serializing_if = "Option::is_none")]
+    pub g_ibs: Option<GIBS>,
     /// Grupo total da CBS
-    #[serde(rename = "gCBS")]
-    pub g_cbs: GCBS,
+    #[serde(rename = "gCBS", skip_serializing_if = "Option::is_none")]
+    pub g_cbs: Option<GCBS>,
+    #[serde(rename = "gTribSN", skip_serializing_if = "Option::is_none")]
+    pub g_trib_sn: Option<TotaisSimplesXml>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TotaisSimplesXml {
+    #[serde(rename = "vIBSSN")]
+    pub v_ibs: String,
+    #[serde(rename = "vCBSSN")]
+    pub v_cbs: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -53,10 +64,10 @@ pub struct GIBS {
 pub struct GIBSUF {
     /// Valor total do diferimento 13v2
     #[serde(rename = "vDif")]
-    pub v_dif: Decimal,
+    pub v_dif: String,
     /// Valor total de devolução de tributos 13v2
     #[serde(rename = "vDevTrib")]
-    pub v_dev_trib: Decimal,
+    pub v_dev_trib: String,
     /// Valor total do IBS da UF 13v2
     #[serde(rename = "vIBSUF")]
     pub v_ibs_uf: String,
@@ -66,10 +77,10 @@ pub struct GIBSUF {
 pub struct GIBSMun {
     /// Valor total do diferimento 13v2
     #[serde(rename = "vDif")]
-    pub v_dif: Decimal,
+    pub v_dif: String,
     /// Valor total de devolução de tributos 13v2
     #[serde(rename = "vDevTrib")]
-    pub v_dev_trib: Decimal,
+    pub v_dev_trib: String,
     /// Valor total do IBS do município 13v2
     #[serde(rename = "vIBSMun")]
     pub v_ibs_mun: String,
@@ -80,10 +91,10 @@ pub struct GIBSMun {
 pub struct GCBS {
     /// Valor total do diferimento 13v2
     #[serde(rename = "vDif")]
-    pub v_dif: Decimal,
+    pub v_dif: String,
     /// Valor total de devolução de tributos 13v2
     #[serde(rename = "vDevTrib")]
-    pub v_dev_trib: Decimal,
+    pub v_dev_trib: String,
     /// Valor total da CBS 13v2
     #[serde(rename = "vCBS")]
     pub v_cbs: String,
@@ -192,17 +203,21 @@ pub fn total_process(
     let mut v_pis_cofins_st_vnf = 0.0_f64;
 
     // ── Totais IBS/CBS ────────────────────────────────────────────────────────
-    let mut v_bc_ibs_cbs_total    = 0.0_f64;
-    let mut ibs_uf_total          = 0.0_f64;
-    let mut ibs_uf_dif_total      = 0.0_f64;
-    let mut ibs_uf_dev_trib_total = 0.0_f64;
-    let mut ibs_mun_total         = 0.0_f64;
-    let mut ibs_mun_dif_total     = 0.0_f64;
-    let mut ibs_mun_dev_trib_total = 0.0_f64;
-    let mut ibs_total             = 0.0_f64;
-    let mut cbs_total             = 0.0_f64;
-    let mut cbs_dif_total         = 0.0_f64;
-    let mut cbs_dev_trib_total    = 0.0_f64;
+    let mut tem_ibscbs = false;
+    let mut tem_grupo_regular = false;
+    let mut v_bc_ibs_cbs_total = Decimal::ZERO;
+    let mut ibs_uf_total = Decimal::ZERO;
+    let mut ibs_uf_dif_total = Decimal::ZERO;
+    let mut ibs_uf_dev_trib_total = Decimal::ZERO;
+    let mut ibs_mun_total = Decimal::ZERO;
+    let mut ibs_mun_dif_total = Decimal::ZERO;
+    let mut ibs_mun_dev_trib_total = Decimal::ZERO;
+    let mut cbs_total = Decimal::ZERO;
+    let mut cbs_dif_total = Decimal::ZERO;
+    let mut cbs_dev_trib_total = Decimal::ZERO;
+    let mut totais_simples: Option<(Decimal, Decimal)> = None;
+    let valor_rtc = |v: &str| Decimal::from_str_exact(v)
+        .map_err(|e| crate::error::DfeError::Xml(format!("Valor de IBS/CBS inválido ({v}): {e}")));
 
     // Cada parcela é o valor IMPRESSO no item (arred2 = mesmo centavo do fmt_dec do item):
     // o total tem de ser exatamente Σ itens do XML (rejeições 531/532/602/603).
@@ -235,35 +250,41 @@ pub fn total_process(
             + arred2(cofins_st_soma_no_vnf(&det.imposto.cofins));
         v_tot_trib   += det.imposto.v_tot_trib.parse::<f64>().unwrap_or(0.0);
 
-        // Item com IBS/CBS sem o grupo de valores (CST sem gIBSCBS) não soma nada.
+        // W34-20: a classificação já exige IBSCBSTot. Sem gIBSCBS, a base regular é zero.
+        tem_ibscbs |= det.imposto.ibs_cbs.is_some();
+        if let Some(grupo) = det.imposto.ibs_cbs.as_ref().and_then(|ib| ib.g_trib_sn.as_ref()) {
+            let (ibs, cbs) = totais_simples.get_or_insert((Decimal::ZERO, Decimal::ZERO));
+            if let Some(grupo_ibs) = &grupo.g_ibs {
+                *ibs += valor_rtc(&grupo_ibs.v_ibs)?;
+            }
+            *cbs += valor_rtc(&grupo.g_cbs.v_cbs)?;
+        }
         if let Some(g_ibscbs) = det.imposto.ibs_cbs.as_ref().and_then(|i| i.g_ibscbs.as_ref()) {
-            v_bc_ibs_cbs_total += g_ibscbs.v_bc.parse::<f64>().unwrap_or(0.0);
+            tem_grupo_regular = true;
+            v_bc_ibs_cbs_total += valor_rtc(&g_ibscbs.v_bc)?;
 
-            let v_ibs_uf = g_ibscbs.g_ibs_uf.v_ibs_uf.parse::<f64>().unwrap_or(0.0);
-            ibs_uf_total += v_ibs_uf;
+            ibs_uf_total += valor_rtc(&g_ibscbs.g_ibs_uf.v_ibs_uf)?;
             if let Some(ref g) = g_ibscbs.g_ibs_uf.g_dif {
-                ibs_uf_dif_total += g.v_dif.to_f64().unwrap_or(0.0);
+                ibs_uf_dif_total += arred_rtc(g.v_dif, 2);
             }
             if let Some(ref g) = g_ibscbs.g_ibs_uf.g_dev_trib {
-                ibs_uf_dev_trib_total += g.v_dev_trib.to_f64().unwrap_or(0.0);
+                ibs_uf_dev_trib_total += arred_rtc(g.v_dev_trib, 2);
             }
 
-            let v_ibs_mun = g_ibscbs.g_ibs_mun.v_ibs_mun.parse::<f64>().unwrap_or(0.0);
-            ibs_mun_total += v_ibs_mun;
+            ibs_mun_total += valor_rtc(&g_ibscbs.g_ibs_mun.v_ibs_mun)?;
             if let Some(ref g) = g_ibscbs.g_ibs_mun.g_dif {
-                ibs_mun_dif_total += g.v_dif.to_f64().unwrap_or(0.0);
+                ibs_mun_dif_total += arred_rtc(g.v_dif, 2);
             }
             if let Some(ref g) = g_ibscbs.g_ibs_mun.g_dev_trib {
-                ibs_mun_dev_trib_total += g.v_dev_trib.to_f64().unwrap_or(0.0);
+                ibs_mun_dev_trib_total += arred_rtc(g.v_dev_trib, 2);
             }
 
-            ibs_total += g_ibscbs.v_ibs.parse::<f64>().unwrap_or(0.0);
-            cbs_total += g_ibscbs.g_cbs.v_cbs.parse::<f64>().unwrap_or(0.0);
+            cbs_total += valor_rtc(&g_ibscbs.g_cbs.v_cbs)?;
             if let Some(ref g) = g_ibscbs.g_cbs.g_dif {
-                cbs_dif_total += g.v_dif.to_f64().unwrap_or(0.0);
+                cbs_dif_total += arred_rtc(g.v_dif, 2);
             }
             if let Some(ref g) = g_ibscbs.g_cbs.g_dev_trib {
-                cbs_dev_trib_total += g.v_dev_trib.to_f64().unwrap_or(0.0);
+                cbs_dev_trib_total += arred_rtc(g.v_dev_trib, 2);
             }
         }
     }
@@ -295,40 +316,38 @@ pub fn total_process(
                // ICMS monofásico sujeito a retenção (CST 15) entra no vNF (NT 2023.001, 610).
                + mono.map(|m| arred2(m[3])).unwrap_or(0.0);
 
-    // Só envia IBSCBSTot se algum item tiver IBS/CBS — enviar zerado causa rejeição 1118
-    let send_ibs_cbs = if v_bc_ibs_cbs_total > 0.0 {
+    // W59h-10: a presença de gTribSN no item exige seus totais, inclusive zerados.
+    let send_ibs_cbs = if tem_ibscbs {
         Some(IBSCBSTot {
-            v_bc_ibs_cbs: fmt_dec(v_bc_ibs_cbs_total, 2),
-            g_ibs: GIBS {
+            v_bc_ibs_cbs: fmt_rtc(v_bc_ibs_cbs_total, 2),
+            g_ibs: tem_grupo_regular.then(|| GIBS {
                 g_ibs_uf: GIBSUF {
-                    v_dif: Decimal::from_str_exact(&fmt_dec(ibs_uf_dif_total, 2))
-                        .unwrap_or(Decimal::new(0, 2)),
-                    v_dev_trib: Decimal::from_str_exact(&fmt_dec(ibs_uf_dev_trib_total, 2))
-                        .unwrap_or(Decimal::new(0, 2)),
-                    v_ibs_uf: fmt_dec(ibs_uf_total, 2),
+                    v_dif: fmt_rtc(ibs_uf_dif_total, 2),
+                    v_dev_trib: fmt_rtc(ibs_uf_dev_trib_total, 2),
+                    v_ibs_uf: fmt_rtc(ibs_uf_total, 2),
                 },
                 g_ibs_mun: GIBSMun {
-                    v_dif: Decimal::from_str_exact(&fmt_dec(ibs_mun_dif_total, 2))
-                        .unwrap_or(Decimal::new(0, 2)),
-                    v_dev_trib: Decimal::from_str_exact(&fmt_dec(ibs_mun_dev_trib_total, 2))
-                        .unwrap_or(Decimal::new(0, 2)),
-                    v_ibs_mun: fmt_dec(ibs_mun_total, 2),
+                    v_dif: fmt_rtc(ibs_mun_dif_total, 2),
+                    v_dev_trib: fmt_rtc(ibs_mun_dev_trib_total, 2),
+                    v_ibs_mun: fmt_rtc(ibs_mun_total, 2),
                 },
-                v_ibs: fmt_dec(ibs_total, 2),
+                v_ibs: fmt_rtc(ibs_uf_total + ibs_mun_total, 2),
                 // Obrigatórios no XSD; a crate não monta gCredPres no item, então o total é 0.00
                 // (`None` saía `<vCredPres/>` e reprovava no pattern).
                 v_cred_pres: Decimal::new(0, 2),
                 v_cred_pres_cond_sus: Decimal::new(0, 2),
-            },
-            g_cbs: GCBS {
-                v_dif: Decimal::from_str_exact(&fmt_dec(cbs_dif_total, 2))
-                    .unwrap_or(Decimal::new(0, 2)),
-                v_dev_trib: Decimal::from_str_exact(&fmt_dec(cbs_dev_trib_total, 2))
-                    .unwrap_or(Decimal::new(0, 2)),
-                v_cbs: fmt_dec(cbs_total, 2),
+            }),
+            g_cbs: tem_grupo_regular.then(|| GCBS {
+                v_dif: fmt_rtc(cbs_dif_total, 2),
+                v_dev_trib: fmt_rtc(cbs_dev_trib_total, 2),
+                v_cbs: fmt_rtc(cbs_total, 2),
                 v_cred_pres: Decimal::new(0, 2),
                 v_cred_pres_cond_sus: Decimal::new(0, 2),
-            },
+            }),
+            g_trib_sn: totais_simples.map(|(ibs, cbs)| TotaisSimplesXml {
+                v_ibs: fmt_rtc(ibs, 2),
+                v_cbs: fmt_rtc(cbs, 2),
+            }),
         })
     } else {
         None
@@ -498,7 +517,7 @@ fn icms_v_fcpst_ret(icms: &ICMSProcess) -> f64 {
 
 /// Monofásico de combustíveis (NT 2023.001): (qBCMono, vICMSMono, qBCMonoReten,
 /// vICMSMonoReten, qBCMonoRet, vICMSMonoRet) do item.
-fn icms_mono(icms: &ICMSProcess) -> Option<[f64; 6]> {
+pub(super) fn icms_mono(icms: &ICMSProcess) -> Option<[f64; 6]> {
     Some(match icms {
         ICMSProcess::ICMS02(v) => [v.q_bc_mono.unwrap_or(0.0), v.v_icms_mono, 0.0, 0.0, 0.0, 0.0],
         ICMSProcess::ICMS15(v) => [

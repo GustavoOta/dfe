@@ -874,8 +874,8 @@ pub struct IbsCbs {
     pub p_cbs: Decimal,
     pub v_cbs: Decimal,
     /// `true` = a crate calcula `v_bc` e os valores (os `v_*` recebidos são ignorados):
-    /// vBC = vProd + vFrete + vSeg + vOutro − vDesc − vPIS − vCOFINS − vICMS − vFCP do item,
-    /// já com o rateio (NT 2025.002-RTC, gIBSCBS/vBC); vIBSUF/vIBSMun/vCBS = vBC × alíquota.
+    /// A base usa vProd + vFrete + vOutro − vDesc e os tributos dedutíveis impressos no
+    /// item, conforme a vigência. Os valores usam a alíquota publicada do respectivo tributo.
     /// `false` = valores prontos do chamador, como antes.
     #[serde(default)]
     pub calcular: bool,

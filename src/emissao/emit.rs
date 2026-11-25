@@ -30,6 +30,8 @@ pub struct EmitProcess {
     /// Ex: 4 para MEI - Microempreendedor Individual
     #[serde(rename = "CRT")]
     pub crt: u8,
+    #[serde(rename = "tpRegimeIBSCBS", skip_serializing_if = "Option::is_none")]
+    pub tp_regime_ibs_cbs: Option<u8>,
 }
 
 /// Endereço do emitente

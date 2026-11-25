@@ -149,6 +149,7 @@ pub use substituicao::SubstituicaoBuilder;
 pub use carta_correcao::CartaCorrecaoBuilder;
 #[cfg(feature = "emissao")]
 pub use emissao::NFeBuilder;
+pub use interno::uf::sigla_por_codigo;
 #[cfg(feature = "emissao")]
 pub use emissao::referencia_cupom::{
     chave_e_de_cupom, finalidade_sujeita_a_vedacao, vedacao_referencia_cupom_ativa,

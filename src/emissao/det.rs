@@ -1,5 +1,6 @@
 use super::det_process::entity::*;
-use crate::arredondamento::{arred_decimal, fmt_dec, fmt_dec_ate, fmt_decimal, para_decimal};
+use super::rtc::{arred_rtc, fmt_rtc};
+use crate::arredondamento::{arred_decimal, fmt_dec, fmt_dec_ate, para_decimal};
 use crate::tipos::{Cofins, Det, IbsCbs, Icms, Ipi, Pis};
 use crate::error::Result;
 use rust_decimal::Decimal;
@@ -12,7 +13,7 @@ pub fn det_process(
     desconto_rateio: Option<Decimal>,
     frete_rateio: Option<Decimal>,
     outro_rateio: Option<Decimal>,
-    _active_ibscbs: Option<String>,
+    ano_fato_gerador: Option<i32>,
 ) -> Result<Vec<DetProcess>> {
     let mut det_process_values: Vec<DetProcess> = Vec::new();
     let mut first_item = 0;
@@ -164,6 +165,7 @@ pub fn det_process(
                 v_desc: v_desc_value,
                 v_outro: v_outro_value,
                 ind_tot: d.ind_tot.to_string(),
+                c_ativ_sn: None,
                 x_ped: d.x_ped.clone(),
                 n_item_ped: d.n_item_ped.clone(),
                 comb: comb_process(d)?,
@@ -174,7 +176,10 @@ pub fn det_process(
                 let cofins = select_cofins_process(&d.cofins);
                 let ibs_cbs = match d.ibs_cbs.as_ref() {
                     Some(ib) if ib.calcular => {
-                        let v_bc = base_ibs_cbs(base_icms, &icms, &pis, &cofins);
+                        let v_prod = arred_decimal(para_decimal(d.v_prod), 2);
+                        let base = v_prod + v_frete_value.unwrap_or_default()
+                            + v_outro_value.unwrap_or_default() - v_desc_value.unwrap_or_default();
+                        let v_bc = base_ibs_cbs(base, &icms, &pis, &cofins, ano_fato_gerador);
                         ibs_cbs_process(Some(&ibs_cbs_calculado(ib, v_bc)))
                     }
                     outro => ibs_cbs_process(outro),
@@ -196,34 +201,47 @@ pub fn det_process(
 
 /// Base do IBS/CBS do item (NT 2025.002-RTC, gIBSCBS/vBC): a base da operação (vProd + frete +
 /// acréscimo − desconto, já rateados) menos os tributos que serão extintos, como impressos no
-/// item. vSeg, vII, vServ, vICMSUFDest, vFCPUFDest, vICMSMono, vISSQN e vIS não existem nas
+/// item. vSeg, vII, vServ, vICMSUFDest, vFCPUFDest, vISSQN e vIS não existem nas
 /// notas que a crate monta hoje: entram como zero.
-fn base_ibs_cbs(base_operacao: f64, icms: &ICMSProcess, pis: &PISProcess, cofins: &COFINSProcess) -> f64 {
-    use super::total::{cofins_v_cofins, icms_v_fcp, icms_v_icms, pis_v_pis};
-    let v = crate::arredondamento::arred2(base_operacao)
-        - crate::arredondamento::arred2(pis_v_pis(pis))
-        - crate::arredondamento::arred2(cofins_v_cofins(cofins))
-        - crate::arredondamento::arred2(icms_v_icms(icms))
-        - crate::arredondamento::arred2(icms_v_fcp(icms));
-    crate::arredondamento::arred2(v.max(0.0))
+fn base_ibs_cbs(
+    base_operacao: Decimal,
+    icms: &ICMSProcess,
+    pis: &PISProcess,
+    cofins: &COFINSProcess,
+    ano_fato_gerador: Option<i32>,
+) -> Decimal {
+    use super::total::{cofins_v_cofins, icms_mono, icms_v_fcp, icms_v_icms, pis_v_pis};
+    let impresso = |v| arred_decimal(para_decimal(v), 2);
+    let ano = ano_fato_gerador.unwrap_or(2026);
+    let mut base = base_operacao;
+    if ano <= 2026 {
+        base -= impresso(pis_v_pis(pis)) + impresso(cofins_v_cofins(cofins));
+    }
+    if ano <= 2032 {
+        base -= impresso(icms_v_icms(icms)) + impresso(icms_v_fcp(icms));
+        if let Some(mono) = icms_mono(icms) {
+            base -= impresso(mono[1]);
+        }
+    }
+    arred_rtc(base.max(Decimal::ZERO), 2)
 }
 
-/// Valores do grupo a partir da base e das alíquotas (arredondamento único da crate).
-fn ibs_cbs_calculado(ib: &IbsCbs, v_bc: f64) -> IbsCbs {
-    use rust_decimal::prelude::FromPrimitive;
-    let dec = |v: f64| Decimal::from_f64(crate::arredondamento::arred2(v)).unwrap_or(Decimal::ZERO);
-    let pct = |p: Decimal| p.to_f64().unwrap_or(0.0);
+/// Usa na conta a mesma alíquota que será publicada no grupo.
+fn ibs_cbs_calculado(ib: &IbsCbs, v_bc: Decimal) -> IbsCbs {
     let (red_ibs, red_cbs) = reducoes(ib);
+    let valor = |aliquota, reducao| {
+        arred_rtc(v_bc * aliq_efetiva(aliquota, reducao) / Decimal::ONE_HUNDRED, 2)
+    };
     IbsCbs {
         cst: ib.cst.clone(),
         class_trib: ib.class_trib.clone(),
-        v_bc: dec(v_bc),
+        v_bc,
         p_ibs_uf: ib.p_ibs_uf,
-        v_ibs_uf: dec(v_bc * pct(aliq_efetiva(ib.p_ibs_uf, red_ibs)) / 100.0),
+        v_ibs_uf: valor(ib.p_ibs_uf, red_ibs),
         p_ibs_mun: ib.p_ibs_mun,
-        v_ibs_mun: dec(v_bc * pct(aliq_efetiva(ib.p_ibs_mun, red_ibs)) / 100.0),
+        v_ibs_mun: valor(ib.p_ibs_mun, red_ibs),
         p_cbs: ib.p_cbs,
-        v_cbs: dec(v_bc * pct(aliq_efetiva(ib.p_cbs, red_cbs)) / 100.0),
+        v_cbs: valor(ib.p_cbs, red_cbs),
         calcular: false,
         p_red_ibs: ib.p_red_ibs,
         p_red_cbs: ib.p_red_cbs,
@@ -238,9 +256,9 @@ fn reducoes(ib: &IbsCbs) -> (Option<Decimal>, Option<Decimal>) {
 
 /// `pAliqEfet = p × (1 − pRedAliq/100)`, 4 casas (TDec_0302_04). Sem redução, a própria alíquota.
 fn aliq_efetiva(p: Decimal, p_red: Option<Decimal>) -> Decimal {
+    let p = arred_rtc(p, 4);
     match p_red {
-        Some(r) => (p * (Decimal::ONE_HUNDRED - r) / Decimal::ONE_HUNDRED)
-            .round_dp_with_strategy(4, rust_decimal::RoundingStrategy::MidpointAwayFromZero)
+        Some(r) => arred_rtc(p * (Decimal::ONE_HUNDRED - arred_rtc(r, 4)) / Decimal::ONE_HUNDRED, 4)
             .max(Decimal::ZERO),
         None => p,
     }
@@ -249,8 +267,8 @@ fn aliq_efetiva(p: Decimal, p_red: Option<Decimal>) -> Decimal {
 /// Grupo `gRed` (TRed: pRedAliq, pAliqEfet) da alíquota `p`.
 fn g_red(p: Decimal, p_red: Option<Decimal>) -> Option<GRed> {
     p_red.map(|r| GRed {
-        p_red_aliq: fmt_decimal(r, 4),
-        p_aliq_efet: fmt_decimal(aliq_efetiva(p, Some(r)), 4),
+        p_red_aliq: fmt_rtc(r, 4),
+        p_aliq_efet: fmt_rtc(aliq_efetiva(p, Some(r)), 4),
     })
 }
 
@@ -269,28 +287,31 @@ pub(super) fn tirar_grupo_ibscbs(dets: &mut [DetProcess], csts: &[String]) {
 fn ibs_cbs_process(ibs_cbs: Option<&IbsCbs>) -> Option<IBSCBSProcess> {
     let ibs = ibs_cbs?;
     let (red_ibs, red_cbs) = reducoes(ibs);
+    let v_ibs_uf = arred_rtc(ibs.v_ibs_uf, 2);
+    let v_ibs_mun = arred_rtc(ibs.v_ibs_mun, 2);
     Some(IBSCBSProcess {
         cst: ibs.cst.clone(),
         c_class_trib: ibs.class_trib.clone(),
+        g_trib_sn: None,
         g_ibscbs: Some(GIBSCBS {
-            v_bc: fmt_decimal(ibs.v_bc, 2),
+            v_bc: fmt_rtc(ibs.v_bc, 2),
             g_ibs_uf: GIBSUF {
-                p_ibs_uf: fmt_decimal(ibs.p_ibs_uf, 4),
+                p_ibs_uf: fmt_rtc(ibs.p_ibs_uf, 4),
                 g_red: g_red(ibs.p_ibs_uf, red_ibs),
-                v_ibs_uf: fmt_decimal(ibs.v_ibs_uf, 2),
+                v_ibs_uf: fmt_rtc(v_ibs_uf, 2),
                 ..Default::default()
             },
             g_ibs_mun: GIBSMun {
-                p_ibs_mun: fmt_decimal(ibs.p_ibs_mun, 4),
+                p_ibs_mun: fmt_rtc(ibs.p_ibs_mun, 4),
                 g_red: g_red(ibs.p_ibs_mun, red_ibs),
-                v_ibs_mun: fmt_decimal(ibs.v_ibs_mun, 2),
+                v_ibs_mun: fmt_rtc(v_ibs_mun, 2),
                 ..Default::default()
             },
-            v_ibs: fmt_decimal(ibs.v_ibs_uf + ibs.v_ibs_mun, 2),
+            v_ibs: fmt_rtc(v_ibs_uf + v_ibs_mun, 2),
             g_cbs: GCBS {
-                p_cbs: fmt_decimal(ibs.p_cbs, 4),
+                p_cbs: fmt_rtc(ibs.p_cbs, 4),
                 g_red: g_red(ibs.p_cbs, red_cbs),
-                v_cbs: fmt_decimal(ibs.v_cbs, 2),
+                v_cbs: fmt_rtc(ibs.v_cbs, 2),
                 ..Default::default()
             },
             ..Default::default()
@@ -842,7 +863,7 @@ mod tests_pis_cofins_total {
 mod tests {
     use super::super::total::total_process;
     use super::det_process;
-    use crate::tipos::{Det, Total};
+    use crate::tipos::{Det, IbsCbs, Total};
     use rust_decimal::Decimal;
 
     fn item(v_prod: f64) -> Det {
@@ -974,7 +995,11 @@ mod tests {
         let tot = total_process(Total::default(), dets, 1, None).unwrap();
         let t = tot.ibs_cbs_tot.expect("IBSCBSTot com itens tributados");
         assert_eq!(t.v_bc_ibs_cbs, "130.94");
-        assert_eq!(t.g_cbs.v_cbs, "1.18");
+        assert_eq!(t.g_cbs.unwrap().v_cbs, "1.18");
+
+        let dets = det_process(vec![item(), item()], 65, 1, Some(d("20.00")), None, None, Some(2027)).unwrap();
+        let g = dets[0].imposto.ibs_cbs.as_ref().unwrap().g_ibscbs.as_ref().unwrap();
+        assert_eq!(g.v_bc, "73.80", "PIS/COFINS já não compõem a base em 2027");
     }
 
     #[test]
@@ -1010,6 +1035,36 @@ mod tests {
     }
 
     #[test]
+    fn rtc_usa_desempate_par_e_calcula_com_aliquota_publicada() {
+        let d = |s| Decimal::from_str_exact(s).unwrap();
+        let (_, xml) = xml_do_item(IbsCbs { p_cbs: d("1"), ..ibs(true) }, 100.50);
+        assert!(xml.contains("<pCBS>1.0000</pCBS><vCBS>1.00</vCBS>"), "{xml}");
+        let (_, xml) = xml_do_item(IbsCbs { p_cbs: d("0.12346"), ..ibs(true) }, 100_000.0);
+        assert!(xml.contains("<pCBS>0.1235</pCBS><vCBS>123.50</vCBS>"), "{xml}");
+    }
+
+    #[test]
+    fn rtc_ibs_soma_as_parcelas_publicadas_mesmo_com_valores_prontos() {
+        let parcela = Decimal::new(4, 3);
+        let (dets, xml) = xml_do_item(IbsCbs { v_ibs_uf: parcela, v_ibs_mun: parcela, ..ibs(false) }, 12.0);
+        assert!(xml.contains("<vIBSUF>0.00</vIBSUF>"), "{xml}");
+        assert!(xml.contains("<vIBSMun>0.00</vIBSMun>"), "{xml}");
+        assert!(xml.contains("<vIBS>0.00</vIBS>"), "{xml}");
+        let total = total_process(Total::default(), dets, 1, None).unwrap();
+        assert_eq!(total.ibs_cbs_tot.unwrap().g_ibs.unwrap().v_ibs, "0.00");
+    }
+
+    #[test]
+    fn rtc_ibs_estadual_e_municipal_fecham_com_o_total_do_item() {
+        // Caso publicado no changelog 1.7.2 da calculadora do regime regular.
+        let p = Decimal::new(5, 2);
+        let (_, xml) = xml_do_item(IbsCbs { p_ibs_uf: p, p_ibs_mun: p, ..ibs(true) }, 12.0);
+        assert!(xml.contains("<vIBSUF>0.01</vIBSUF>"), "{xml}");
+        assert!(xml.contains("<vIBSMun>0.01</vIBSMun>"), "{xml}");
+        assert!(xml.contains("<vIBS>0.02</vIBS>"), "{xml}");
+    }
+
+    #[test]
     fn cst_200_com_reducao_total_manda_gred_e_zera_os_valores() {
         // Rejeição 1033/1074: CST 200 (ind_gRed = 1) exige gRed em gIBSUF, gIBSMun e gCBS.
         // 200014 (hortícolas, Anexo XV) = redução de 100% → pAliqEfet 0 e valores zerados.
@@ -1024,7 +1079,7 @@ mod tests {
             "<gCBS><pCBS>0.9000</pCBS><gRed><pRedAliq>100.0000</pRedAliq><pAliqEfet>0.0000</pAliqEfet></gRed><vCBS>0.00</vCBS></gCBS>"
         ), "{xml}");
         let t = total_process(Total::default(), dets, 1, None).unwrap().ibs_cbs_tot.unwrap();
-        assert_eq!((t.v_bc_ibs_cbs.as_str(), t.g_cbs.v_cbs.as_str()), ("50.00", "0.00"));
+        assert_eq!((t.v_bc_ibs_cbs.as_str(), t.g_cbs.unwrap().v_cbs.as_str()), ("50.00", "0.00"));
     }
 
     #[test]
@@ -1074,9 +1129,11 @@ mod tests {
         assert_eq!(xml, "<IBSCBS><CST>410</CST><cClassTrib>410014</cClassTrib></IBSCBS>");
         crate::interno::validation::validar_fragmento("IBSCBS", &xml).expect("sem o grupo também é XSD");
         assert!(dets_000[0].imposto.ibs_cbs.as_ref().unwrap().g_ibscbs.is_some());
-        // Item sem grupo não soma: só ele na nota → sem IBSCBSTot (zerado é a rejeição 1118).
+        // A classificação exige IBSCBSTot (W34-20), mas não tem parcelas de cálculo regular.
         let tot = total_process(crate::tipos::Total::default(), dets, 3, None).unwrap();
-        assert!(tot.ibs_cbs_tot.is_none());
+        let rtc = tot.ibs_cbs_tot.unwrap();
+        assert_eq!(rtc.v_bc_ibs_cbs, "0.00");
+        assert!(rtc.g_ibs.is_none() && rtc.g_cbs.is_none());
     }
 
     #[test]
