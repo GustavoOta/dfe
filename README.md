@@ -205,6 +205,36 @@ Dúvidas, sugestões e troca de experiência com quem integra a SEFAZ em Rust: e
 [comunidade do dfe no WhatsApp](https://chat.whatsapp.com/GYV2d62n46k7vYaZg5zRBb).
 Bugs e pedidos de funcionalidade: [issues do GitHub](https://github.com/GustavoOta/dfe/issues).
 
+## Agradecimentos
+
+Agradeço às comunidades do [SPED-NFe (NFePHP)](https://github.com/nfephp-org/sped-nfe)
+e do [Projeto ACBr](https://projetoacbr.com.br/sobre/) por compartilharem, há anos,
+documentação, exemplos e experiência com documentos fiscais eletrônicos no Brasil.
+Esses projetos foram referências técnicas importantes no desenvolvimento da `dfe`.
+
+Agradeço também à Receita Federal por disponibilizar publicamente as calculadoras
+da Reforma Tributária do Consumo e o gerador oficial de DANFSe. Iniciativas assim
+facilitam a vida de quem desenvolve software fiscal. Ter ferramentas oficiais
+abertas à consulta ajuda a entender as regras, tirar dúvidas e avançar com mais
+segurança na implementação.
+
+- [Calculadora de Tributos — Regime Regular](https://github.com/ReceitaFederal/calculadora-rtc-regime-regular)
+- [Calculadora de Tributos — Simples Nacional](https://github.com/ReceitaFederal/calculadora-rtc-simples-nacional)
+- [DANFSe Service](https://github.com/ReceitaFederal/calculadora-rtc-gerador-danfse)
+
+O SPED-NFe é uma biblioteca muito robusta, escrita em PHP, e um ótimo trabalho
+do Roberto Machado. Um dos motivos que me levaram ao Rust foi a possibilidade
+de criar aplicações desktop nativas.
+
+Peraí, mas o ACBr também é desktop! Pois é. O ACBr, criado pelo Daniel Simões
+de Almeida, é outro projeto que admiro. Ele foi escrito em Object Pascal, com
+suporte a Delphi e Lazarus. Uma vantagem que vejo nessa linguagem é dispensar
+um coletor de lixo (*garbage collector*).
+
+Pra ser sincero, eu me sinto mais à vontade programando em Rust, e foi por isso
+que escolhi a linguagem para desenvolver a `dfe`. Espero que a crate seja
+útil. Valeu!
+
 ## Licença
 
 MIT — veja [LICENSE](LICENSE).
