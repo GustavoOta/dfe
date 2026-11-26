@@ -1,3 +1,10 @@
+# Fim de linha: LF no índice e na pasta de trabalho, em qualquer sistema. O atributo eol vale
+# mais que o core.autocrlf=true do Windows, então checkout/restore/stash não trazem CRLF de volta.
+* text=auto eol=lf
+# O cmd.exe pode errar o salto de goto/call :rótulo em .bat/.cmd com LF: esses ficam CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
 # Scripts de shell sempre com LF: rodam no Linux/WSL, e o CRLF do checkout no Windows
 # (core.autocrlf=true) quebra o bash com "\r: command not found".
 *.sh text eol=lf
