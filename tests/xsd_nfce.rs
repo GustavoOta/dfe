@@ -8,7 +8,7 @@ mod common;
 const DATA_CONTINGENCIA: &str = "2026-11-25T09:59:00-03:00";
 const JUSTIFICATIVA: &str = "Falha de comunicacao com a SEFAZ";
 
-async fn gerar_nfce_offline() -> String {
+fn nfce_offline(ind_pres: u8) -> NFeBuilder {
     let cert = common::fixtures_dir().join("cert/sintetico_aes.pfx");
     let item = Det {
         c_prod: "001".into(),
@@ -35,6 +35,7 @@ async fn gerar_nfce_offline() -> String {
             tp_amb: common::HOMOLOGACAO,
             dh_cont: Some(DATA_CONTINGENCIA.into()),
             x_just: Some(JUSTIFICATIVA.into()),
+            ind_pres,
             ..Default::default()
         })
         .emitente(Emit {
@@ -60,9 +61,6 @@ async fn gerar_nfce_offline() -> String {
             ..Default::default()
         })
         .total(Total::default())
-        .gerar_xml()
-        .await
-        .expect("gerar e assinar a NFC-e em contingência com o certificado sintético")
 }
 
 fn substituir(xml: &str, original: &str, novo: &str) -> String {
@@ -87,7 +85,7 @@ fn conferir_xsd(caso: &str, xml: &str, deve_aceitar: bool) {
 
 #[tokio::test]
 async fn nfce_offline_referencia_xsd() {
-    let xml = gerar_nfce_offline().await;
+    let xml = nfce_offline(1).gerar_xml().await.expect("gerar e assinar a NFC-e com certificado sintético");
     assert!(xml.contains("<mod>65</mod>") && xml.contains("<tpEmis>9</tpEmis>"));
     assert!(xml.contains("<qrCode><![CDATA[") && xml.contains("|3|2|"));
     assert!(!xml.contains("<protNFe"));
@@ -139,4 +137,13 @@ async fn nfce_offline_referencia_xsd() {
         &substituir(&xml, &grupo, ""),
         true,
     );
+}
+
+#[tokio::test]
+async fn operacao_direta_nao_presencial_leva_ind_intermed_ao_xml() {
+    let xml = nfce_offline(9).sem_intermediador().gerar_xml().await.unwrap();
+    assert!(xml.contains("<indPres>9</indPres><indIntermed>0</indIntermed><procEmi>"));
+    conferir_xsd("indIntermed de operação direta", &xml, true);
+    let erro = nfce_offline(1).sem_intermediador().gerar_xml().await.unwrap_err();
+    assert!(matches!(erro, DfeError::Validacao(s) if s.contains("indIntermed")));
 }

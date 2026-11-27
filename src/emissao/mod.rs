@@ -98,6 +98,7 @@ pub struct NFeBuilder {
     cert_path: Option<String>,
     cert_pass: Option<String>,
     ide: Option<Ide>,
+    operacao_sem_intermediador: bool,
     emitente: Option<Emit>,
     destinatario: Option<Dest>,
     itens: Vec<Det>,
@@ -122,7 +123,7 @@ impl NFeBuilder {
     /// Cria um builder vazio. Chame os métodos de configuração antes de [`emitir`](Self::emitir).
     pub fn new() -> Self {
         Self {
-            cert_path: None, cert_pass: None, ide: None, emitente: None,
+            cert_path: None, cert_pass: None, ide: None, operacao_sem_intermediador: false, emitente: None,
             destinatario: None, itens: Vec::new(), total: None, transporte: None,
             pagamento: None, informacoes_adicionais: None, id_csc: None, csc: None,
             active_ibs_cbs: None, desconto_rateio: None, frete_rateio: None, outro_rateio: None,
@@ -137,6 +138,9 @@ impl NFeBuilder {
     }
     /// Identificação do documento (`<ide>`). **Obrigatório.**
     pub fn ide(mut self, ide: Ide)       -> Self { self.ide = Some(ide); self }
+    /// Informa indIntermed=0 para uma venda direta não presencial (indPres 2, 3, 4 ou 9).
+    /// Sem esta chamada o XML conserva o comportamento anterior.
+    pub fn sem_intermediador(mut self) -> Self { self.operacao_sem_intermediador = true; self }
     /// Dados do emitente (`<emit>`). **Obrigatório.**
     pub fn emitente(mut self, e: Emit)   -> Self { self.emitente = Some(e); self }
     /// Dados do destinatário (`<dest>`). Obrigatório para NF-e modelo 55.
@@ -235,6 +239,14 @@ impl NFeBuilder {
         let pagamento  = self.pagamento.ok_or_else(|| DfeError::Validacao("pagamento não informado".to_string()))?;
 
         validar_contingencia(&ide)?;
+        let ind_intermed = if self.operacao_sem_intermediador {
+            if !matches!(ide.ind_pres, 2 | 3 | 4 | 9) {
+                return Err(DfeError::Validacao("indIntermed só se aplica a indPres 2, 3, 4 ou 9.".into()));
+            }
+            Some(0)
+        } else {
+            None
+        };
         // Ajuste SINIEF 32/2025: NF-e de saída não referencia NFC-e/CF-e (produção 14/12/2026).
         referencia_cupom::validar_referencias(&ide, &self.referencias, chrono::Local::now().date_naive())?;
 
@@ -245,6 +257,7 @@ impl NFeBuilder {
         Ok(NFeInterno {
             cert_path, cert_pass, id_csc: self.id_csc, csc: self.csc,
             ide, emit: emitente, dest: self.destinatario,
+            ind_intermed,
             det: self.itens, total, transp: transporte, pag: pagamento,
             inf_adic: self.informacoes_adicionais,
             active_ibs_cbs: self.active_ibs_cbs,

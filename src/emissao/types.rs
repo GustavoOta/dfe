@@ -11,6 +11,7 @@ pub(super) struct NFeInterno {
     pub id_csc: Option<String>,
     pub csc: Option<String>,
     pub ide: Ide,
+    pub ind_intermed: Option<u8>,
     pub emit: Emit,
     pub dest: Option<Dest>,
     pub det: Vec<Det>,

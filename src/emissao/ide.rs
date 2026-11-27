@@ -124,6 +124,10 @@ pub struct IdeProcess {
     #[serde(rename = "indPres")]
     pub ind_pres: u8,
 
+    /// 0=Operação direta, sem intermediador.
+    #[serde(rename = "indIntermed", skip_serializing_if = "Option::is_none")]
+    pub ind_intermed: Option<u8>,
+
     /// Processo de emissão da NF-e
     /// 0=Emissão de NF-e com aplicativo do contribuinte;
     /// 1=Emissão de NF-e avulsa pelo Fisco;

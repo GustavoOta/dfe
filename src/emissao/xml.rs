@@ -87,6 +87,7 @@ pub(super) async fn build_signed_xml(nfe: NFeInterno) -> Result<SignedNfe> {
         fin_nfe: nfe.ide.fin_nfe,
         ind_final: nfe.ide.ind_final,
         ind_pres: nfe.ide.ind_pres,
+        ind_intermed: nfe.ind_intermed,
         proc_emi: nfe.ide.proc_emi,
         ver_proc: nfe.ide.ver_proc.clone(),
         dh_cont: nfe.ide.dh_cont.clone(),
